@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run python tasks.py test *)",
+      "Bash(uv run python tasks.py test-all)",
+      "Bash(uv run python tasks.py run *)",
+      "Bash(uv run python tasks.py list)",
+      "Bash(git status)",
+      "Bash(git status:*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git show*)",
+      "Bash(git branch)",
+      "Bash(git branch*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+
+      "Bash(mkdir*)",
+      "Read(.claude/templates/**)",
+      "Write(problems/**)",
+      "Read(problems/**)",
+      "Edit(problems/**)",
+      "Read(CLAUDE.md)",
+      "Edit(CLAUDE.md)"
+    ]
+  }
+}
