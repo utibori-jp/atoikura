@@ -16,26 +16,19 @@
 
 ---
 
-## Getting Started
+## Development
 
-```bash
-# リポジトリをクローン
-git clone <repo-url>
-cd atoikura
-
-# 環境変数を設定
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-
-# 起動
-docker compose up
+### Start the database
+```
+docker compose up -d db
 ```
 
-起動後:
+### Stop everything
+```
+docker compose down
+```
 
-- フロントエンド: http://localhost:5173
-- バックエンド API: http://localhost:8080
-- ヘルスチェック: `GET http://localhost:8080/health`
+(Backend and frontend containers will be runnable after Step 5 and Step 7 respectively.)
 
 ---
 
