@@ -1,0 +1,1767 @@
+openapi: 3.1.0
+
+info:
+  title: atoikura API
+  version: 0.1.0
+  description: |
+    個人開発の家計簿アプリ「atoikura」のバックエンドAPI。
+    コアバリュー：「今月俺はあといくら使えるのかがいつでも確認できるアプリ」
+
+servers:
+  - url: http://localhost:8080
+    description: ローカル開発環境
+
+security:
+  - basicAuth: []
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: |
+        Basic認証（Ver1）。
+        クライアントはすべてのリクエストの `Authorization` ヘッダーに
+        `Basic {Base64(email:password)}` を付与する。
+        バックエンドはヘッダーをデコードしてDBのユーザーと照合し、
+        一致すれば処理続行、不一致なら401を返す。
+        毎リクエストで認証情報を検証するため、ログイン用エンドポイントは存在しない。
+
+  responses:
+    Unauthorized:
+      description: 認証失敗
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: UNAUTHORIZED
+            message: "認証情報が不正です"
+
+    InternalServerError:
+      description: サーバー内部エラー
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: INTERNAL_SERVER_ERROR
+            message: "予期しないエラーが発生しました"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: エラーコード
+        message:
+          type: string
+          description: エラーメッセージ
+
+    DailyEntry:
+      type: object
+      required:
+        - date
+        - food
+        - other
+        - total
+        - is_actual
+      properties:
+        date:
+          type: string
+          format: date
+          description: 日付（YYYY-MM-DD）
+          example: "2025-05-05"
+        food:
+          type: integer
+          description: 当日時点の変動費食費累積額（円）
+          example: 15000
+        other:
+          type: integer
+          description: 当日時点の変動費その他累積額（円）
+          example: 20000
+        total:
+          type: integer
+          description: 当日時点の変動費合計累積額（円）
+          example: 35000
+        is_actual:
+          type: boolean
+          description: |
+            true = 実績値（今日以前）
+            false = 予測値（明日以降。今日時点の日次ペースで積み上げ）
+          example: true
+
+    DailyCumulativeResponse:
+      type: object
+      required:
+        - year_month
+        - monthly_budget
+        - daily_budget
+        - days
+      properties:
+        year_month:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+          description: 対象年月（YYYY-MM）
+          example: "2025-05"
+        monthly_budget:
+          type: integer
+          description: 月次変動費予算（円）
+          example: 150000
+        daily_budget:
+          type: integer
+          description: |
+            日割り予算（円）
+            monthly_budget ÷ 当月日数、小数切り捨て
+          example: 4839
+        days:
+          type: array
+          description: 当月1日〜末日の全日付分のデータ
+          items:
+            $ref: '#/components/schemas/DailyEntry'
+
+    StatementTypeSummary:
+      type: object
+      required:
+        - id
+        - type_code
+        - statement_type_name
+      properties:
+        id:
+          type: integer
+          description: 変動費分析用グループID
+          example: 1
+        type_code:
+          type: string
+          description: 変動費分析用グループコード
+          example: "food"
+        statement_type_name:
+          type: string
+          description: 変動費分析用グループ表示名
+          example: "食費"
+
+    CategoryGroup:
+      type: object
+      required:
+        - id
+        - group_name
+        - statement_type
+      properties:
+        id:
+          type: integer
+          description: 大分類ID
+          example: 1
+        group_name:
+          type: string
+          description: 大分類名
+          example: "食費"
+        statement_type:
+          $ref: '#/components/schemas/StatementTypeSummary'
+        description:
+          type: string
+          nullable: true
+          description: 説明
+          example: "日常の食費全般"
+
+    CategoryGroupListResponse:
+      type: object
+      required:
+        - category_groups
+      properties:
+        category_groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryGroup'
+
+    ExpenseCategory:
+      type: object
+      required:
+        - id
+        - category_name
+        - group_id
+        - group_name
+      properties:
+        id:
+          type: integer
+          description: 生活区分ID
+          example: 1
+        category_name:
+          type: string
+          description: 生活区分名
+          example: "スーパー"
+        category_code:
+          type: string
+          nullable: true
+          description: 生活区分コード
+          example: "food_super"
+        group_id:
+          type: integer
+          description: 紐づく大分類ID
+          example: 1
+        group_name:
+          type: string
+          description: 紐づく大分類名
+          example: "食費"
+        description:
+          type: string
+          nullable: true
+          description: 説明
+          example: null
+
+    ExpenseCategoryListResponse:
+      type: object
+      required:
+        - expense_categories
+      properties:
+        expense_categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseCategory'
+
+    JournalEntryRequest:
+      type: object
+      required:
+        - transaction_date
+        - amount
+        - category_id
+        - is_excluded
+      properties:
+        transaction_date:
+          type: string
+          format: date
+          description: 取引日（YYYY-MM-DD）
+          example: "2025-05-05"
+        item:
+          type: string
+          nullable: true
+          description: 項目名（コンビニ、ランチ代など）
+          example: "コンビニ"
+        amount:
+          type: integer
+          description: 金額（円、正の整数）
+          example: 650
+        category_id:
+          type: integer
+          description: 生活区分ID
+          example: 1
+        is_excluded:
+          type: boolean
+          description: |
+            集計除外フラグ。
+            true にすると変動費集計から除外される（特別出費など）。デフォルトはfalse（集計対象）
+          example: true
+        note:
+          type: string
+          nullable: true
+          description: 補足コメント
+          example: "昼飯"
+
+    JournalEntryResponse:
+      type: object
+      required:
+        - id
+        - transaction_date
+        - amount
+        - category_id
+        - category_name
+        - group_id
+        - group_name
+        - is_excluded
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: 仕訳ID
+          example: 42
+        transaction_date:
+          type: string
+          format: date
+          description: 取引日（YYYY-MM-DD）
+          example: "2025-05-05"
+        item:
+          type: string
+          nullable: true
+          description: 項目名
+          example: "コンビニ"
+        amount:
+          type: integer
+          description: 金額（円）
+          example: 650
+        category_id:
+          type: integer
+          description: 生活区分ID
+          example: 1
+        category_name:
+          type: string
+          description: 生活区分名
+          example: "スーパー"
+        group_id:
+          type: integer
+          description: 大分類ID
+          example: 1
+        group_name:
+          type: string
+          description: 大分類名
+          example: "食費"
+        is_excluded:
+          type: boolean
+          description: 集計除外フラグ（trueで集計から除外）
+          example: true
+        note:
+          type: string
+          nullable: true
+          description: 補足コメント
+          example: "昼飯"
+        created_at:
+          type: string
+          format: date-time
+          description: 登録日時（RFC3339）
+          example: "2025-05-05T12:34:56Z"
+
+    CategoryGroupRequest:
+      type: object
+      required:
+        - group_name
+        - statement_type_id
+      properties:
+        group_name:
+          type: string
+          description: 大分類名(ユーザー内でユニーク)
+          example: "日用品"
+        statement_type_id:
+          type: integer
+          description: 変動費分析用グループID（statement_types.id）
+          example: 2
+        description:
+          type: string
+          nullable: true
+          description: 説明
+          example: "シャンプーや洗剤など"
+
+    ExpenseCategoryRequest:
+      type: object
+      required:
+        - category_name
+        - group_id
+      properties:
+        category_name:
+          type: string
+          description: 生活区分名（同一大分類内でユニーク）
+          example: "ドラッグストア"
+        group_id:
+          type: integer
+          description: 紐づく大分類ID
+          example: 3
+        description:
+          type: string
+          nullable: true
+          description: 説明
+          example: "日用品の購入など"
+
+    MonthlyBreakdownItem:
+      type: object
+      required:
+        - category_id
+        - category_name
+        - group_id
+        - group_name
+        - statement_type_id
+        - statement_type_name
+        - total
+      properties:
+        category_id:
+          type: integer
+          description: 生活区分ID
+          example: 1
+        category_name:
+          type: string
+          description: 生活区分名
+          example: "スーパー"
+        group_id:
+          type: integer
+          description: 大分類ID
+          example: 1
+        group_name:
+          type: string
+          description: 大分類名（is_excludedで対象外になった仕訳も元の大分類名をそのまま使う）
+          example: "食費"
+        statement_type_id:
+          type: integer
+          description: |
+            変動費分析用グループID。
+            is_excluded = true の仕訳は対象外のIDに上書きされる
+          example: 1
+        statement_type_name:
+          type: string
+          description: |
+            変動費分析用グループ名。
+            is_excluded = true の仕訳は「対象外」に上書きされる
+          example: "食費（変動費）"
+        total:
+          type: integer
+          description: 合計金額（円）
+          example: 24800
+
+    MonthlyBreakdownResponse:
+      type: object
+      required:
+        - year_month
+        - breakdown
+      properties:
+        year_month:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+          description: 対象年月（YYYY-MM）
+          example: "2025-04"
+        breakdown:
+          type: array
+          description: 生活区分単位の集計リスト
+          items:
+            $ref: '#/components/schemas/MonthlyBreakdownItem'
+
+    BudgetResponse:
+      type: object
+      properties:
+        monthly_budget:
+          type: integer
+          nullable: true
+          description: 月次変動費予算（円）。未設定時はnull
+          example: 150000
+        goal_text:
+          type: string
+          nullable: true
+          description: 貯金目標テキスト。未設定時はnull
+          example: "夏までに旅行費を貯める"
+        goal_amount:
+          type: integer
+          nullable: true
+          description: 目標金額（円）。未設定時はnull
+          example: 300000
+
+    BudgetRequest:
+      type: object
+      properties:
+        monthly_budget:
+          type: integer
+          nullable: true
+          description: 月次変動費予算（円）。nullで未設定に戻る。1以上の整数のみ許容
+          example: 120000
+        goal_text:
+          type: string
+          nullable: true
+          description: 貯金目標テキスト。nullで未設定に戻る
+          example: "夏までに旅行費を貯める"
+        goal_amount:
+          type: integer
+          nullable: true
+          description: 目標金額（円）。nullで未設定に戻る
+          example: 300000
+
+    MonthlyReviewNote:
+      type: object
+      required:
+        - category_id
+        - note
+      properties:
+        category_id:
+          type: integer
+          description: 生活区分ID
+          example: 1
+        note:
+          type: string
+          description: メモテキスト
+          example: "スーパーで買いすぎた。特売につられがち"
+
+    MonthlyReviewResponse:
+      type: object
+      required:
+        - year_month
+        - notes
+      properties:
+        year_month:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+          description: 対象年月（YYYY-MM）
+          example: "2025-04"
+        notes:
+          type: array
+          description: |
+            生活区分ごとのメモ一覧。
+            メモが存在しない月は空配列を返す。
+          items:
+            $ref: '#/components/schemas/MonthlyReviewNote'
+
+    DailyJournalEntries:
+      type: object
+      required:
+        - date
+        - journal_entries
+      properties:
+        date:
+          type: string
+          format: date
+          description: 日付（YYYY-MM-DD）
+          example: "2025-05-05"
+        journal_entries:
+          type: array
+          description: その日の仕訳一覧（id降順）
+          items:
+            $ref: '#/components/schemas/JournalEntryResponse'
+
+    JournalEntryListResponse:
+      type: object
+      required:
+        - year_month
+        - entries
+      properties:
+        year_month:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+          description: 対象年月（YYYY-MM）
+          example: "2025-05"
+        entries:
+          type: array
+          description: 日付ごとの仕訳グループ（日付降順）。0件月は空配列
+          items:
+            $ref: '#/components/schemas/DailyJournalEntries'
+
+    DailyNote:
+      type: object
+      required:
+        - date
+        - note
+      properties:
+        date:
+          type: string
+          format: date
+          description: 日付（YYYY-MM-DD）
+          example: "2025-05-05"
+        note:
+          type: string
+          nullable: true
+          description: コメントテキスト。空文字送信後の削除状態ではnullを返す
+          example: "ディズニー行ったから出費多め"
+
+    DailyNoteListResponse:
+      type: object
+      required:
+        - year_month
+        - notes
+      properties:
+        year_month:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+          description: 対象年月（YYYY-MM）
+          example: "2025-05"
+        notes:
+          type: array
+          description: 日付ごとのコメント一覧。コメントなし月は空配列
+          items:
+            $ref: '#/components/schemas/DailyNote'
+
+paths:
+  /expenses/daily-cumulative:
+    get:
+      summary: グラフ用日次累積取得
+      description: |
+        ホーム画面の折れ線グラフ用データを返す。
+        当月1日〜末日の全日付分を返す。
+
+        **集計ルール：**
+        - `journal_entries.is_excluded = false` の仕訳のみ集計対象
+        - `statement_types.type_code` で食費（`food`）／その他（`other`）に分類
+        - 今日以前：実績の累積値（`is_actual: true`）
+        - 明日以降：今日時点の日次ペースで積み上げた予測値（`is_actual: false`）
+          - 例）5日時点で食費15,000円なら、6日以降は+3,000円/日で積み上げ
+
+        **基準線の計算はフロント側で処理する（`daily_budget`を使って描画）。**
+      operationId: getDailyCumulative
+      tags:
+        - expenses
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyCumulativeResponse'
+              example:
+                year_month: "2025-05"
+                monthly_budget: 150000
+                daily_budget: 4839
+                days:
+                  - date: "2025-05-01"
+                    food: 3200
+                    other: 5100
+                    total: 8300
+                    is_actual: true
+                  - date: "2025-05-05"
+                    food: 15000
+                    other: 20000
+                    total: 35000
+                    is_actual: true
+                  - date: "2025-05-06"
+                    food: 18000
+                    other: 24000
+                    total: 42000
+                    is_actual: false
+                  - date: "2025-05-31"
+                    food: 93000
+                    other: 124000
+                    total: 217000
+                    is_actual: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /expenses/monthly-breakdown:
+    get:
+      summary: 月次支出内訳取得
+      description: |
+        指定月の支出を生活区分単位で集計して返す。
+        振り返り画面の3段構成（statement_type → category_group → expense_category）への組み立てはフロント側で行う。
+
+        **集計ルール：**
+        - `is_excluded = false`：`statement_type` そのままで集計
+        - `is_excluded = true`：`statement_type` を対象外に強制上書きして集計。`group_name` は元の大分類をそのまま使う
+        - 論理削除済みの生活区分（`is_deleted = true`）に紐づく仕訳も集計に含める
+
+        **利用画面：**
+        - 振り返り画面：カテゴリ別支出内訳
+      operationId: getMonthlyBreakdown
+      tags:
+        - expenses
+      parameters:
+        - name: year_month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+          description: 対象年月（YYYY-MM）
+          example: "2025-04"
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyBreakdownResponse'
+              example:
+                year_month: "2025-04"
+                breakdown:
+                  - category_id: 1
+                    category_name: "スーパー"
+                    group_id: 1
+                    group_name: "食費"
+                    statement_type_id: 1
+                    statement_type_name: "食費（変動費）"
+                    total: 24800
+                  - category_id: 2
+                    category_name: "外食"
+                    group_id: 1
+                    group_name: "食費"
+                    statement_type_id: 3
+                    statement_type_name: "対象外"
+                    total: 15000
+        '400':
+          description: year_monthの形式不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "year_monthはYYYY-MM形式で指定してください"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /category-groups:
+    get:
+      summary: 大分類一覧取得
+      description: |
+        ログインユーザーの大分類一覧を返す。
+        論理削除済み（`is_deleted = true`）は除外。
+        `statement_types` をJOINして返すため、フロント側での結合は不要。
+        `group_name` の昇順で返す。
+
+        **利用画面：**
+        - ホーム：仕訳入力フォームの大分類プルダウン
+        - マスタ管理：大分類一覧表示・編集
+        - 仕訳一覧：仕訳入力フォームの大分類プルダウン
+      operationId: getCategoryGroups
+      tags:
+        - category-groups
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryGroupListResponse'
+              example:
+                category_groups:
+                  - id: 1
+                    group_name: "食費"
+                    statement_type:
+                      id: 1
+                      type_code: "food"
+                      statement_type_name: "食費"
+                    description: "日常の食費全般"
+                  - id: 2
+                    group_name: "交通費"
+                    statement_type:
+                      id: 2
+                      type_code: "other"
+                      statement_type_name: "その他"
+                    description: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: 大分類作成
+      description: |
+        新しい大分類を作成する。
+        `group_name` はログインユーザー内でユニーク。重複時は409を返す。
+
+        **利用画面：**
+        - マスタ管理：大分類追加
+      operationId: createCategoryGroup
+      tags:
+        - category-groups
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryGroupRequest'
+            example:
+              group_name: "日用品"
+              statement_type_id: 2
+              description: "シャンプーや洗剤など"
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryGroup'
+              example:
+                id: 3
+                group_name: "日用品"
+                statement_type:
+                  id: 2
+                  type_code: "other"
+                  statement_type_name: "その他"
+                description: "シャンプーや洗剤など"
+        '400':
+          description: リクエスト不正（必須項目欠落・statement_type_idが存在しないなど）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "group_nameは必須です"
+        '409':
+          description: 大分類名が重複している
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: CONFLICT
+                message: "同名の大分類が既に存在します"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /category-groups/{id}:
+    put:
+      summary: 大分類更新
+      description: |
+        指定した大分類を更新する。全フィールドを毎回送信する（PUT）。
+        フロント側は編集画面を開いた時点で既存値をプリフィルし、変更分だけ上書きして送る。
+
+        - 論理削除済み・他ユーザーのリソースは404を返す（リソースの存在を露出しない）
+
+        **利用画面：**
+        - マスタ管理：大分類編集
+      operationId: updateCategoryGroup
+      tags:
+        - category-groups
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 大分類ID
+          example: 3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryGroupRequest'
+            example:
+              group_name: "日用品・消耗品"
+              statement_type_id: 2
+              description: "シャンプーや洗剤など"
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryGroup'
+              example:
+                id: 3
+                group_name: "日用品・消耗品"
+                statement_type:
+                  id: 2
+                  type_code: "other"
+                  statement_type_name: "その他"
+                description: "シャンプーや洗剤など"
+        '400':
+          description: リクエスト不正（必須項目欠落・statement_type_idが存在しないなど）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "group_nameは必須です"
+        '404':
+          description: 指定した大分類が存在しない（論理削除済み・他ユーザーのリソースを含む）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: NOT_FOUND
+                message: "大分類が見つかりません"
+        '409':
+          description: 変更後の大分類名が既存と重複している
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: CONFLICT
+                message: "同名の大分類が既に存在します"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: 大分類削除
+      description: |
+        指定した大分類を論理削除する（`is_deleted = true`）。
+
+        - 紐づく生活区分（`expense_categories`）が1件以上存在する場合は削除を拒否し400を返す
+        - 論理削除済み・他ユーザーのリソースは404を返す
+
+        **利用画面：**
+        - マスタ管理：大分類削除
+      operationId: deleteCategoryGroup
+      tags:
+        - category-groups
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 大分類ID
+          example: 3
+      responses:
+        '204':
+          description: 削除成功（ボディなし）
+        '400':
+          description: 紐づく生活区分が存在するため削除不可
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "紐づく生活区分が存在するため削除できません"
+        '404':
+          description: 指定した大分類が存在しない（論理削除済み・他ユーザーのリソースを含む）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: NOT_FOUND
+                message: "大分類が見つかりません"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /expense-categories:
+    get:
+      summary: 生活区分一覧取得
+      description: |
+        ログインユーザーの生活区分一覧を返す。
+        論理削除済み（`is_deleted = true`）は除外。
+        `category_groups` をJOINして返すため、フロント側での結合は不要。
+        `group_name` → `category_name` の2段昇順ソートで返す。
+
+        **利用画面：**
+        - ホーム：仕訳入力フォームの生活区分プルダウン（大分類選択による絞り込みはフロント側で処理）
+        - マスタ管理：生活区分一覧表示・編集（大分類ごとに固まって表示）
+        - 仕訳一覧：仕訳入力フォームの生活区分プルダウン
+      operationId: getExpenseCategories
+      tags:
+        - expense-categories
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategoryListResponse'
+              example:
+                expense_categories:
+                  - id: 1
+                    category_name: "スーパー"
+                    category_code: "food_super"
+                    group_id: 1
+                    group_name: "食費"
+                    description: null
+                  - id: 2
+                    category_name: "外食"
+                    category_code: "food_eat_out"
+                    group_id: 1
+                    group_name: "食費"
+                    description: "レストラン・カフェ等"
+                  - id: 3
+                    category_name: "電車・バス"
+                    category_code: null
+                    group_id: 2
+                    group_name: "交通費"
+                    description: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: 生活区分作成
+      description: |
+        新しい生活区分を作成する。
+        `category_name` は同一大分類内（`user_id + group_id`）でユニーク。重複時は409を返す。
+
+        **利用画面：**
+        - マスタ管理：生活区分追加
+      operationId: createExpenseCategory
+      tags:
+        - expense-categories
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseCategoryRequest'
+            example:
+              category_name: "ドラッグストア"
+              group_id: 3
+              description: "日用品の購入など"
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategory'
+              example:
+                id: 10
+                category_name: "ドラッグストア"
+                category_code: null
+                group_id: 3
+                group_name: "日用品・消耗品"
+                description: "日用品の購入など"
+        '400':
+          description: リクエスト不正（必須項目欠落・group_idが存在しないなど）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "category_nameは必須です"
+        '409':
+          description: 同一大分類内で生活区分名が重複している
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: CONFLICT
+                message: "同名の生活区分が既に存在します"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /expense-categories/{id}:
+    put:
+      summary: 生活区分更新
+      description: |
+        指定した生活区分を更新する。全フィールドを毎回送信する（PUT）。
+        `group_id` の変更も許容する（別の大分類への付け替え）。
+        付け替え後は振り返り画面の集計が新しい大分類で行われる。
+
+        - 論理削除済み・他ユーザーのリソースは404を返す
+
+        **利用画面：**
+        - マスタ管理：生活区分編集
+      operationId: updateExpenseCategory
+      tags:
+        - expense-categories
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 生活区分ID
+          example: 10
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseCategoryRequest'
+            example:
+              category_name: "ドラッグストア・薬局"
+              group_id: 3
+              description: "日用品の購入など"
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategory'
+              example:
+                id: 10
+                category_name: "ドラッグストア・薬局"
+                category_code: null
+                group_id: 3
+                group_name: "日用品・消耗品"
+                description: "日用品の購入など"
+        '400':
+          description: リクエスト不正（必須項目欠落・group_idが存在しないなど）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "category_nameは必須です"
+        '404':
+          description: 指定した生活区分が存在しない（論理削除済み・他ユーザーのリソースを含む）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: NOT_FOUND
+                message: "生活区分が見つかりません"
+        '409':
+          description: 変更後の生活区分名が同一大分類内で重複している
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: CONFLICT
+                message: "同名の生活区分が既に存在します"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: 生活区分削除
+      description: |
+        指定した生活区分を論理削除する（`is_deleted = true`）。
+        削除後はその生活区分は新規仕訳の登録に使用できなくなる。
+        過去の仕訳データはそのまま保持され、仕訳一覧・振り返り画面での集計にも引き続き使用される。
+
+        - 論理削除済み・他ユーザーのリソースは404を返す
+
+        **実装上の注意：**
+        仕訳一覧・振り返り画面でJOINする際は `is_deleted = true` の生活区分も含めること。
+        除外すると過去仕訳の表示が壊れる。
+
+        **利用画面：**
+        - マスタ管理：生活区分削除
+      operationId: deleteExpenseCategory
+      tags:
+        - expense-categories
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 生活区分ID
+          example: 10
+      responses:
+        '204':
+          description: 削除成功（ボディなし）
+        '404':
+          description: 指定した生活区分が存在しない（論理削除済み・他ユーザーのリソースを含む）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: NOT_FOUND
+                message: "生活区分が見つかりません"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /statement-types:
+    get:
+      summary: 変動費分析用グループ一覧取得
+      description: |
+        変動費分析用グループの一覧を返す。固定マスタのためCRUDなし。
+        大分類の追加・編集フォームのプルダウン表示に使用する。
+        `id` 昇順で返す。
+
+        **利用画面：**
+        - マスタ管理：大分類追加・編集フォームのプルダウン
+      operationId: getStatementTypes
+      tags:
+        - statement-types
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - statement_types
+                properties:
+                  statement_types:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StatementTypeSummary'
+              example:
+                statement_types:
+                  - id: 1
+                    type_code: "food"
+                    statement_type_name: "食費"
+                  - id: 2
+                    type_code: "other"
+                    statement_type_name: "その他"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /budgets:
+    get:
+      summary: 予算・目標取得
+      description: |
+        ログインユーザーの予算・目標設定を返す。
+        レコードが未作成の場合も200を返し、全フィールドをnullで返す。
+
+        **利用画面：**
+        - 目標設定画面：初期表示
+      operationId: getBudgets
+      tags:
+        - budgets
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetResponse'
+              example:
+                monthly_budget: 150000
+                goal_text: "夏までに旅行費を貯める"
+                goal_amount: 300000
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      summary: 予算・目標更新
+      description: |
+        ログインユーザーの予算・目標設定を更新する。
+        レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
+        全フィールド任意。変更しないフィールドは現在値をそのまま送ること。
+        nullを送ると未設定状態に戻る。
+        `monthly_budget` に0以下の値を送った場合は400を返す。
+
+        **利用画面：**
+        - 目標設定画面：保存
+      operationId: updateBudgets
+      tags:
+        - budgets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetRequest'
+            example:
+              monthly_budget: 120000
+              goal_text: "夏までに旅行費を貯める"
+              goal_amount: 300000
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetResponse'
+              example:
+                monthly_budget: 120000
+                goal_text: "夏までに旅行費を貯める"
+                goal_amount: 300000
+        '400':
+          description: リクエスト不正（monthly_budgetが0以下など）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "monthly_budgetは1以上の整数である必要があります"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /journal-entries:
+    get:
+      summary: 仕訳一覧取得
+      description: |
+        指定月の仕訳一覧を日付ごとにグループ化して返す。
+        日付降順、各日付内はid降順（登録が新しい順）。
+
+        **利用画面：**
+        - 仕訳一覧：指定月の仕訳履歴表示
+      operationId: getJournalEntries
+      tags:
+        - journal-entries
+      parameters:
+        - name: year_month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+          description: 対象年月（YYYY-MM）
+          example: "2025-05"
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JournalEntryListResponse'
+              example:
+                year_month: "2025-05"
+                entries:
+                  - date: "2025-05-05"
+                    journal_entries:
+                      - id: 43
+                        transaction_date: "2025-05-05"
+                        item: "ランチ"
+                        amount: 1200
+                        category_id: 2
+                        category_name: "外食"
+                        group_id: 1
+                        group_name: "食費"
+                        is_excluded: false
+                        note: null
+                        created_at: "2025-05-05T13:00:00Z"
+                      - id: 42
+                        transaction_date: "2025-05-05"
+                        item: "コンビニ"
+                        amount: 650
+                        category_id: 1
+                        category_name: "スーパー"
+                        group_id: 1
+                        group_name: "食費"
+                        is_excluded: false
+                        note: "昼飯"
+                        created_at: "2025-05-05T12:34:56Z"
+                  - date: "2025-05-03"
+                    journal_entries:
+                      - id: 41
+                        transaction_date: "2025-05-03"
+                        item: "電車代"
+                        amount: 480
+                        category_id: 5
+                        category_name: "電車・バス"
+                        group_id: 2
+                        group_name: "交通費"
+                        is_excluded: false
+                        note: null
+                        created_at: "2025-05-03T09:10:00Z"
+        '400':
+          description: year_monthの形式不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "year_monthはYYYY-MM形式で指定してください"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: 仕訳登録
+      description: |
+        仕訳を新規登録する。
+
+        **利用画面：**
+        - ホーム：仕訳入力フォーム
+        - 仕訳一覧：仕訳追加
+
+        **フォームの操作フロー（フロント側）：**
+        大分類を選択 → 生活区分を大分類でフィルタリング → 生活区分を選択。
+        APIには選択結果の `category_id`（生活区分ID）のみ送信する。
+      operationId: createJournalEntry
+      tags:
+        - journal-entries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JournalEntryRequest'
+            example:
+              transaction_date: "2025-05-05"
+              item: "コンビニ"
+              amount: 650
+              category_id: 1
+              is_excluded: true
+              note: "昼飯"
+      responses:
+        '201':
+          description: 登録成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JournalEntryResponse'
+              example:
+                id: 42
+                transaction_date: "2025-05-05"
+                item: "コンビニ"
+                amount: 650
+                category_id: 1
+                category_name: "スーパー"
+                group_id: 1
+                group_name: "食費"
+                is_excluded: true
+                note: "昼飯"
+                created_at: "2025-05-05T12:34:56Z"
+        '400':
+          description: リクエスト不正（必須項目欠落・amountが0以下など）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "amountは正の整数である必要があります"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /journal-entries/{id}:
+    put:
+      summary: 仕訳更新
+      description: |
+        指定した仕訳を更新する。全フィールドを毎回送信する（PUT）。
+        `transaction_date` の変更も許容する（入力ミス修正のユースケースに対応）。
+
+        - 論理削除済み・他ユーザーのリソースは404を返す
+
+        **利用画面：**
+        - 仕訳一覧：仕訳編集・コメント修正
+      operationId: updateJournalEntry
+      tags:
+        - journal-entries
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 仕訳ID
+          example: 42
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JournalEntryRequest'
+            example:
+              transaction_date: "2025-05-05"
+              item: "コンビニ（修正）"
+              amount: 700
+              category_id: 1
+              is_excluded: false
+              note: "昼飯のついでに買い物"
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JournalEntryResponse'
+              example:
+                id: 42
+                transaction_date: "2025-05-05"
+                item: "コンビニ（修正）"
+                amount: 700
+                category_id: 1
+                category_name: "スーパー"
+                group_id: 1
+                group_name: "食費"
+                is_excluded: false
+                note: "昼飯のついでに買い物"
+                created_at: "2025-05-05T12:34:56Z"
+        '400':
+          description: リクエスト不正（必須項目欠落・amountが0以下など）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "amountは正の整数である必要があります"
+        '404':
+          description: 指定した仕訳が存在しない（論理削除済み・他ユーザーのリソースを含む）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: NOT_FOUND
+                message: "仕訳が見つかりません"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: 仕訳削除
+      description: |
+        指定した仕訳を物理削除する。
+        マスタ系（生活区分・大分類）の論理削除と異なり、仕訳は他テーブルから参照されないため物理削除とする。
+
+        - 他ユーザーのリソースは404を返す
+
+        **利用画面：**
+        - 仕訳一覧:仕訳削除
+      operationId: deleteJournalEntry
+      tags:
+        - journal-entries
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 仕訳ID
+          example: 42
+      responses:
+        '204':
+          description: 削除成功（ボディなし）
+        '404':
+          description: 指定した仕訳が存在しない（他ユーザーのリソースを含む）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: NOT_FOUND
+                message: "仕訳が見つかりません"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /notes/monthly-reviews:
+    get:
+      summary: 月次振り返りメモ取得
+      description: |
+        指定月の生活区分ごとの振り返りメモ一覧を返す。
+        `GET /expenses/monthly-breakdown` の集計データとフロント側で `category_id` をキーに突合して表示する。
+
+        レコードが未作成の場合も200を返し、`notes` を空配列で返す。
+
+        **利用画面：**
+        - 振り返り画面：生活区分ごとのメモ表示
+      operationId: getMonthlyReviews
+      tags:
+        - notes
+      parameters:
+        - name: year_month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+          description: 対象年月（YYYY-MM）
+          example: "2025-04"
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyReviewResponse'
+              example:
+                year_month: "2025-04"
+                notes:
+                  - category_id: 1
+                    note: "スーパーで買いすぎた。特売につられがち"
+                  - category_id: 3
+                    note: "今月は外食少なめで頑張れた"
+        '400':
+          description: year_monthの形式不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "year_monthはYYYY-MM形式で指定してください"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      summary: 月次振り返りメモ保存
+      description: |
+        指定月の生活区分ごとの振り返りメモを保存する。
+        レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
+        送信内容で **全件洗い替え**（jsonbを丸ごと置き換え）。
+
+        **空文字の扱い：**
+        `note` が空文字のエントリはサーバー側で除外してDBに保存しない。
+        ユーザーがメモを空にして保存した場合、そのカテゴリのメモは削除扱いになる。
+
+        `notes` を空配列で送ると、その月のメモを全件削除する。
+
+        **利用画面：**
+        - 振り返り画面：生活区分ごとのメモ保存
+      operationId: putMonthlyReviews
+      tags:
+        - notes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - year_month
+                - notes
+              properties:
+                year_month:
+                  type: string
+                  pattern: '^\d{4}-\d{2}$'
+                  description: 対象年月（YYYY-MM）
+                  example: "2025-04"
+                notes:
+                  type: array
+                  description: |
+                    生活区分ごとのメモ一覧。空配列で全件削除。
+                    `note` が空文字のエントリはサーバー側で除外する。
+                  items:
+                    $ref: '#/components/schemas/MonthlyReviewNote'
+            example:
+              year_month: "2025-04"
+              notes:
+                - category_id: 1
+                  note: "スーパーで買いすぎた。特売につられがち"
+                - category_id: 3
+                  note: "今月は外食少なめで頑張れた"
+                - category_id: 5
+                  note: ""
+      responses:
+        '200':
+          description: 保存成功（空文字エントリは除外して返す）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyReviewResponse'
+              example:
+                year_month: "2025-04"
+                notes:
+                  - category_id: 1
+                    note: "スーパーで買いすぎた。特売につられがち"
+                  - category_id: 3
+                    note: "今月は外食少なめで頑張れた"
+        '400':
+          description: リクエスト不正（year_month形式不正・必須項目欠落など）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "year_monthはYYYY-MM形式で指定してください"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /notes/daily:
+    get:
+      summary: 日次コメント一覧取得
+      description: |
+        指定月の日付ごとのコメント一覧を返す。
+        `GET /journal-entries` の仕訳一覧とフロント側で `date` をキーに突合して表示する。
+
+        コメントが存在しない月は空配列を返す。
+
+        **利用画面：**
+        - 仕訳一覧：日付ごとのコメント表示
+      operationId: getDailyNotes
+      tags:
+        - notes
+      parameters:
+        - name: year_month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+          description: 対象年月（YYYY-MM）
+          example: "2025-05"
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyNoteListResponse'
+              example:
+                year_month: "2025-05"
+                notes:
+                  - date: "2025-05-05"
+                    note: "ディズニー行ったから出費多め"
+                  - date: "2025-05-03"
+                    note: "飲み会"
+        '400':
+          description: year_monthの形式不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "year_monthはYYYY-MM形式で指定してください"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /notes/daily/{date}:
+    put:
+      summary: 日次コメント保存
+      description: |
+        指定日付のコメントを保存する。
+        レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
+
+        **空文字の扱い：**
+        `note` が空文字の場合、レコードを物理削除する。
+        レスポンスは `note: null` を返す（フロント側はステータスコードで挙動を分岐しなくてよい）。
+
+        **利用画面：**
+        - 仕訳一覧：日付ごとのコメント入力・編集
+      operationId: putDailyNote
+      tags:
+        - notes
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+          description: 対象日付（YYYY-MM-DD）
+          example: "2025-05-05"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - note
+              properties:
+                note:
+                  type: string
+                  description: コメントテキスト。空文字で削除扱い（レコードを物理削除し、nullを返す）
+                  example: "ディズニー行ったから出費多め"
+            example:
+              note: "ディズニー行ったから出費多め"
+      responses:
+        '200':
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyNote'
+              examples:
+                saved:
+                  summary: コメントあり
+                  value:
+                    date: "2025-05-05"
+                    note: "ディズニー行ったから出費多め"
+                deleted:
+                  summary: 空文字送信→削除（nullで返す）
+                  value:
+                    date: "2025-05-05"
+                    note: null
+        '400':
+          description: リクエスト不正（dateの形式不正・必須項目欠落など）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "dateはYYYY-MM-DD形式で指定してください"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'

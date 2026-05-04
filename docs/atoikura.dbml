@@ -1,0 +1,161 @@
+// Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+
+Table users {
+  id integer [primary key]
+  email varchar [not null, unique]
+  display_name varchar
+  last_name varchar
+  first_name varchar
+  password_hash varchar [not null]
+  avatar_url varchar
+  last_login_at timestamp
+  is_deleted boolean [not null, default: false]
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+  version integer
+}
+
+Table journal_entries {
+  id integer [primary key]
+  transaction_date date [not null]
+  item varchar                              // 変更: description → item
+  amount integer [not null]
+  // entry_id 削除: entriesテーブル廃止に伴い不要
+  is_excluded boolean [not null, default: false]       // 変更: is_variable_cost → is_excluded（除外フラグ。trueで集計から除外）
+  category_id integer [not null]
+  user_id integer [not null]
+  note text
+  created_at timestamp
+  updated_at timestamp
+  version integer
+}
+
+// entriesテーブル削除: 通常出費・特別出費の区分はis_variable_costで代替可能なため不要
+
+Table expense_categories {
+  id integer [primary key]
+  category_code varchar
+  category_name varchar
+  user_id integer [not null]
+  group_id integer [not null]
+  // statement_type_id 削除: category_groups経由で取得するため不要
+  // is_variable_cost 削除: journal_entries側で管理するため不要（is_excludedで代替）
+  description text
+  is_deleted boolean [not null, default: false]
+  // 注意: 論理削除後も journal_entries から参照される可能性がある。
+  // 仕訳一覧・振り返り画面でJOINする際は is_deleted = true の行も含めること（除外すると過去仕訳の表示が壊れる）
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+  version integer
+
+  indexes {
+    (user_id, category_code) [unique]
+    (user_id, group_id, category_name) [unique]   // 追加: 同一大分類内での重複を防ぐ
+  }
+}
+
+Table category_groups {
+  id integer [primary key]
+  user_id integer [not null]
+  group_name varchar [not null]
+  statement_type_id integer [not null]     // 追加: 変動費分析用グループとの紐づけ
+  description text
+  is_deleted boolean [not null, default: false]
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+  version integer
+
+  indexes {
+    (user_id, group_name) [unique]
+  }
+}
+
+Table statement_types {
+  id integer [primary key]
+  type_code varchar [not null, unique]     // 追加: サーバー側での分類に使用
+  statement_type_name varchar [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table budgets {
+  id integer [primary key]
+  user_id integer [not null]
+  monthly_budget integer
+  goal_text text
+  goal_amount integer
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table daily_notes {
+  id integer [primary key]
+  user_id integer [not null]
+  date date [not null]
+  note text [not null]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (user_id, date) [unique]
+  }
+}
+
+Table monthly_reviews {
+  id integer [primary key]
+  user_id integer [not null]
+  year_month varchar [not null]
+  notes jsonb
+  created_at timestamp
+  updated_at timestamp
+}
+
+// accounts・account_transactionsはVer2用
+Table accounts {
+  id integer [primary key]
+  account_code varchar
+  account_name varchar
+  account_type varchar
+  user_id integer [not null]
+  description text
+  is_deleted boolean [not null, default: false]
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+  version integer
+
+  indexes {
+    (user_id, account_code) [unique]
+  }
+}
+
+Table account_transactions {
+  id integer [primary key]
+  transaction_date date [not null]
+  description varchar
+  amount integer [not null]
+  account_id integer [not null]
+  user_id integer [not null]
+  note text
+  created_at timestamp
+  updated_at timestamp
+  version integer
+}
+
+Ref: users.id < journal_entries.user_id
+Ref: users.id < expense_categories.user_id
+Ref: users.id < category_groups.user_id
+Ref: users.id < budgets.user_id
+Ref: users.id < monthly_reviews.user_id
+Ref: users.id < daily_notes.user_id
+Ref: users.id < accounts.user_id
+Ref: users.id < account_transactions.user_id
+Ref: journal_entries.category_id > expense_categories.id
+Ref: expense_categories.group_id > category_groups.id
+Ref: category_groups.statement_type_id > statement_types.id
+Ref: accounts.id < account_transactions.account_id
+// Ref: journal_entries.entry_id > entries.id 削除
