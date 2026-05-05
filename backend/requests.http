@@ -1,0 +1,173 @@
+### Health check
+GET http://localhost:8080/health
+
+###
+
+### GET /category-groups — should return seeded groups with statement_type joined
+GET http://localhost:8080/category-groups
+
+###
+
+### GET /expense-categories — should return seeded categories with group_name
+GET http://localhost:8080/expense-categories
+
+###
+
+### POST /journal-entries — valid input, expect 201 + joined response
+POST http://localhost:8080/journal-entries
+Content-Type: application/json
+
+{
+  "transaction_date": "2025-05-05",
+  "item": "コンビニランチ",
+  "amount": 850,
+  "category_id": 1,
+  "is_excluded": false,
+  "note": "昼飯"
+}
+
+###
+
+### POST /journal-entries — second entry on the same date (to test grouping)
+POST http://localhost:8080/journal-entries
+Content-Type: application/json
+
+{
+  "transaction_date": "2025-05-05",
+  "item": "外食",
+  "amount": 1200,
+  "category_id": 2,
+  "is_excluded": false,
+  "note": null
+}
+
+###
+
+### POST /journal-entries — different date (to test multi-date grouping)
+POST http://localhost:8080/journal-entries
+Content-Type: application/json
+
+{
+  "transaction_date": "2025-05-03",
+  "item": "電車代",
+  "amount": 480,
+  "category_id": 8,
+  "is_excluded": false,
+  "note": null
+}
+
+###
+
+### POST /journal-entries — is_excluded true
+POST http://localhost:8080/journal-entries
+Content-Type: application/json
+
+{
+  "transaction_date": "2025-05-01",
+  "item": "特別出費",
+  "amount": 50000,
+  "category_id": 1,
+  "is_excluded": true,
+  "note": "特別な支払い"
+}
+
+###
+
+### POST /journal-entries — ERROR: deleted/nonexistent category_id, expect 400
+POST http://localhost:8080/journal-entries
+Content-Type: application/json
+
+{
+  "transaction_date": "2025-05-05",
+  "amount": 100,
+  "category_id": 99999,
+  "is_excluded": false
+}
+
+###
+
+### POST /journal-entries — ERROR: negative amount, expect 400
+POST http://localhost:8080/journal-entries
+Content-Type: application/json
+
+{
+  "transaction_date": "2025-05-05",
+  "amount": -50,
+  "category_id": 1,
+  "is_excluded": false
+}
+
+###
+
+### POST /journal-entries — ERROR: amount = 0, expect 400
+POST http://localhost:8080/journal-entries
+Content-Type: application/json
+
+{
+  "transaction_date": "2025-05-05",
+  "amount": 0,
+  "category_id": 1,
+  "is_excluded": false
+}
+
+###
+
+### POST /journal-entries — ERROR: missing is_excluded, expect 400
+POST http://localhost:8080/journal-entries
+Content-Type: application/json
+
+{
+  "transaction_date": "2025-05-05",
+  "amount": 500,
+  "category_id": 1
+}
+
+###
+
+### POST /journal-entries — ERROR: missing transaction_date, expect 400
+POST http://localhost:8080/journal-entries
+Content-Type: application/json
+
+{
+  "amount": 500,
+  "category_id": 1,
+  "is_excluded": false
+}
+
+###
+
+### POST /journal-entries — ERROR: bad date format, expect 400
+POST http://localhost:8080/journal-entries
+Content-Type: application/json
+
+{
+  "transaction_date": "2025/05/05",
+  "amount": 500,
+  "category_id": 1,
+  "is_excluded": false
+}
+
+###
+
+### GET /journal-entries — May 2025, expect date-grouped result (date desc, id desc within date)
+GET http://localhost:8080/journal-entries?year_month=2025-05
+
+###
+
+### GET /journal-entries — empty month, expect {"year_month":"...","entries":[]}
+GET http://localhost:8080/journal-entries?year_month=2024-01
+
+###
+
+### GET /journal-entries — ERROR: bad year_month format (missing leading zero), expect 400
+GET http://localhost:8080/journal-entries?year_month=2025-5
+
+###
+
+### GET /journal-entries — ERROR: bad year_month format (full date), expect 400
+GET http://localhost:8080/journal-entries?year_month=2025-05-01
+
+###
+
+### GET /journal-entries — ERROR: missing year_month param, expect 400
+GET http://localhost:8080/journal-entries
