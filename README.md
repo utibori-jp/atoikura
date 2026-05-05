@@ -11,7 +11,7 @@
 ## Requirements
 
 - Docker / Docker Compose
-- Go 1.22+（ローカル開発時）
+- Go 1.25+（ローカル開発時）
 - Node.js 20+（ローカル開発時）
 
 ---

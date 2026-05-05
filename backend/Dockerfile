@@ -1,5 +1,5 @@
 # NOTE: This build will fail until cmd/server/main.go exists (added in Step 5).
-FROM golang:1.22 AS builder
+FROM golang:1.25 AS builder
 WORKDIR /app
 COPY go.mod go.sum* ./
 RUN go mod download
