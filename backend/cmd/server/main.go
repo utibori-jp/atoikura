@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/utibori-jp/atoikura/backend/internal/handler"
+	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
 
 func main() {
@@ -86,10 +87,16 @@ func run(parent_ctx context.Context) error {
 	return http_server.Shutdown(shutdown_ctx)
 }
 
-func registerRoutes(mux *http.ServeMux, _ *pgxpool.Pool) {
+func registerRoutes(mux *http.ServeMux, db_pool *pgxpool.Pool) {
+	repo := repository.New(db_pool)
+
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+	mux.Handle("GET /category-groups", handler.ListCategoryGroupsHandler(repo))
+	mux.Handle("GET /expense-categories", handler.ListExpenseCategoriesHandler(repo))
+	mux.Handle("POST /journal-entries", handler.CreateJournalEntryHandler(repo))
+	mux.Handle("GET /journal-entries", handler.ListJournalEntriesHandler(repo))
 }
