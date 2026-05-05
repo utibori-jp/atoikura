@@ -1,3 +1,0 @@
-DROP INDEX IF EXISTS expense_categories_user_group_category_name_active_idx;
-DROP INDEX IF EXISTS expense_categories_user_category_code_active_idx;
-DROP TABLE IF EXISTS expense_categories;

@@ -1,10 +1,9 @@
-CREATE TABLE budgets (
+CREATE TABLE IF NOT EXISTS daily_notes (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
-    monthly_budget INTEGER NOT NULL DEFAULT 0,
-    goal_text TEXT,
-    goal_amount INTEGER NOT NULL DEFAULT 0,
+    date DATE NOT NULL,
+    note TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (user_id)
+    UNIQUE (user_id, date)
 );

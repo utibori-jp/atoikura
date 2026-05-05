@@ -1,4 +1,4 @@
-CREATE TABLE accounts (
+CREATE TABLE IF NOT EXISTS accounts (
     id SERIAL PRIMARY KEY,
     account_code VARCHAR,
     account_name VARCHAR,
@@ -12,11 +12,11 @@ CREATE TABLE accounts (
     version INTEGER NOT NULL DEFAULT 1
 );
 
-CREATE UNIQUE INDEX accounts_user_account_code_active_idx
+CREATE UNIQUE INDEX IF NOT EXISTS accounts_user_account_code_active_idx
     ON accounts (user_id, account_code)
     WHERE is_deleted = false AND account_code IS NOT NULL;
 
-CREATE TABLE account_transactions (
+CREATE TABLE IF NOT EXISTS account_transactions (
     id SERIAL PRIMARY KEY,
     transaction_date DATE NOT NULL,
     description VARCHAR,

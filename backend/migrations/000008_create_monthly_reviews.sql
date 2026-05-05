@@ -1,9 +1,9 @@
-CREATE TABLE daily_notes (
+CREATE TABLE IF NOT EXISTS monthly_reviews (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
-    date DATE NOT NULL,
-    note TEXT NOT NULL,
+    year_month VARCHAR NOT NULL,
+    notes JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (user_id, date)
+    UNIQUE (user_id, year_month)
 );

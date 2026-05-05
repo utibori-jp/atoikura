@@ -1,4 +1,4 @@
-CREATE TABLE expense_categories (
+CREATE TABLE IF NOT EXISTS expense_categories (
     id SERIAL PRIMARY KEY,
     category_code VARCHAR,
     category_name VARCHAR NOT NULL,
@@ -12,10 +12,10 @@ CREATE TABLE expense_categories (
     version INTEGER NOT NULL DEFAULT 1
 );
 
-CREATE UNIQUE INDEX expense_categories_user_category_code_active_idx
+CREATE UNIQUE INDEX IF NOT EXISTS expense_categories_user_category_code_active_idx
     ON expense_categories (user_id, category_code)
     WHERE is_deleted = false AND category_code IS NOT NULL;
 
-CREATE UNIQUE INDEX expense_categories_user_group_category_name_active_idx
+CREATE UNIQUE INDEX IF NOT EXISTS expense_categories_user_group_category_name_active_idx
     ON expense_categories (user_id, group_id, category_name)
     WHERE is_deleted = false;

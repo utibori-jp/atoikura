@@ -1,13 +1,4 @@
-DB_URL ?= pgx5://atoikura:dev_password@localhost:5432/atoikura?sslmode=disable
-
-.PHONY: migrate-up migrate-down migrate-create
+.PHONY: migrate-up
 
 migrate-up:
-	migrate -path migrations -database "$(DB_URL)" up
-
-migrate-down:
-	migrate -path migrations -database "$(DB_URL)" down 1
-
-migrate-create:
-	@read -p "Migration name: " name; \
-	migrate create -ext sql -dir migrations -seq $$name
+	bash scripts/migrate.sh

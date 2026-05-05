@@ -1,4 +1,4 @@
-CREATE TABLE journal_entries (
+CREATE TABLE IF NOT EXISTS journal_entries (
     id SERIAL PRIMARY KEY,
     transaction_date DATE NOT NULL,
     item VARCHAR,

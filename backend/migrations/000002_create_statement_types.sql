@@ -1,4 +1,4 @@
-CREATE TABLE statement_types (
+CREATE TABLE IF NOT EXISTS statement_types (
     id SERIAL PRIMARY KEY,
     type_code VARCHAR NOT NULL UNIQUE,
     statement_type_name VARCHAR NOT NULL,

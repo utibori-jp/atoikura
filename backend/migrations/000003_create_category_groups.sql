@@ -1,4 +1,4 @@
-CREATE TABLE category_groups (
+CREATE TABLE IF NOT EXISTS category_groups (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
     group_name VARCHAR NOT NULL,
@@ -11,6 +11,6 @@ CREATE TABLE category_groups (
     version INTEGER NOT NULL DEFAULT 1
 );
 
-CREATE UNIQUE INDEX category_groups_user_group_name_active_idx
+CREATE UNIQUE INDEX IF NOT EXISTS category_groups_user_group_name_active_idx
     ON category_groups (user_id, group_name)
     WHERE is_deleted = false;
