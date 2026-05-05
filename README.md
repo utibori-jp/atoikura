@@ -23,6 +23,11 @@
 docker compose up -d db
 ```
 
+### Run migrations
+```
+cd backend && make migrate-up
+```
+
 ### Stop everything
 ```
 docker compose down
