@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose *)",
+      "Read(//c/Users/k8489/go/bin/**)",
+      "Read(//usr/local/bin/**)",
+      "Bash(go install *)"
+    ]
+  }
+}
