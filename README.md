@@ -28,12 +28,19 @@ docker compose up -d db
 cd backend && make migrate-up
 ```
 
+### Run the frontend
+```
+cd frontend
+npm install
+npm run dev
+```
+
+The app will be available at http://localhost:3000.
+
 ### Stop everything
 ```
 docker compose down
 ```
-
-(Backend and frontend containers will be runnable after Step 5 and Step 7 respectively.)
 
 ---
 
