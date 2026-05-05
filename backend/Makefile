@@ -1,4 +1,4 @@
-DB_URL ?= pgx5://atoikura:dev_password@localhost:5433/atoikura?sslmode=disable
+DB_URL ?= pgx5://atoikura:dev_password@localhost:5432/atoikura?sslmode=disable
 
 .PHONY: migrate-up migrate-down migrate-create
 
