@@ -50,4 +50,10 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+  getDailyCumulative: (year_month?: string) => {
+    const qs = year_month ? `?year_month=${year_month}` : "";
+    return request<components["schemas"]["DailyCumulativeResponse"]>(
+      `/expenses/daily-cumulative${qs}`,
+    );
+  },
 };
