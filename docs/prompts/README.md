@@ -37,10 +37,22 @@ Goal: To create a home screen where "How much more can I spend this month?" is v
 
 ---
 
+## M4 Roadmap — Review Screen
+
+Goal: Build the monthly review screen with expense breakdown and per-category memo editing.
+
+**Branching**: All M4 steps share a single branch `feature/m4`. Open one PR to `develop` after all steps pass.
+
+| Step | File | What it covers |
+|---|---|---|
+| 1 | `m4/M4-step1-monthly-breakdown-backend.md` | `GET /expenses/monthly-breakdown`: SQL with is_excluded override |
+| 2 | `m4/M4-step2-monthly-reviews-backend.md` | `GET/PUT /notes/monthly-reviews`: jsonb memo CRUD |
+| 3 | `m4/M4-step3-review-frontend.md` | Review screen: 3-tier accordion, month selector, memo save |
+
+---
+
 ## Future Milestones (Not Yet Drafted)
 
-- **M3**: Master management UI (CRUD for `category_groups` and `expense_categories`)
-- **M4**: Review screen (`GET /expenses/monthly-breakdown`, `monthly_reviews` CRUD)
 - **M5**: Journal list polish (edit/delete entries, daily notes, filters)
 
 ---
