@@ -21,7 +21,8 @@
       "Read(problems/**)",
       "Edit(problems/**)",
       "Read(CLAUDE.md)",
-      "Edit(CLAUDE.md)"
+      "Edit(CLAUDE.md)",
+      "Bash(curl -s *)"
     ]
   }
 }

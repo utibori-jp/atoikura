@@ -56,3 +56,4 @@ Read additional documents based on the work area:
 - Variable names must describe their role, type, and content. Avoid generic names.
   - NG: `seen`, `current`, `result`, `temp`
   - OK: `num_to_index`, `target_complement`, `monthly_budget_yen`
+- Python Execution: When executing Python commands or scripts, always use `uv run python` instead of `python3`.
