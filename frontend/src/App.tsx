@@ -4,8 +4,9 @@ import { JournalEntryList } from "./components/JournalEntryList";
 import { BudgetSettings } from "./components/BudgetSettings";
 import { HomeGraph } from "./components/HomeGraph";
 import { SummaryCards } from "./components/SummaryCards";
+import { MasterManagement } from "./components/MasterManagement";
 
-type Tab = "home" | "list" | "budget";
+type Tab = "home" | "list" | "budget" | "master";
 
 function HomeIcon() {
   return (
@@ -58,6 +59,17 @@ function SettingsIcon() {
   );
 }
 
+function CalendarIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x={3} y={4} width={18} height={18} rx={2} ry={2} />
+      <line x1={16} y1={2} x2={16} y2={6} />
+      <line x1={8} y1={2} x2={8} y2={6} />
+      <line x1={3} y1={10} x2={21} y2={10} />
+    </svg>
+  );
+}
+
 interface NavItemProps {
   icon: React.ReactNode;
   label: string;
@@ -92,6 +104,23 @@ function NavItem({ icon, label, active, onClick, disabled }: NavItemProps) {
   );
 }
 
+function currentMonthJST(): string {
+  return new Date()
+    .toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" })
+    .slice(0, 7);
+}
+
+function addMonths(ym: string, delta: number): string {
+  const [year, month] = ym.split("-").map(Number);
+  const date = new Date(year, month - 1 + delta, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthJP(ym: string): string {
+  const [year, month] = ym.split("-").map(Number);
+  return `${year}年${month}月`;
+}
+
 function todayJST(): string {
   return new Date().toLocaleDateString("ja-JP", {
     timeZone: "Asia/Tokyo",
@@ -101,15 +130,78 @@ function todayJST(): string {
   });
 }
 
+const nav_btn_style: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 32,
+  height: 32,
+  borderRadius: 6,
+  border: "1px solid #2e2e2e",
+  background: "#1a1a1a",
+  color: "#aaa",
+  fontSize: 13,
+  cursor: "pointer",
+};
+
+interface MonthNavProps {
+  value: string;
+  onChange: (ym: string) => void;
+}
+
+function MonthNav({ value, onChange }: MonthNavProps) {
+  const is_current = value >= currentMonthJST();
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <button
+        onClick={() => onChange(addMonths(value, -1))}
+        style={nav_btn_style}
+      >
+        &lt;
+      </button>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "5px 14px",
+          borderRadius: 6,
+          border: "1px solid #2e2e2e",
+          background: "#1a1a1a",
+          color: "#ccc",
+          fontSize: 13,
+          fontWeight: 500,
+        }}
+      >
+        <CalendarIcon />
+        {formatMonthJP(value)}
+      </div>
+      <button
+        onClick={() => onChange(addMonths(value, 1))}
+        disabled={is_current}
+        style={{
+          ...nav_btn_style,
+          color: is_current ? "#3a3a3a" : "#aaa",
+          cursor: is_current ? "default" : "pointer",
+        }}
+      >
+        &gt;
+      </button>
+    </div>
+  );
+}
+
 const PAGE_TITLES: Record<Tab, string> = {
   home: "ダッシュボード",
   list: "仕訳一覧",
   budget: "目標設定",
+  master: "マスタ管理",
 };
 
 export default function App() {
   const [active_tab, setActiveTab] = useState<Tab>("home");
   const [refresh_token, setRefreshToken] = useState(0);
+  const [list_year_month, setListYearMonth] = useState(currentMonthJST());
 
   return (
     <div style={{ display: "flex", height: "100%", background: "#0c0c0c", color: "#fff" }}>
@@ -183,9 +275,8 @@ export default function App() {
           <NavItem
             icon={<SettingsIcon />}
             label="マスタ管理"
-            active={false}
-            onClick={() => {}}
-            disabled
+            active={active_tab === "master"}
+            onClick={() => setActiveTab("master")}
           />
         </nav>
 
@@ -205,7 +296,11 @@ export default function App() {
           }}
         >
           <h1 style={{ fontSize: 24, fontWeight: 700 }}>{PAGE_TITLES[active_tab]}</h1>
-          <span style={{ color: "#555", fontSize: 14 }}>{todayJST()}</span>
+          {active_tab === "list" ? (
+            <MonthNav value={list_year_month} onChange={setListYearMonth} />
+          ) : (
+            <span style={{ color: "#555", fontSize: 14 }}>{todayJST()}</span>
+          )}
         </div>
 
         {active_tab === "home" && (
@@ -238,10 +333,15 @@ export default function App() {
         )}
 
         {active_tab === "list" && (
-          <JournalEntryList refresh_token={refresh_token} />
+          <JournalEntryList
+            year_month={list_year_month}
+            refresh_token={refresh_token}
+          />
         )}
 
         {active_tab === "budget" && <BudgetSettings />}
+
+        {active_tab === "master" && <MasterManagement />}
       </main>
     </div>
   );

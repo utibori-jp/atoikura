@@ -56,4 +56,50 @@ export const api = {
       `/expenses/daily-cumulative${qs}`,
     );
   },
+  updateJournalEntry: (
+    id: number,
+    body: components["schemas"]["JournalEntryRequest"],
+  ) =>
+    request<components["schemas"]["JournalEntryResponse"]>(
+      `/journal-entries/${id}`,
+      { method: "PUT", body: JSON.stringify(body) },
+    ),
+  deleteJournalEntry: (id: number) =>
+    request<void>(`/journal-entries/${id}`, { method: "DELETE" }),
+  listStatementTypes: () =>
+    request<{ statement_types: components["schemas"]["StatementTypeSummary"][] }>(
+      "/statement-types",
+    ),
+  createCategoryGroup: (body: components["schemas"]["CategoryGroupRequest"]) =>
+    request<components["schemas"]["CategoryGroup"]>("/category-groups", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateCategoryGroup: (
+    id: number,
+    body: components["schemas"]["CategoryGroupRequest"],
+  ) =>
+    request<components["schemas"]["CategoryGroup"]>(`/category-groups/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteCategoryGroup: (id: number) =>
+    request<void>(`/category-groups/${id}`, { method: "DELETE" }),
+  createExpenseCategory: (
+    body: components["schemas"]["ExpenseCategoryRequest"],
+  ) =>
+    request<components["schemas"]["ExpenseCategory"]>("/expense-categories", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateExpenseCategory: (
+    id: number,
+    body: components["schemas"]["ExpenseCategoryRequest"],
+  ) =>
+    request<components["schemas"]["ExpenseCategory"]>(
+      `/expense-categories/${id}`,
+      { method: "PUT", body: JSON.stringify(body) },
+    ),
+  deleteExpenseCategory: (id: number) =>
+    request<void>(`/expense-categories/${id}`, { method: "DELETE" }),
 };
