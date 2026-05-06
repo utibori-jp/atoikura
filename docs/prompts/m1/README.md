@@ -12,7 +12,7 @@ A collection of prompts for Claude Code to execute each development step.
 
 ## M1 Roadmap — Spreadsheet Escape
 
-Goal: スプレッドシートを脱却できる最小限の家計記録アプリをローカルで動かす。
+Goal: To run a minimal expenditure tracking app locally that replaces spreadsheet-based management.
 
 | Step | File | What it covers |
 |---|---|---|
