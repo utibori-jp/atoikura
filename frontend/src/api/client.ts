@@ -67,9 +67,9 @@ export const api = {
   deleteJournalEntry: (id: number) =>
     request<void>(`/journal-entries/${id}`, { method: "DELETE" }),
   listStatementTypes: () =>
-    request<{ statement_types: components["schemas"]["StatementTypeSummary"][] }>(
-      "/statement-types",
-    ),
+    request<{
+      statement_types: components["schemas"]["StatementTypeSummary"][];
+    }>("/statement-types"),
   createCategoryGroup: (body: components["schemas"]["CategoryGroupRequest"]) =>
     request<components["schemas"]["CategoryGroup"]>("/category-groups", {
       method: "POST",
@@ -102,4 +102,23 @@ export const api = {
     ),
   deleteExpenseCategory: (id: number) =>
     request<void>(`/expense-categories/${id}`, { method: "DELETE" }),
+  getMonthlyBreakdown: (year_month: string) =>
+    request<components["schemas"]["MonthlyBreakdownResponse"]>(
+      `/expenses/monthly-breakdown?year_month=${year_month}`,
+    ),
+  getMonthlyReviews: (year_month: string) =>
+    request<components["schemas"]["MonthlyReviewResponse"]>(
+      `/notes/monthly-reviews?year_month=${year_month}`,
+    ),
+  updateMonthlyReviews: (
+    year_month: string,
+    notes: components["schemas"]["MonthlyReviewNote"][],
+  ) =>
+    request<components["schemas"]["MonthlyReviewResponse"]>(
+      "/notes/monthly-reviews",
+      {
+        method: "PUT",
+        body: JSON.stringify({ year_month, notes }),
+      },
+    ),
 };

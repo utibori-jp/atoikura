@@ -61,3 +61,84 @@ func (q *Queries) ListDailyExpenseSumsForMonth(ctx context.Context, arg ListDail
 	}
 	return items, nil
 }
+
+const listMonthlyBreakdown = `-- name: ListMonthlyBreakdown :many
+SELECT
+  je.category_id,
+  ec.category_name,
+  cg.id                                                                              AS group_id,
+  cg.group_name,
+  CASE WHEN je.is_excluded THEN excl.id   ELSE st.id   END                          AS statement_type_id,
+  CASE WHEN je.is_excluded THEN excl.statement_type_name ELSE st.statement_type_name END AS statement_type_name,
+  CAST(SUM(je.amount) AS integer)                                                    AS total
+FROM journal_entries je
+JOIN expense_categories ec  ON je.category_id       = ec.id
+JOIN category_groups    cg  ON ec.group_id           = cg.id
+JOIN statement_types    st  ON cg.statement_type_id  = st.id
+CROSS JOIN (
+  SELECT id, statement_type_name
+  FROM statement_types
+  WHERE type_code = 'excluded'
+) excl
+WHERE je.user_id          = $1
+  AND je.transaction_date >= $2::date
+  AND je.transaction_date <  $2::date + INTERVAL '1 month'
+GROUP BY
+  je.category_id,
+  ec.category_name,
+  cg.id,
+  cg.group_name,
+  CASE WHEN je.is_excluded THEN excl.id   ELSE st.id   END,
+  CASE WHEN je.is_excluded THEN excl.statement_type_name ELSE st.statement_type_name END
+ORDER BY
+  CASE WHEN je.is_excluded THEN excl.id   ELSE st.id   END,
+  cg.id,
+  je.category_id
+`
+
+type ListMonthlyBreakdownParams struct {
+	UserID  int32       `json:"user_id"`
+	Column2 pgtype.Date `json:"column_2"`
+}
+
+type ListMonthlyBreakdownRow struct {
+	CategoryID        int32       `json:"category_id"`
+	CategoryName      string      `json:"category_name"`
+	GroupID           int32       `json:"group_id"`
+	GroupName         string      `json:"group_name"`
+	StatementTypeID   interface{} `json:"statement_type_id"`
+	StatementTypeName interface{} `json:"statement_type_name"`
+	Total             int32       `json:"total"`
+}
+
+// Returns per-category totals for the target month.
+// is_excluded=true entries have their statement_type overridden to 'excluded'.
+// Logically-deleted expense_categories (is_deleted=true) are included because
+// past journal_entries may still reference them.
+func (q *Queries) ListMonthlyBreakdown(ctx context.Context, arg ListMonthlyBreakdownParams) ([]ListMonthlyBreakdownRow, error) {
+	rows, err := q.db.Query(ctx, listMonthlyBreakdown, arg.UserID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMonthlyBreakdownRow
+	for rows.Next() {
+		var i ListMonthlyBreakdownRow
+		if err := rows.Scan(
+			&i.CategoryID,
+			&i.CategoryName,
+			&i.GroupID,
+			&i.GroupName,
+			&i.StatementTypeID,
+			&i.StatementTypeName,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

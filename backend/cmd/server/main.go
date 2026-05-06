@@ -109,4 +109,7 @@ func registerRoutes(mux *http.ServeMux, db_pool *pgxpool.Pool) {
 	mux.Handle("GET /budgets", handler.GetBudgetsHandler(repo))
 	mux.Handle("PUT /budgets", handler.UpdateBudgetsHandler(repo))
 	mux.Handle("GET /expenses/daily-cumulative", handler.GetDailyCumulativeHandler(repo))
+	mux.Handle("GET /expenses/monthly-breakdown", handler.GetMonthlyBreakdownHandler(repo))
+	mux.Handle("GET /notes/monthly-reviews", handler.GetMonthlyReviewsHandler(repo))
+	mux.Handle("PUT /notes/monthly-reviews", handler.UpdateMonthlyReviewsHandler(repo))
 }

@@ -9,6 +9,68 @@ import (
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
 
+type monthlyBreakdownItemJSON struct {
+	CategoryID        int32  `json:"category_id"`
+	CategoryName      string `json:"category_name"`
+	GroupID           int32  `json:"group_id"`
+	GroupName         string `json:"group_name"`
+	StatementTypeID   int32  `json:"statement_type_id"`
+	StatementTypeName string `json:"statement_type_name"`
+	Total             int32  `json:"total"`
+}
+
+type monthlyBreakdownResponseJSON struct {
+	YearMonth string                     `json:"year_month"`
+	Breakdown []monthlyBreakdownItemJSON `json:"breakdown"`
+}
+
+func GetMonthlyBreakdownHandler(repo *repository.Repository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user_id, ok := UserIDFromContext(r.Context())
+		if !ok {
+			WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "認証情報が不正です")
+			return
+		}
+
+		year_month := r.URL.Query().Get("year_month")
+		if year_month == "" || !yearMonthPattern.MatchString(year_month) {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "year_monthはYYYY-MM形式で指定してください")
+			return
+		}
+
+		first_day, err := time.Parse("2006-01-02", year_month+"-01")
+		if err != nil {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "year_monthはYYYY-MM形式で指定してください")
+			return
+		}
+
+		items, err := repo.ListMonthlyBreakdown(r.Context(), user_id, first_day)
+		if err != nil {
+			slog.Error("listing monthly breakdown", "error", err)
+			WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
+			return
+		}
+
+		breakdown := make([]monthlyBreakdownItemJSON, len(items))
+		for i, item := range items {
+			breakdown[i] = monthlyBreakdownItemJSON{
+				CategoryID:        item.CategoryID,
+				CategoryName:      item.CategoryName,
+				GroupID:           item.GroupID,
+				GroupName:         item.GroupName,
+				StatementTypeID:   item.StatementTypeID,
+				StatementTypeName: item.StatementTypeName,
+				Total:             item.Total,
+			}
+		}
+
+		WriteJSON(w, http.StatusOK, monthlyBreakdownResponseJSON{
+			YearMonth: year_month,
+			Breakdown: breakdown,
+		})
+	}
+}
+
 type dailyEntryJSON struct {
 	Date     string `json:"date"`
 	Food     int32  `json:"food"`
