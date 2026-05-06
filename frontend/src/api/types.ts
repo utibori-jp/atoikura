@@ -888,7 +888,13 @@ export type $defs = Record<string, never>;
 export interface operations {
     getDailyCumulative: {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description 対象年月（YYYY-MM）。省略時は当月（JST）
+                 * @example 2025-04
+                 */
+                year_month?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -939,6 +945,21 @@ export interface operations {
                      *     }
                      */
                     "application/json": components["schemas"]["DailyCumulativeResponse"];
+                };
+            };
+            /** @description year_monthの形式不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "BAD_REQUEST",
+                     *       "message": "year_monthはYYYY-MM形式で指定してください"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
