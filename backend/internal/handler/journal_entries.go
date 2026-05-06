@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
@@ -183,5 +184,130 @@ func ListJournalEntriesHandler(repo *repository.Repository) http.HandlerFunc {
 			YearMonth: year_month,
 			Entries:   grouped,
 		})
+	}
+}
+
+func UpdateJournalEntryHandler(repo *repository.Repository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user_id, ok := UserIDFromContext(r.Context())
+		if !ok {
+			WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "認証情報が不正です")
+			return
+		}
+
+		raw_id := r.PathValue("id")
+		entry_id, err := strconv.ParseInt(raw_id, 10, 32)
+		if err != nil || entry_id < 1 {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "idは正の整数で指定してください")
+			return
+		}
+
+		type request struct {
+			TransactionDate string  `json:"transaction_date"`
+			Item            *string `json:"item"`
+			Amount          *int32  `json:"amount"`
+			CategoryID      *int32  `json:"category_id"`
+			IsExcluded      *bool   `json:"is_excluded"`
+			Note            *string `json:"note"`
+		}
+		var req request
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "リクエストの形式が不正です")
+			return
+		}
+
+		tx_date, err := time.Parse("2006-01-02", req.TransactionDate)
+		if err != nil {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "transaction_dateはYYYY-MM-DD形式で指定してください")
+			return
+		}
+
+		if req.Amount == nil || *req.Amount < 1 {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "amountは正の整数である必要があります")
+			return
+		}
+
+		if req.CategoryID == nil {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "category_idは必須です")
+			return
+		}
+
+		if req.IsExcluded == nil {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "is_excludedは必須です")
+			return
+		}
+
+		if req.Item != nil && len([]rune(*req.Item)) > 100 {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "itemは100文字以内で入力してください")
+			return
+		}
+
+		if req.Note != nil && len([]rune(*req.Note)) > 500 {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "noteは500文字以内で入力してください")
+			return
+		}
+
+		cat, err := repo.GetActiveExpenseCategory(r.Context(), int64(*req.CategoryID), user_id)
+		if err != nil {
+			slog.Error("getting expense category for validation", "error", err)
+			WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
+			return
+		}
+		if cat == nil {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "指定されたcategory_idは存在しないか削除済みです")
+			return
+		}
+
+		entry, err := repo.UpdateJournalEntry(r.Context(), repository.UpdateJournalEntryParams{
+			ID:              int32(entry_id),
+			UserID:          int32(user_id),
+			TransactionDate: tx_date,
+			Item:            req.Item,
+			Amount:          *req.Amount,
+			CategoryID:      *req.CategoryID,
+			IsExcluded:      *req.IsExcluded,
+			Note:            req.Note,
+		})
+		if err != nil {
+			slog.Error("updating journal entry", "error", err)
+			WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
+			return
+		}
+		if entry == nil {
+			WriteError(w, http.StatusNotFound, "NOT_FOUND", "仕訳が見つかりません")
+			return
+		}
+
+		WriteJSON(w, http.StatusOK, viewToJournalEntryJSON(*entry))
+	}
+}
+
+func DeleteJournalEntryHandler(repo *repository.Repository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user_id, ok := UserIDFromContext(r.Context())
+		if !ok {
+			WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "認証情報が不正です")
+			return
+		}
+
+		raw_id := r.PathValue("id")
+		entry_id, err := strconv.ParseInt(raw_id, 10, 32)
+		if err != nil || entry_id < 1 {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "idは正の整数で指定してください")
+			return
+		}
+
+		deleted, err := repo.DeleteJournalEntry(r.Context(), entry_id, user_id)
+		if err != nil {
+			slog.Error("deleting journal entry", "error", err)
+			WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
+			return
+		}
+		if !deleted {
+			WriteError(w, http.StatusNotFound, "NOT_FOUND", "仕訳が見つかりません")
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
 	}
 }

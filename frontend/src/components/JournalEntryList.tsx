@@ -232,6 +232,10 @@ export function JournalEntryList({ year_month, refresh_token }: Props) {
   const [deleting_id, setDeletingId] = useState<number | null>(null);
   const [category_groups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const [all_expense_categories, setAllExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [daily_notes_map, setDailyNotesMap] = useState<Record<string, string>>({});
+  const [editing_note_date, setEditingNoteDate] = useState<string | null>(null);
+  const [note_draft, setNoteDraft] = useState('');
+  const [saving_note_date, setSavingNoteDate] = useState<string | null>(null);
 
   useEffect(() => {
     api.listCategoryGroups().then((res) => setCategoryGroups(res.category_groups));
@@ -242,10 +246,19 @@ export function JournalEntryList({ year_month, refresh_token }: Props) {
     let is_cancelled = false;
     setEntries(null);
     setErrorMessage('');
-    api
-      .listJournalEntries(year_month)
-      .then((res) => {
-        if (!is_cancelled) setEntries(res.entries);
+    setEditingNoteDate(null);
+    Promise.all([
+      api.listJournalEntries(year_month),
+      api.getDailyNotes(year_month),
+    ])
+      .then(([entries_res, notes_res]) => {
+        if (is_cancelled) return;
+        setEntries(entries_res.entries);
+        const notes_map: Record<string, string> = {};
+        for (const n of notes_res.notes) {
+          if (n.note != null) notes_map[n.date] = n.note;
+        }
+        setDailyNotesMap(notes_map);
       })
       .catch((err) => {
         if (!is_cancelled) {
@@ -271,6 +284,27 @@ export function JournalEntryList({ year_month, refresh_token }: Props) {
       alert(err instanceof Error ? err.message : '削除に失敗しました');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handle_save_note = async (date: string) => {
+    setSavingNoteDate(date);
+    try {
+      const saved = await api.updateDailyNote(date, note_draft.trim());
+      setDailyNotesMap((prev) => {
+        const next = { ...prev };
+        if (saved.note == null || saved.note === '') {
+          delete next[date];
+        } else {
+          next[date] = saved.note;
+        }
+        return next;
+      });
+      setEditingNoteDate(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'コメントの保存に失敗しました');
+    } finally {
+      setSavingNoteDate(null);
     }
   };
 
@@ -328,41 +362,94 @@ export function JournalEntryList({ year_month, refresh_token }: Props) {
               }}
             >
               {/* Day header */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 20px',
-                  borderBottom: '1px solid #1e1e1e',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontWeight: 600, fontSize: 15 }}>
-                    {formatDayHeader(daily.date)}
-                  </span>
-                  <span
-                    style={{
-                      background: '#2a2a2a',
-                      borderRadius: 20,
-                      fontSize: 12,
-                      padding: '2px 10px',
-                      color: '#999',
-                    }}
-                  >
-                    ¥{daily_total.toLocaleString()}
-                  </span>
-                </div>
-                <button
+              <div style={{ borderBottom: '1px solid #1e1e1e' }}>
+                <div
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    background: 'transparent', border: 'none',
-                    color: '#555', fontSize: 13, cursor: 'default',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '14px 20px',
                   }}
                 >
-                  <MessageIcon />
-                  コメント
-                </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontWeight: 600, fontSize: 15 }}>
+                      {formatDayHeader(daily.date)}
+                    </span>
+                    <span
+                      style={{
+                        background: '#2a2a2a',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        padding: '2px 10px',
+                        color: '#999',
+                      }}
+                    >
+                      ¥{daily_total.toLocaleString()}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (editing_note_date === daily.date) {
+                        setEditingNoteDate(null);
+                      } else {
+                        setNoteDraft(daily_notes_map[daily.date] ?? '');
+                        setEditingNoteDate(daily.date);
+                      }
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      background: 'transparent', border: 'none',
+                      color: daily_notes_map[daily.date] ? '#60a5fa' : '#555',
+                      fontSize: 13, cursor: 'pointer',
+                    }}
+                  >
+                    <MessageIcon />
+                    コメント
+                  </button>
+                </div>
+                {/* Existing note preview */}
+                {daily_notes_map[daily.date] && editing_note_date !== daily.date && (
+                  <div style={{ padding: '0 20px 12px', fontSize: 12, color: '#60a5fa' }}>
+                    {daily_notes_map[daily.date]}
+                  </div>
+                )}
+                {/* Inline note editor */}
+                {editing_note_date === daily.date && (
+                  <div style={{ padding: '0 20px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <textarea
+                      value={note_draft}
+                      onChange={(e) => setNoteDraft(e.target.value)}
+                      placeholder="この日のコメントを入力..."
+                      rows={2}
+                      style={{ resize: 'vertical', fontSize: 13 }}
+                      autoFocus
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => handle_save_note(daily.date)}
+                        disabled={saving_note_date === daily.date}
+                        style={{
+                          padding: '5px 14px', borderRadius: 6, border: 'none',
+                          background: '#22c55e', color: '#000', fontWeight: 600,
+                          fontSize: 12, cursor: saving_note_date === daily.date ? 'default' : 'pointer',
+                          opacity: saving_note_date === daily.date ? 0.7 : 1,
+                        }}
+                      >
+                        {saving_note_date === daily.date ? '保存中...' : '保存'}
+                      </button>
+                      <button
+                        onClick={() => setEditingNoteDate(null)}
+                        style={{
+                          padding: '5px 14px', borderRadius: 6,
+                          border: '1px solid #333', background: 'transparent',
+                          color: '#888', fontSize: 12, cursor: 'pointer',
+                        }}
+                      >
+                        キャンセル
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Entry rows */}

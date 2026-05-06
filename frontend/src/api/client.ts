@@ -121,4 +121,13 @@ export const api = {
         body: JSON.stringify({ year_month, notes }),
       },
     ),
+  getDailyNotes: (year_month: string) =>
+    request<components["schemas"]["DailyNoteListResponse"]>(
+      `/notes/daily?year_month=${year_month}`,
+    ),
+  updateDailyNote: (date: string, note: string) =>
+    request<components["schemas"]["DailyNote"]>(`/notes/daily/${date}`, {
+      method: "PUT",
+      body: JSON.stringify({ note }),
+    }),
 };
