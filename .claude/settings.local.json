@@ -4,7 +4,29 @@
       "Bash(docker compose *)",
       "Read(//c/Users/k8489/go/bin/**)",
       "Read(//usr/local/bin/**)",
-      "Bash(go install *)"
+      "Bash(go install *)",
+      "Bash(make sqlc-gen *)",
+      "Bash(go build *)",
+      "Bash(pkill -f \"go run\")",
+      "Bash(pkill -f \"server\")",
+      "Bash(make run *)",
+      "Bash(curl -s http://localhost:8080/health)",
+      "Bash(DATABASE_URL=postgres://atoikura:dev_password@localhost:5432/atoikura?sslmode=disable go run ./cmd/server)",
+      "Bash(curl -s http://localhost:8080/budgets)",
+      "Bash(curl -s -X PUT http://localhost:8080/budgets -H 'Content-Type: application/json' -d '{\"monthly_budget\":120000,\"goal_text\":\"旅行費を貯める\",\"goal_amount\":300000}')",
+      "Bash(curl -s -X PUT http://localhost:8080/budgets -H 'Content-Type: application/json' -d '{\"monthly_budget\":0}')",
+      "Bash(curl -s -X PUT http://localhost:8080/budgets -H 'Content-Type: application/json' -d '{\"goal_text\":\"updated note\"}')",
+      "Bash(curl -s -X PUT http://localhost:8080/budgets -H 'Content-Type: application/json' -d '{\"monthly_budget\":-1}')",
+      "Bash(golangci-lint run *)",
+      "Bash(dir C:\\\\Users\\\\k8489\\\\git\\\\atoikura\\\\backend\\\\internal\\\\db *)",
+      "Bash(gofmt *)",
+      "Bash(make migrate-up *)",
+      "Bash(curl -s http://localhost:8080/expenses/daily-cumulative)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "PowerShell(Start-Sleep -Seconds 5; Invoke-RestMethod -Uri \"http://localhost:8080/health\" 2>&1)"
     ]
   }
 }
