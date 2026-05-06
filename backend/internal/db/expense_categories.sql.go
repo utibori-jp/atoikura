@@ -9,6 +9,45 @@ import (
 	"context"
 )
 
+const createExpenseCategory = `-- name: CreateExpenseCategory :one
+INSERT INTO expense_categories (user_id, group_id, category_name, description)
+VALUES ($1, $2, $3, $4)
+RETURNING id, category_name, category_code, group_id, description
+`
+
+type CreateExpenseCategoryParams struct {
+	UserID       int32   `json:"user_id"`
+	GroupID      int32   `json:"group_id"`
+	CategoryName string  `json:"category_name"`
+	Description  *string `json:"description"`
+}
+
+type CreateExpenseCategoryRow struct {
+	ID           int32   `json:"id"`
+	CategoryName string  `json:"category_name"`
+	CategoryCode *string `json:"category_code"`
+	GroupID      int32   `json:"group_id"`
+	Description  *string `json:"description"`
+}
+
+func (q *Queries) CreateExpenseCategory(ctx context.Context, arg CreateExpenseCategoryParams) (CreateExpenseCategoryRow, error) {
+	row := q.db.QueryRow(ctx, createExpenseCategory,
+		arg.UserID,
+		arg.GroupID,
+		arg.CategoryName,
+		arg.Description,
+	)
+	var i CreateExpenseCategoryRow
+	err := row.Scan(
+		&i.ID,
+		&i.CategoryName,
+		&i.CategoryCode,
+		&i.GroupID,
+		&i.Description,
+	)
+	return i, err
+}
+
 const getActiveExpenseCategoryByID = `-- name: GetActiveExpenseCategoryByID :one
 SELECT id, user_id, group_id, is_deleted
 FROM expense_categories
@@ -36,6 +75,47 @@ func (q *Queries) GetActiveExpenseCategoryByID(ctx context.Context, arg GetActiv
 		&i.UserID,
 		&i.GroupID,
 		&i.IsDeleted,
+	)
+	return i, err
+}
+
+const getExpenseCategoryByID = `-- name: GetExpenseCategoryByID :one
+SELECT
+  ec.id,
+  ec.category_name,
+  ec.category_code,
+  ec.group_id,
+  cg.group_name,
+  ec.description
+FROM expense_categories ec
+JOIN category_groups cg ON ec.group_id = cg.id
+WHERE ec.id = $1 AND ec.user_id = $2 AND ec.is_deleted = false
+`
+
+type GetExpenseCategoryByIDParams struct {
+	ID     int32 `json:"id"`
+	UserID int32 `json:"user_id"`
+}
+
+type GetExpenseCategoryByIDRow struct {
+	ID           int32   `json:"id"`
+	CategoryName string  `json:"category_name"`
+	CategoryCode *string `json:"category_code"`
+	GroupID      int32   `json:"group_id"`
+	GroupName    string  `json:"group_name"`
+	Description  *string `json:"description"`
+}
+
+func (q *Queries) GetExpenseCategoryByID(ctx context.Context, arg GetExpenseCategoryByIDParams) (GetExpenseCategoryByIDRow, error) {
+	row := q.db.QueryRow(ctx, getExpenseCategoryByID, arg.ID, arg.UserID)
+	var i GetExpenseCategoryByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.CategoryName,
+		&i.CategoryCode,
+		&i.GroupID,
+		&i.GroupName,
+		&i.Description,
 	)
 	return i, err
 }
@@ -87,4 +167,51 @@ func (q *Queries) ListExpenseCategoriesByUser(ctx context.Context, userID int32)
 		return nil, err
 	}
 	return items, nil
+}
+
+const softDeleteExpenseCategory = `-- name: SoftDeleteExpenseCategory :execrows
+UPDATE expense_categories
+SET is_deleted = true, deleted_at = NOW(), updated_at = NOW(), version = version + 1
+WHERE id = $1 AND user_id = $2 AND is_deleted = false
+`
+
+type SoftDeleteExpenseCategoryParams struct {
+	ID     int32 `json:"id"`
+	UserID int32 `json:"user_id"`
+}
+
+func (q *Queries) SoftDeleteExpenseCategory(ctx context.Context, arg SoftDeleteExpenseCategoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, softDeleteExpenseCategory, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateExpenseCategoryByID = `-- name: UpdateExpenseCategoryByID :execrows
+UPDATE expense_categories
+SET category_name = $3, group_id = $4, description = $5, updated_at = NOW(), version = version + 1
+WHERE id = $1 AND user_id = $2 AND is_deleted = false
+`
+
+type UpdateExpenseCategoryByIDParams struct {
+	ID           int32   `json:"id"`
+	UserID       int32   `json:"user_id"`
+	CategoryName string  `json:"category_name"`
+	GroupID      int32   `json:"group_id"`
+	Description  *string `json:"description"`
+}
+
+func (q *Queries) UpdateExpenseCategoryByID(ctx context.Context, arg UpdateExpenseCategoryByIDParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateExpenseCategoryByID,
+		arg.ID,
+		arg.UserID,
+		arg.CategoryName,
+		arg.GroupID,
+		arg.Description,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

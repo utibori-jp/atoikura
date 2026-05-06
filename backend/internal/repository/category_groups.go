@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	ErrNotFound                   = errors.New("not found")
-	ErrDuplicateCategoryGroupName = errors.New("duplicate category group name")
-	ErrCategoryGroupHasChildren   = errors.New("category group has expense categories")
+	ErrNotFound                     = errors.New("not found")
+	ErrDuplicateCategoryGroupName   = errors.New("duplicate category group name")
+	ErrCategoryGroupHasChildren     = errors.New("category group has expense categories")
+	ErrDuplicateExpenseCategoryName = errors.New("duplicate expense category name")
 )
 
 type StatementTypeView struct {
