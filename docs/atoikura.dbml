@@ -20,10 +20,9 @@ Table users {
 Table journal_entries {
   id integer [primary key]
   transaction_date date [not null]
-  item varchar                              // 変更: description → item
+  item varchar
   amount integer [not null]
-  // entry_id 削除: entriesテーブル廃止に伴い不要
-  is_excluded boolean [not null, default: false]       // 変更: is_variable_cost → is_excluded（除外フラグ。trueで集計から除外）
+  is_excluded boolean [not null, default: false]
   category_id integer [not null]
   user_id integer [not null]
   note text
@@ -32,7 +31,6 @@ Table journal_entries {
   version integer
 }
 
-// entriesテーブル削除: 通常出費・特別出費の区分はis_variable_costで代替可能なため不要
 
 Table expense_categories {
   id integer [primary key]
@@ -40,8 +38,6 @@ Table expense_categories {
   category_name varchar
   user_id integer [not null]
   group_id integer [not null]
-  // statement_type_id 削除: category_groups経由で取得するため不要
-  // is_variable_cost 削除: journal_entries側で管理するため不要（is_excludedで代替）
   description text
   is_deleted boolean [not null, default: false]
   // 注意: 論理削除後も journal_entries から参照される可能性がある。
@@ -53,7 +49,7 @@ Table expense_categories {
 
   indexes {
     (user_id, category_code) [unique]
-    (user_id, group_id, category_name) [unique]   // 追加: 同一大分類内での重複を防ぐ
+    (user_id, group_id, category_name) [unique]
   }
 }
 
@@ -61,7 +57,7 @@ Table category_groups {
   id integer [primary key]
   user_id integer [not null]
   group_name varchar [not null]
-  statement_type_id integer [not null]     // 追加: 変動費分析用グループとの紐づけ
+  statement_type_id integer [not null]
   description text
   is_deleted boolean [not null, default: false]
   created_at timestamp
@@ -76,7 +72,7 @@ Table category_groups {
 
 Table statement_types {
   id integer [primary key]
-  type_code varchar [not null, unique]     // 追加: サーバー側での分類に使用
+  type_code varchar [not null, unique]
   statement_type_name varchar [not null]
   created_at timestamp
   updated_at timestamp
@@ -158,4 +154,3 @@ Ref: journal_entries.category_id > expense_categories.id
 Ref: expense_categories.group_id > category_groups.id
 Ref: category_groups.statement_type_id > statement_types.id
 Ref: accounts.id < account_transactions.account_id
-// Ref: journal_entries.entry_id > entries.id 削除

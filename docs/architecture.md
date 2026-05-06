@@ -1,7 +1,7 @@
 # Architecture
 
-技術スタックとリポジトリ構成のリファレンス。
-Claude Code・人間どちらも参照する。
+Reference for the technology stack and repository structure.
+To be used by both Claude Code and human developers.
 
 ---
 
@@ -23,16 +23,16 @@ Claude Code・人間どちらも参照する。
 
 ## Repository Layout
 
-```
+```text
 atoikura/
 ├── backend/
 │   ├── cmd/server/main.go
 │   ├── internal/
-│   │   ├── handler/        # HTTP handlers
-│   │   ├── repository/     # Wraps sqlc-generated code
-│   │   └── db/             # sqlc-generated code (do not edit by hand)
-│   ├── migrations/         # golang-migrate SQL files
-│   ├── queries/            # sqlc input SQL queries
+│   │   ├── handler/         # HTTP handlers
+│   │   ├── repository/      # Wraps sqlc-generated code
+│   │   └── db/              # sqlc-generated code (do not edit by hand)
+│   ├── migrations/          # golang-migrate SQL files
+│   ├── queries/             # sqlc input SQL queries
 │   ├── sqlc.yaml
 │   ├── Dockerfile
 │   ├── .env.example
@@ -46,7 +46,7 @@ atoikura/
 │   ├── package.json
 │   └── vite.config.ts
 ├── deploy/
-│   └── k8s/                # K3s manifests (empty until deploy phase)
+│   └── k8s/                 # K3s manifests (empty until deploy phase)
 ├── docs/
 │   ├── spec.md
 │   ├── atoikura.dbml

@@ -1,32 +1,32 @@
 # CLAUDE.md
 
-Claude Code がこのリポジトリで作業する際の指針。
+Guidelines for Claude Code when working in this repository.
 
 ---
 
-## 作業前に必ず読むこと
+## Must Read Before Starting
 
-すべてのタスクで共通:
+Common to all tasks:
 
-- `docs/spec.md` — 仕様・V1制約（source of truth）
-- `docs/atoikura.dbml` — DBスキーマ定義
-- `docs/atoikura-api.yaml` — OpenAPI契約
-- `docs/architecture.md` — 技術スタック・ディレクトリ構成
-- `docs/prompts/<current-step>.md` — 現ステップのタスク定義
+- `docs/spec.md` — Specifications / V1 constraints (Source of Truth)
+- `docs/atoikura.dbml` — DB schema definitions
+- `docs/atoikura-api.yaml` — OpenAPI contracts
+- `docs/architecture.md` — Tech stack and directory structure
+- `docs/prompts/<current-step>.md` — Task definitions for the current step
 
-作業領域に応じて追加で読むこと:
+Read additional documents based on the work area:
 
-- バックエンド作業時 → `docs/conventions-backend.md`
-- フロントエンド作業時 → `docs/conventions-frontend.md`
+- For Backend work → `docs/conventions-backend.md`
+- For Frontend work → `docs/conventions-frontend.md`
 
 ---
 
 ## Working Rules
 
-- **スコープを守る**: 現ステップのプロンプトに記載のタスクのみ実装する。便利でも先取りしない。
-- **仕様を優先する**: spec・スキーマと指示が矛盾したら作業を止めてユーザーに確認する。推測で進めない。
-- **検証してから完了宣言**: 各プロンプトの "Verification Checklist" を全項目実行してから完了とする。
-- **段階的にコミット**: 論理的な単位ごとにコミットする。1ステップ = 1 PR。
+- **Maintain Scope**: Implement only the tasks listed in the current step's prompt. Do not implement future features, even if they seem useful.
+- **Prioritize Specifications**: If there is a conflict between the specs/schema and instructions, stop work and confirm with the user. Do not proceed based on assumptions.
+- **Verify Before Declaring Completion**: Execute all items in the "Verification Checklist" of each prompt before finishing a task.
+- **Incremental Commits**: Commit in logical units. 1 Step = 1 PR.
 
 ---
 
@@ -34,17 +34,17 @@ Claude Code がこのリポジトリで作業する際の指針。
 
 ### Branch Strategy
 
-- `main`: stable、デプロイ対象
-- `develop`: 開発統合ブランチ
-- `feature/*`: `develop` から切る。PR で `develop` にマージ。
-- ブランチ名例: `feature/m1-step1-monorepo-setup`
+- `main`: Stable, deployment target.
+- `develop`: Development integration branch.
+- `feature/*`: Branched from `develop`. Merged into `develop` via PR.
+- Example branch name: `feature/m1-step1-monorepo-setup`
 
 ### Commit
 
-- [Conventional Commits](https://www.conventionalcommits.org/) 形式
-- メッセージは**英語**、タイトル行のみ（body・bullet points なし）
-- `Co-Authored-By:` は付けない
-- スコープ例:
+- Use [Conventional Commits](https://www.conventionalcommits.org/) format.
+- Messages must be in **English**, title line only (no body or bullet points).
+- Do not include `Co-Authored-By:`.
+- Scope examples:
   - `feat(backend/handler): add POST /journal-entries`
   - `chore(backend/migrations): add statement_types seed`
   - `feat(frontend/forms): add journal entry form`
@@ -52,7 +52,7 @@ Claude Code がこのリポジトリで作業する際の指針。
 
 ### General
 
-- コメントは英語
-- 変数名は役割・型・内容を表すこと。汎用名禁止。
+- Comments must be in English.
+- Variable names must describe their role, type, and content. Avoid generic names.
   - NG: `seen`, `current`, `result`, `temp`
   - OK: `num_to_index`, `target_complement`, `monthly_budget_yen`
