@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { components } from "../api/types";
+import { T } from "../theme";
 
 type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
 
@@ -27,88 +28,52 @@ function computeSummary(data: DailyCumulativeResponse) {
   const total_spend = last_actual?.total ?? 0;
   const remaining_budget = data.monthly_budget - total_spend;
   const today_day = todayDayJST();
-  const days_left = daysInMonthJST() - today_day;
+  const days_in_month = daysInMonthJST();
+  const days_left = days_in_month - today_day;
   const daily_available = days_left > 0 ? Math.floor(remaining_budget / days_left) : 0;
-  return { total_spend, remaining_budget, daily_available, days_left };
+  const monthly_budget = data.monthly_budget;
+  const baseline_today = monthly_budget > 0 ? Math.round((monthly_budget / days_in_month) * today_day) : 0;
+  const budget_margin = baseline_today - total_spend;
+  return { total_spend, remaining_budget, daily_available, days_left, monthly_budget, budget_margin };
 }
 
-function WalletIcon() {
-  return (
-    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <rect x={1} y={4} width={22} height={16} rx={2} ry={2} />
-      <line x1={1} y1={10} x2={23} y2={10} />
-    </svg>
-  );
-}
+type Tone = "coral" | "mustard" | "sage";
 
-function TrendUpIcon() {
-  return (
-    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="23,6 13.5,15.5 8.5,10.5 1,18" />
-      <polyline points="17,6 23,6 23,12" />
-    </svg>
-  );
-}
+const TONE_COLORS: Record<Tone, { bg: string; fg: string }> = {
+  coral:   { bg: "#FFE8DD", fg: T.coralDeep },
+  mustard: { bg: "#FFF1CC", fg: "#A3791F" },
+  sage:    { bg: "#DEF1E6", fg: T.sageDeep },
+};
 
-interface CardProps {
-  icon: React.ReactNode;
-  icon_bg: string;
+interface StatPillProps {
+  tone: Tone;
   label: string;
   value: string;
   sub?: string;
 }
 
-function SummaryCard({ icon, icon_bg, label, value, sub }: CardProps) {
+function StatPill({ tone, label, value, sub }: StatPillProps) {
+  const { bg, fg } = TONE_COLORS[tone];
   return (
-    <div
-      style={{
-        flex: 1,
-        background: "#161616",
-        border: "1px solid #222",
-        borderRadius: 12,
-        padding: "20px 24px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-      }}
-    >
-      <div
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 10,
-          background: icon_bg,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          color: "#fff",
-        }}
-      >
-        {icon}
-      </div>
-      <div>
-        <div style={{ fontSize: 13, color: "#777", marginBottom: 4 }}>{label}</div>
-        <div style={{ fontSize: 26, fontWeight: 700, color: "#fff", letterSpacing: "-0.5px" }}>
-          {value}
-        </div>
-        {sub && <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{sub}</div>}
-      </div>
+    <div style={{
+      background: bg, borderRadius: 24, padding: "18px 22px", flex: 1, minWidth: 0,
+    }}>
+      <div style={{ fontSize: 12, color: fg, fontWeight: 700, letterSpacing: "0.04em" }}>{label}</div>
+      <div style={{
+        fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 26,
+        color: T.ink, marginTop: 4,
+      }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
 
-function SkeletonCard() {
+function SkeletonPill() {
   return (
-    <div
-      style={{
-        flex: 1,
-        height: 96,
-        background: "#161616",
-        border: "1px solid #222",
-        borderRadius: 12,
-      }}
-    />
+    <div style={{
+      flex: 1, height: 88, borderRadius: 24,
+      background: "#F2E4D2", opacity: 0.5,
+    }} />
   );
 }
 
@@ -122,36 +87,32 @@ export function SummaryCards() {
   if (!data) {
     return (
       <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
-        <SkeletonCard />
-        <SkeletonCard />
-        <SkeletonCard />
+        <SkeletonPill /><SkeletonPill /><SkeletonPill />
       </div>
     );
   }
 
-  const { total_spend, remaining_budget, daily_available, days_left } = computeSummary(data);
-  const green_bg = "#14532d";
-  const gold_bg = "#78350f";
+  const { total_spend, remaining_budget, daily_available, days_left, monthly_budget, budget_margin } = computeSummary(data);
+  const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 
   return (
     <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
-      <SummaryCard
-        icon={<WalletIcon />}
-        icon_bg={green_bg}
+      <StatPill
+        tone="coral"
         label="今月の支出"
-        value={`¥${total_spend.toLocaleString()}`}
+        value={yen(total_spend)}
+        sub={monthly_budget > 0 ? `予算 ${yen(monthly_budget)} のうち` : undefined}
       />
-      <SummaryCard
-        icon={<TrendUpIcon />}
-        icon_bg={green_bg}
+      <StatPill
+        tone="mustard"
         label="残り予算"
-        value={`¥${remaining_budget.toLocaleString()}`}
+        value={yen(remaining_budget)}
+        sub={budget_margin >= 0 ? `基準より ${yen(budget_margin)} 余裕` : `基準より ${yen(-budget_margin)} オーバー`}
       />
-      <SummaryCard
-        icon={<TrendUpIcon />}
-        icon_bg={gold_bg}
+      <StatPill
+        tone="sage"
         label="1日あたり利用可能額"
-        value={`¥${daily_available.toLocaleString()}`}
+        value={yen(daily_available)}
         sub={`残り${days_left}日`}
       />
     </div>
