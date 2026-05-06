@@ -62,13 +62,13 @@ function CustomTooltip(props: TooltipContentProps<TooltipValueType, NameType>) {
     <div
       style={{
         background: "#1a1a1a",
-        border: "1px solid #444",
+        border: "1px solid #333",
         padding: "8px 12px",
         borderRadius: 6,
         fontSize: 13,
       }}
     >
-      <p style={{ margin: "0 0 4px", color: "#ccc" }}>{label}日</p>
+      <p style={{ margin: "0 0 4px", color: "#aaa" }}>{label}日</p>
       {payload.map((entry: TooltipPayloadEntry) => (
         <p
           key={String(entry.name)}
@@ -84,56 +84,12 @@ function CustomTooltip(props: TooltipContentProps<TooltipValueType, NameType>) {
   );
 }
 
-function MonthNavigator({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (ym: string) => void;
-}) {
-  const current_month = currentMonthJST();
-  const is_at_current = value >= current_month;
-
+function TrendIcon() {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        marginBottom: 12,
-      }}
-    >
-      <button
-        onClick={() => onChange(addMonths(value, -1))}
-        style={{
-          padding: "4px 12px",
-          borderRadius: 6,
-          border: "1px solid #444",
-          background: "#222",
-          color: "#ccc",
-          cursor: "pointer",
-        }}
-      >
-        &lt;
-      </button>
-      <span style={{ fontWeight: 600, minWidth: 90, textAlign: "center" }}>
-        {formatMonthLabel(value)}
-      </span>
-      <button
-        onClick={() => onChange(addMonths(value, 1))}
-        disabled={is_at_current}
-        style={{
-          padding: "4px 12px",
-          borderRadius: 6,
-          border: "1px solid #444",
-          background: is_at_current ? "#111" : "#222",
-          color: is_at_current ? "#555" : "#ccc",
-          cursor: is_at_current ? "default" : "pointer",
-        }}
-      >
-        &gt;
-      </button>
-    </div>
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23,6 13.5,15.5 8.5,10.5 1,18" />
+      <polyline points="17,6 23,6 23,12" />
+    </svg>
   );
 }
 
@@ -151,9 +107,7 @@ type FetchState =
 
 export function HomeGraph() {
   const [year_month, setYearMonth] = useState<string>(currentMonthJST());
-  const [fetch_state, setFetchState] = useState<FetchState>({
-    status: "loading",
-  });
+  const [fetch_state, setFetchState] = useState<FetchState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
@@ -166,8 +120,7 @@ export function HomeGraph() {
         if (!cancelled)
           setFetchState({
             status: "error",
-            message:
-              err instanceof Error ? err.message : "データ取得に失敗しました",
+            message: err instanceof Error ? err.message : "データ取得に失敗しました",
           });
       });
     return () => {
@@ -178,35 +131,74 @@ export function HomeGraph() {
 
   const data = fetch_state.status === "success" ? fetch_state.data : null;
   const chart_data = data ? buildChartData(data) : [];
-
   const last_actual = lastActualIndex(chart_data);
   const actual_rows = chart_data.slice(0, last_actual + 1);
   const forecast_rows = chart_data.slice(last_actual);
+  const current_month = currentMonthJST();
+  const is_at_current = year_month >= current_month;
 
   return (
-    <section style={{ marginBottom: 32 }}>
-      <h2 style={{ fontSize: 16, marginBottom: 8 }}>変動費累積グラフ</h2>
-      <MonthNavigator value={year_month} onChange={setYearMonth} />
+    <>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <h2 style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 600, color: "#ccc" }}>
+          <TrendIcon />
+          変動費累積グラフ
+        </h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={() => setYearMonth(addMonths(year_month, -1))}
+            style={{
+              padding: "3px 10px",
+              borderRadius: 6,
+              border: "1px solid #2e2e2e",
+              background: "#1e1e1e",
+              color: "#aaa",
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            &lt;
+          </button>
+          <span style={{ fontSize: 13, color: "#aaa", minWidth: 80, textAlign: "center" }}>
+            {formatMonthLabel(year_month)}
+          </span>
+          <button
+            onClick={() => setYearMonth(addMonths(year_month, 1))}
+            disabled={is_at_current}
+            style={{
+              padding: "3px 10px",
+              borderRadius: 6,
+              border: "1px solid #2e2e2e",
+              background: is_at_current ? "#141414" : "#1e1e1e",
+              color: is_at_current ? "#3a3a3a" : "#aaa",
+              fontSize: 13,
+              cursor: is_at_current ? "default" : "pointer",
+            }}
+          >
+            &gt;
+          </button>
+        </div>
+      </div>
 
       {fetch_state.status === "error" && (
-        <p style={{ color: "#f87171" }}>{fetch_state.message}</p>
+        <p style={{ color: "#f87171", fontSize: 14 }}>{fetch_state.message}</p>
       )}
 
       {data && (
-        <ResponsiveContainer width="100%" height={320}>
-          <ComposedChart margin={{ top: 8, right: 16, left: 16, bottom: 0 }}>
+        <ResponsiveContainer width="100%" height={300}>
+          <ComposedChart margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
             <XAxis
               dataKey="day"
               type="number"
               domain={[1, chart_data.length]}
               tickCount={chart_data.length}
               tickFormatter={(v: number) => String(v)}
-              stroke="#888"
-              tick={{ fontSize: 11, fill: "#888" }}
+              stroke="#333"
+              tick={{ fontSize: 10, fill: "#555" }}
             />
             <YAxis
-              stroke="#888"
-              tick={{ fontSize: 11, fill: "#888" }}
+              stroke="#333"
+              tick={{ fontSize: 10, fill: "#555" }}
               tickFormatter={(v: number) =>
                 v >= 10000 ? `¥${Math.round(v / 1000)}k` : `¥${v}`
               }
@@ -214,11 +206,10 @@ export function HomeGraph() {
             <Tooltip content={CustomTooltip} />
             <Legend
               formatter={(value: string) => (
-                <span style={{ fontSize: 12, color: "#ccc" }}>{value}</span>
+                <span style={{ fontSize: 12, color: "#888" }}>{value}</span>
               )}
             />
 
-            {/* Actual days — solid lines */}
             <Line
               data={actual_rows}
               dataKey="food"
@@ -257,14 +248,13 @@ export function HomeGraph() {
               isAnimationActive={false}
             />
 
-            {/* Forecast days — dashed and faded */}
             <Line
               data={forecast_rows}
               dataKey="food"
               stroke="#4ade80"
               strokeWidth={2}
               strokeDasharray="4 4"
-              strokeOpacity={0.4}
+              strokeOpacity={0.35}
               dot={false}
               isAnimationActive={false}
               legendType="none"
@@ -275,7 +265,7 @@ export function HomeGraph() {
               stroke="#facc15"
               strokeWidth={2}
               strokeDasharray="4 4"
-              strokeOpacity={0.4}
+              strokeOpacity={0.35}
               dot={false}
               isAnimationActive={false}
               legendType="none"
@@ -286,7 +276,7 @@ export function HomeGraph() {
               stroke="#a78bfa"
               strokeWidth={2}
               strokeDasharray="4 4"
-              strokeOpacity={0.4}
+              strokeOpacity={0.35}
               dot={false}
               isAnimationActive={false}
               legendType="none"
@@ -297,7 +287,7 @@ export function HomeGraph() {
               stroke="#fb923c"
               strokeWidth={2}
               strokeDasharray="6 3"
-              strokeOpacity={0.4}
+              strokeOpacity={0.35}
               dot={false}
               isAnimationActive={false}
               legendType="none"
@@ -307,10 +297,10 @@ export function HomeGraph() {
       )}
 
       {data?.monthly_budget === 0 && (
-        <p style={{ marginTop: 8, color: "#facc15", fontSize: 14 }}>
+        <p style={{ marginTop: 8, color: "#facc15", fontSize: 13 }}>
           予算を設定してください
         </p>
       )}
-    </section>
+    </>
   );
 }

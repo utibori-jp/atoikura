@@ -11,6 +11,29 @@ interface Props {
 
 const today_jst = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
 
+function PlusIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+      <line x1={12} y1={5} x2={12} y2={19} />
+      <line x1={5} y1={12} x2={19} y2={12} />
+    </svg>
+  );
+}
+
+interface FieldProps {
+  label: string;
+  children: React.ReactNode;
+}
+
+function Field({ label, children }: FieldProps) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ fontSize: 13, color: '#888', fontWeight: 500 }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
 export function JournalEntryForm({ onSuccess }: Props) {
   const [category_groups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const [all_expense_categories, setAllExpenseCategories] = useState<ExpenseCategory[]>([]);
@@ -78,102 +101,144 @@ export function JournalEntryForm({ onSuccess }: Props) {
   };
 
   return (
-    <form onSubmit={handle_submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <h2>仕訳入力</h2>
+    <form onSubmit={handle_submit}>
+      <h2
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 15,
+          fontWeight: 600,
+          color: '#ccc',
+          marginBottom: 20,
+        }}
+      >
+        <PlusIcon />
+        仕訳入力
+      </h2>
 
-      <label>
-        日付
-        <input
-          type="date"
-          value={transaction_date}
-          onChange={(e) => setTransactionDate(e.target.value)}
-          required
-          style={{ marginLeft: 8 }}
-        />
-      </label>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <Field label="日付">
+          <input
+            type="date"
+            value={transaction_date}
+            onChange={(e) => setTransactionDate(e.target.value)}
+            required
+          />
+        </Field>
 
-      <label>
-        大分類
-        <select
-          value={selected_group_id}
-          onChange={(e) => handle_group_change(e.target.value)}
-          style={{ marginLeft: 8 }}
-        >
-          <option value="">-- 選択してください --</option>
-          {category_groups.map((g) => (
-            <option key={g.id} value={String(g.id)}>
-              {g.group_name}
-            </option>
-          ))}
-        </select>
-      </label>
+        <Field label="金額">
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            min={1}
+            placeholder="¥0"
+            required
+          />
+        </Field>
 
-      <label>
-        生活区分
-        <select
-          value={selected_category_id}
-          onChange={(e) => setSelectedCategoryId(e.target.value)}
-          disabled={!selected_group_id}
-          style={{ marginLeft: 8 }}
-        >
-          <option value="">-- 選択してください --</option>
-          {filtered_categories.map((cat) => (
-            <option key={cat.id} value={String(cat.id)}>
-              {cat.category_name}
-            </option>
-          ))}
-        </select>
-      </label>
+        <Field label="項目名">
+          <input
+            type="text"
+            value={item}
+            onChange={(e) => setItem(e.target.value)}
+            placeholder="例: コンビニ弁当"
+          />
+        </Field>
+      </div>
 
-      <label>
-        金額（円）
-        <input
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          min={1}
-          required
-          style={{ marginLeft: 8 }}
-        />
-      </label>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <Field label="大分類">
+          <select
+            value={selected_group_id}
+            onChange={(e) => handle_group_change(e.target.value)}
+          >
+            <option value="">選択してください</option>
+            {category_groups.map((g) => (
+              <option key={g.id} value={String(g.id)}>
+                {g.group_name}
+              </option>
+            ))}
+          </select>
+        </Field>
 
-      <label>
-        項目名
-        <input
-          type="text"
-          value={item}
-          onChange={(e) => setItem(e.target.value)}
-          placeholder="任意"
-          style={{ marginLeft: 8 }}
-        />
-      </label>
+        <Field label="生活区分">
+          <select
+            value={selected_category_id}
+            onChange={(e) => setSelectedCategoryId(e.target.value)}
+            disabled={!selected_group_id}
+            style={{ opacity: selected_group_id ? 1 : 0.5 }}
+          >
+            <option value="">{selected_group_id ? '選択してください' : '大分類を先に選択'}</option>
+            {filtered_categories.map((cat) => (
+              <option key={cat.id} value={String(cat.id)}>
+                {cat.category_name}
+              </option>
+            ))}
+          </select>
+        </Field>
 
-      <label>
-        <input
-          type="checkbox"
-          checked={is_excluded}
-          onChange={(e) => setIsExcluded(e.target.checked)}
-          style={{ marginRight: 8 }}
-        />
-        集計除外（特別支出など）
-      </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontSize: 13, color: '#888', fontWeight: 500 }}>&nbsp;</label>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              fontSize: 14,
+              color: '#ccc',
+              cursor: 'pointer',
+              paddingTop: 2,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={is_excluded}
+              onChange={(e) => setIsExcluded(e.target.checked)}
+              style={{ width: 'auto' }}
+            />
+            集計から除外
+          </label>
+        </div>
+      </div>
 
-      <label>
-        メモ
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="任意"
-          rows={2}
-          style={{ marginLeft: 8 }}
-        />
-      </label>
+      <div style={{ marginBottom: 20 }}>
+        <Field label="メモ">
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="メモを入力..."
+            rows={3}
+            style={{ resize: 'vertical' }}
+          />
+        </Field>
+      </div>
 
       {error_message && (
-        <p style={{ color: 'red', margin: 0 }}>{error_message}</p>
+        <p style={{ color: '#f87171', fontSize: 13, marginBottom: 12 }}>{error_message}</p>
       )}
 
-      <button type="submit" disabled={submitting} style={{ width: 120 }}>
+      <button
+        type="submit"
+        disabled={submitting}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '10px 24px',
+          borderRadius: 8,
+          border: 'none',
+          background: submitting ? '#166534' : '#22c55e',
+          color: '#000',
+          fontWeight: 600,
+          fontSize: 14,
+          cursor: submitting ? 'default' : 'pointer',
+          opacity: submitting ? 0.7 : 1,
+          transition: 'opacity 0.15s',
+        }}
+      >
+        <PlusIcon />
         {submitting ? '送信中...' : '登録'}
       </button>
     </form>
