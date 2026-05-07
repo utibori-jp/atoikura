@@ -77,7 +77,7 @@ export function BudgetSettings() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
-        <h1 style={{ fontFamily: "'M PLUS Rounded 1c', sans-serif", fontSize: 28, fontWeight: 900, color: T.ink, letterSpacing: "-0.01em" }}>
+        <h1 style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 30, fontWeight: 900, color: T.ink, letterSpacing: "-0.01em" }}>
           今月の目標
         </h1>
         <p style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>無理せず続けられるラインを決めましょう</p>
@@ -89,7 +89,7 @@ export function BudgetSettings() {
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
             <div style={{ width: 48, height: 48, borderRadius: 16, background: "#FFE8DD", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>💰</div>
             <div>
-              <div style={{ fontFamily: "'M PLUS Rounded 1c', sans-serif", fontSize: 16, fontWeight: 700 }}>貯金目標</div>
+              <div style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 16, fontWeight: 700 }}>貯金目標</div>
               <div style={{ fontSize: 12, color: T.inkSoft }}>叶えたいことを書いておこう</div>
             </div>
           </div>
@@ -125,7 +125,7 @@ export function BudgetSettings() {
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, position: "relative" }}>
             <div style={{ width: 48, height: 48, borderRadius: 16, background: "#FFF1CC", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>🌞</div>
             <div>
-              <div style={{ fontFamily: "'M PLUS Rounded 1c', sans-serif", fontSize: 16, fontWeight: 700 }}>変動費の月次予算</div>
+              <div style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 16, fontWeight: 700 }}>変動費の月次予算</div>
               <div style={{ fontSize: 12, color: T.inkSoft }}>食費・日用品など変動するもの合計</div>
             </div>
           </div>

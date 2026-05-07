@@ -77,24 +77,24 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange }: NavBarPr
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <LogoIcon />
         <span style={{
-          fontFamily: "'M PLUS Rounded 1c', sans-serif",
+          fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
           fontWeight: 900, fontSize: 22, letterSpacing: "-0.01em", color: T.ink,
         }}>Atoikura</span>
       </div>
 
       {/* Nav pills */}
       <nav style={{
-        display: "flex", gap: 4,
-        background: T.bgSoft,
-        padding: 5, borderRadius: 999,
-        border: `1px solid ${T.hair}`,
+        display: "flex", gap: 6,
+        background: T.card,
+        padding: 6, borderRadius: 999,
+        boxShadow: "0 4px 16px -10px rgba(80,40,10,0.2)",
       }}>
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
             onClick={() => onChange(item.id)}
             style={{
-              padding: "9px 18px", borderRadius: 999,
+              padding: "10px 18px", borderRadius: 999,
               border: "none",
               background: active === item.id ? T.ink : "transparent",
               color: active === item.id ? "#fff" : T.ink,

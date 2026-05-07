@@ -136,7 +136,7 @@ export function ReviewScreen() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontFamily: "'M PLUS Rounded 1c', sans-serif", fontSize: 28, fontWeight: 900, color: T.ink, letterSpacing: "-0.01em" }}>
+        <h1 style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 30, fontWeight: 900, color: T.ink, letterSpacing: "-0.01em" }}>
           {formatMonthJP(year_month)}の振り返り
         </h1>
         <p style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>使い方の傾向を、月単位で眺めてみる</p>

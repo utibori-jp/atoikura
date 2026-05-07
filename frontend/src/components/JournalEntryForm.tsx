@@ -27,6 +27,82 @@ function Field({ label, children, flex }: FieldProps) {
   );
 }
 
+interface ChipProps {
+  active: boolean;
+  tone?: 'coral' | 'mustard';
+  onClick: () => void;
+  children: React.ReactNode;
+}
+
+function Chip({ active, tone = 'coral', onClick, children }: ChipProps) {
+  const active_bg = tone === 'mustard' ? T.mustard : T.coral;
+  const active_border = tone === 'mustard' ? T.mustard : T.coral;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: `1.5px solid ${active ? active_border : T.hair}`,
+        background: active ? active_bg : '#fff',
+        color: active ? '#fff' : T.ink,
+        padding: '10px 16px',
+        borderRadius: 999,
+        fontFamily: 'inherit',
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+interface ToggleProps {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  sub?: string;
+}
+
+function Toggle({ checked, onChange, label, sub }: ToggleProps) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        background: 'transparent', border: 'none',
+        cursor: 'pointer', padding: 0, fontFamily: 'inherit',
+      }}
+    >
+      <span style={{
+        width: 36, height: 22, borderRadius: 999,
+        background: checked ? T.coral : T.hair,
+        position: 'relative', flexShrink: 0,
+        transition: 'background 0.15s',
+        display: 'inline-block',
+      }}>
+        <span style={{
+          position: 'absolute',
+          left: checked ? 16 : 2,
+          top: 2,
+          width: 18, height: 18,
+          borderRadius: 999,
+          background: '#fff',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+          transition: 'left 0.15s',
+        }} />
+      </span>
+      <span style={{ fontSize: 13, color: T.inkSoft }}>
+        {label}
+        {sub && <span style={{ fontSize: 11, marginLeft: 4 }}>{sub}</span>}
+      </span>
+    </button>
+  );
+}
+
 export function JournalEntryForm({ onSuccess }: Props) {
   const [category_groups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const [all_expense_categories, setAllExpenseCategories] = useState<ExpenseCategory[]>([]);
@@ -49,8 +125,8 @@ export function JournalEntryForm({ onSuccess }: Props) {
     (cat) => String(cat.group_id) === selected_group_id,
   );
 
-  const handle_group_change = (group_id: string) => {
-    setSelectedGroupId(group_id);
+  const handle_group_select = (group_id: string) => {
+    setSelectedGroupId(group_id === selected_group_id ? '' : group_id);
     setSelectedCategoryId('');
   };
 
@@ -94,7 +170,7 @@ export function JournalEntryForm({ onSuccess }: Props) {
   return (
     <form onSubmit={handle_submit}>
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontFamily: "'M PLUS Rounded 1c', sans-serif", fontSize: 18, fontWeight: 700, color: T.ink }}>
+        <h2 style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 18, fontWeight: 700, color: T.ink }}>
           支出を記録
         </h2>
         <p style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>サクッと入力してすぐ反映</p>
@@ -120,28 +196,42 @@ export function JournalEntryForm({ onSuccess }: Props) {
         </Field>
       </div>
 
-      <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
-        <Field label="大分類">
-          <select value={selected_group_id} onChange={(e) => handle_group_change(e.target.value)}>
-            <option value="">選択してください</option>
-            {category_groups.map((g) => (
-              <option key={g.id} value={String(g.id)}>{g.group_name}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="生活区分">
-          <select
-            value={selected_category_id}
-            onChange={(e) => setSelectedCategoryId(e.target.value)}
-            disabled={!selected_group_id}
-            style={{ opacity: selected_group_id ? 1 : 0.5 }}
-          >
-            <option value="">{selected_group_id ? '選択してください' : '大分類を先に選択'}</option>
+      {/* 大分類 chips */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600, marginBottom: 8 }}>大分類</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {category_groups.map((g) => (
+            <Chip
+              key={g.id}
+              active={selected_group_id === String(g.id)}
+              tone="coral"
+              onClick={() => handle_group_select(String(g.id))}
+            >
+              {g.group_name}
+            </Chip>
+          ))}
+        </div>
+      </div>
+
+      {/* 生活区分 chips */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600, marginBottom: 8 }}>生活区分</div>
+        {!selected_group_id ? (
+          <p style={{ fontSize: 13, color: T.inkSoft, fontStyle: 'italic', margin: 0 }}>大分類を先に選択してください</p>
+        ) : (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {filtered_categories.map((cat) => (
-              <option key={cat.id} value={String(cat.id)}>{cat.category_name}</option>
+              <Chip
+                key={cat.id}
+                active={selected_category_id === String(cat.id)}
+                tone="mustard"
+                onClick={() => setSelectedCategoryId(selected_category_id === String(cat.id) ? '' : String(cat.id))}
+              >
+                {cat.category_name}
+              </Chip>
             ))}
-          </select>
-        </Field>
+          </div>
+        )}
       </div>
 
       <div style={{ marginBottom: 20 }}>
@@ -155,10 +245,12 @@ export function JournalEntryForm({ onSuccess }: Props) {
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: T.inkSoft, cursor: 'pointer' }}>
-          <input type="checkbox" checked={is_excluded} onChange={(e) => setIsExcluded(e.target.checked)} style={{ width: 'auto' }} />
-          集計から除外する <span style={{ fontSize: 11 }}>（記念日など）</span>
-        </label>
+        <Toggle
+          checked={is_excluded}
+          onChange={setIsExcluded}
+          label="集計から除外する"
+          sub="（記念日など）"
+        />
 
         <button
           type="submit"

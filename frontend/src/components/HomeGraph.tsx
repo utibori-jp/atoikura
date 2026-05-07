@@ -122,7 +122,7 @@ export function HomeGraph() {
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div>
-          <h2 style={{ fontFamily: "'M PLUS Rounded 1c', sans-serif", fontSize: 18, fontWeight: 700, color: T.ink }}>
+          <h2 style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 18, fontWeight: 700, color: T.ink }}>
             変動費の累積
           </h2>
           {data && (
