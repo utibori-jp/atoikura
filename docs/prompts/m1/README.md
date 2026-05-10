@@ -1,18 +1,18 @@
 # Prompts
 
-Claude Code が各ステップを実行するためのプロンプト集。
+A collection of prompts for Claude Code to execute each development step.
 
 ## How to Use
 
-1. リポジトリルートで Claude Code を開く
-2. Claude Code は自動的に `CLAUDE.md` を読み込む
-3. 各ステップのプロンプトファイルを貼り付けるか、明示的に参照する
-   （例: "Please follow `docs/prompts/M1-step1-monorepo-setup.md`"）
-4. 完了後、PR をレビューして `develop` にマージし、次のステップへ
+1. Open Claude Code at the repository root.
+2. Claude Code will automatically read `CLAUDE.md`.
+3. Paste the content of each step's prompt file or explicitly reference it.
+   (e.g., "Please follow `docs/prompts/M1-step1-monorepo-setup.md`")
+4. Once the tasks are completed, verify the changes and proceed to the next step.
 
 ## M1 Roadmap — Spreadsheet Escape
 
-Goal: スプレッドシートを脱却できる最小限の家計記録アプリをローカルで動かす。
+Goal: To run a minimal expenditure tracking app locally that replaces spreadsheet-based management.
 
 | Step | File | What it covers |
 |---|---|---|
@@ -33,7 +33,7 @@ Goal: スプレッドシートを脱却できる最小限の家計記録アプ�
 
 ## Conventions
 
-- 各ステップは `develop` からの1つのフィーチャーブランチ
-- 各ステップは PR レビューとマージをしてから次へ進む
-- プロンプトの "Tasks" リストにないものは実装しない。次のステップに先送り。
-- 各プロンプトの "Verification Checklist" を全項目実行してから完了とする
+- **Direct Development on `develop`**: Perform all work directly on the `develop` branch without creating feature branches.
+- **Sequential Execution**: Complete each step and ensure it works before moving to the next.
+- **Strict Task Adherence**: Do not implement anything not listed in the "Tasks" section of the prompt. Defer any extra features to future steps.
+- **Verification**: All items in the "Verification Checklist" must be completed and confirmed before a step is considered finished.

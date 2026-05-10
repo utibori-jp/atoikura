@@ -11,31 +11,36 @@
 ## Requirements
 
 - Docker / Docker Compose
-- Go 1.22+（ローカル開発時）
+- Go 1.25+（ローカル開発時）
 - Node.js 20+（ローカル開発時）
 
 ---
 
-## Getting Started
+## Development
 
-```bash
-# リポジトリをクローン
-git clone <repo-url>
-cd atoikura
-
-# 環境変数を設定
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-
-# 起動
-docker compose up
+### Start the database
+```
+docker compose up -d db
 ```
 
-起動後:
+### Run migrations
+```
+cd backend && make migrate-up
+```
 
-- フロントエンド: http://localhost:5173
-- バックエンド API: http://localhost:8080
-- ヘルスチェック: `GET http://localhost:8080/health`
+### Run the frontend
+```
+cd frontend
+npm install
+npm run dev
+```
+
+The app will be available at http://localhost:3000.
+
+### Stop everything
+```
+docker compose down
+```
 
 ---
 
