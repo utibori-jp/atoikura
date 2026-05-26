@@ -4,14 +4,10 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"regexp"
-	"strconv"
 	"time"
 
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
-
-var yearMonthPattern = regexp.MustCompile(`^\d{4}-\d{2}$`)
 
 type journalEntryJSON struct {
 	ID              int32   `json:"id"`
@@ -195,10 +191,8 @@ func UpdateJournalEntryHandler(repo *repository.Repository) http.HandlerFunc {
 			return
 		}
 
-		raw_id := r.PathValue("id")
-		entry_id, err := strconv.ParseInt(raw_id, 10, 32)
-		if err != nil || entry_id < 1 {
-			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "idは正の整数で指定してください")
+		entry_id, ok := parsePathID(w, r)
+		if !ok {
 			return
 		}
 
@@ -290,10 +284,8 @@ func DeleteJournalEntryHandler(repo *repository.Repository) http.HandlerFunc {
 			return
 		}
 
-		raw_id := r.PathValue("id")
-		entry_id, err := strconv.ParseInt(raw_id, 10, 32)
-		if err != nil || entry_id < 1 {
-			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "idは正の整数で指定してください")
+		entry_id, ok := parsePathID(w, r)
+		if !ok {
 			return
 		}
 

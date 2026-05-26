@@ -4,12 +4,9 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"regexp"
 
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
-
-var datePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
 type monthlyReviewNoteJSON struct {
 	CategoryID int32  `json:"category_id"`
