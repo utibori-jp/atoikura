@@ -1,10 +1,17 @@
 package handler
 
 import (
+	"encoding/base64"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
 
 type responseWriter struct {
@@ -61,11 +68,63 @@ func AllowCORS(next http.Handler) http.Handler {
 	})
 }
 
-func InjectHardcodedUser(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := WithUserID(r.Context(), 1)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+// VerifyBasicAuth parses the Authorization header and looks up + verifies the user.
+// Returns the user id on success, or an error code suitable for a 401 response.
+func VerifyBasicAuth(r *http.Request, repo *repository.Repository) (int64, error) {
+	email, password, ok := parseBasicAuthHeader(r.Header.Get("Authorization"))
+	if !ok {
+		return 0, errors.New("missing or malformed Authorization header")
+	}
+	user, err := repo.GetUserByEmail(r.Context(), email)
+	if errors.Is(err, repository.ErrUserNotFound) {
+		return 0, errors.New("invalid credentials")
+	}
+	if err != nil {
+		return 0, err
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return 0, errors.New("invalid credentials")
+	}
+	return user.ID, nil
+}
+
+// parseBasicAuthHeader extracts (email, password) from an `Authorization: Basic ...` header.
+// Mirrors http.Request.BasicAuth but works on the raw header string so it can be unit-tested directly.
+func parseBasicAuthHeader(header string) (string, string, bool) {
+	const prefix = "Basic "
+	if len(header) < len(prefix) || !strings.EqualFold(header[:len(prefix)], prefix) {
+		return "", "", false
+	}
+	decoded, err := base64.StdEncoding.DecodeString(header[len(prefix):])
+	if err != nil {
+		return "", "", false
+	}
+	sep := strings.IndexByte(string(decoded), ':')
+	if sep < 0 {
+		return "", "", false
+	}
+	return string(decoded[:sep]), string(decoded[sep+1:]), true
+}
+
+// RequireBasicAuth enforces Basic auth on every protected request and injects user_id into the context.
+// Public endpoints (CORS preflight, /health) bypass auth.
+func RequireBasicAuth(repo *repository.Repository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodOptions || r.URL.Path == "/health" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			user_id, err := VerifyBasicAuth(r, repo)
+			if err != nil {
+				w.Header().Set("WWW-Authenticate", `Basic realm="atoikura"`)
+				WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "認証情報が不正です")
+				return
+			}
+			ctx := WithUserID(r.Context(), user_id)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
 func ChainMiddleware(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.Handler {

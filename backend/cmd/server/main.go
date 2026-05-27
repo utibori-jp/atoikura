@@ -51,12 +51,14 @@ func run(parent_ctx context.Context) error {
 	}
 	slog.Info("connected to database")
 
+	repo := repository.New(db_pool)
+
 	mux := http.NewServeMux()
-	registerRoutes(mux, db_pool)
+	registerRoutes(mux, repo)
 
 	h := handler.ChainMiddleware(mux,
 		handler.LogRequest,
-		handler.InjectHardcodedUser,
+		handler.RequireBasicAuth(repo),
 		handler.RecoverPanic,
 		handler.AllowCORS,
 	)
@@ -87,14 +89,14 @@ func run(parent_ctx context.Context) error {
 	return http_server.Shutdown(shutdown_ctx)
 }
 
-func registerRoutes(mux *http.ServeMux, db_pool *pgxpool.Pool) {
-	repo := repository.New(db_pool)
-
+func registerRoutes(mux *http.ServeMux, repo *repository.Repository) {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+	mux.Handle("POST /auth/login", handler.LoginHandler(repo))
+	mux.Handle("GET /users/me", handler.GetCurrentUserHandler(repo))
 	mux.Handle("GET /category-groups", handler.ListCategoryGroupsHandler(repo))
 	mux.Handle("POST /category-groups", handler.CreateCategoryGroupHandler(repo))
 	mux.Handle("PUT /category-groups/{id}", handler.UpdateCategoryGroupHandler(repo))
