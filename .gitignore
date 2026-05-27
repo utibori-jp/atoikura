@@ -29,3 +29,6 @@ Thumbs.db
 
 # Docker volumes
 postgres_data/
+
+# Claude Code per-developer overrides
+.claude/settings.local.json

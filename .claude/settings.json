@@ -26,7 +26,7 @@
       "Bash(npm run *)",
       "Bash(npx tsc *)",
 
-      "Bash(curl -s http://localhost:8080/health)",
+      "Bash(curl -s http://localhost:8080/*)",
 
       "Bash(mkdir*)",
       "Read(CLAUDE.md)",
