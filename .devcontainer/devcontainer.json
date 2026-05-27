@@ -1,0 +1,58 @@
+{
+  "name": "atoikura",
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.dev.yml"
+  ],
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+  "runServices": ["db", "adminer"],
+  "remoteUser": "node",
+  "shutdownAction": "stopCompose",
+
+  "containerEnv": {
+    "NODE_OPTIONS": "--max-old-space-size=4096",
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude",
+    "DATABASE_URL": "postgres://atoikura:dev_password@db:5432/atoikura?sslmode=disable",
+    "PORT": "8080",
+    "VITE_API_URL": "http://localhost:8080",
+    "CORS_ALLOWED_ORIGIN": "http://localhost:3000"
+  },
+
+  "forwardPorts": [8080, 3000, 8001],
+  "portsAttributes": {
+    "8080": { "label": "backend (Go)" },
+    "3000": { "label": "frontend (Vite)" },
+    "8001": { "label": "adminer" }
+  },
+
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "waitFor": "postStartCommand",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "golang.go",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "go.toolsManagement.checkForUpdates": "off",
+        "go.useLanguageServer": true,
+        "editor.formatOnSave": true,
+        "[go]": {
+          "editor.defaultFormatter": "golang.go"
+        },
+        "[typescript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[typescriptreact]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        }
+      }
+    }
+  }
+}
