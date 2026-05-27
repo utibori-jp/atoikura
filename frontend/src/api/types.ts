@@ -4,6 +4,51 @@
  */
 
 export interface paths {
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * ログイン検証
+         * @description Basic認証ヘッダーで送られた資格情報を検証するためのプローブエンドポイント。
+         *     成功時は `last_login_at` を更新し、ユーザー情報を返す。失敗時は401。
+         *
+         *     通常のリクエストはBasic認証ミドルウェアが毎回検証するため、このエンドポイントは
+         *     ログイン画面でフォーム入力された資格情報を「先に試す」ためだけに使う。
+         */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 現在のユーザー情報取得
+         * @description Basic認証で認証中のユーザー情報を返す。
+         *     ユーザー情報画面で利用する。
+         */
+        get: operations["getCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/expenses/daily-cumulative": {
         parameters: {
             query?: never;
@@ -846,6 +891,30 @@ export interface components {
             /** @description 日付ごとのコメント一覧。コメントなし月は空配列 */
             notes: components["schemas"]["DailyNote"][];
         };
+        UserResponse: {
+            /**
+             * @description ユーザーID
+             * @example 1
+             */
+            id: number;
+            /**
+             * Format: email
+             * @description メールアドレス（ログインID）
+             * @example dev@atoikura.local
+             */
+            email: string;
+            /**
+             * @description 表示名
+             * @example Dev User
+             */
+            display_name: string | null;
+            /**
+             * Format: date-time
+             * @description 最終ログイン日時（ISO 8601）
+             * @example 2026-05-27T09:12:34+09:00
+             */
+            last_login_at: string | null;
+        };
     };
     responses: {
         /** @description 認証失敗 */
@@ -886,6 +955,50 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 認証成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 取得成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     getDailyCumulative: {
         parameters: {
             query?: {

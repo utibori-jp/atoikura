@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { JournalEntryForm } from "./components/JournalEntryForm";
 import { JournalEntryList } from "./components/JournalEntryList";
 import { BudgetSettings } from "./components/BudgetSettings";
@@ -6,9 +6,14 @@ import { HomeGraph } from "./components/HomeGraph";
 import { SummaryCards } from "./components/SummaryCards";
 import { MasterManagement } from "./components/MasterManagement";
 import { ReviewScreen } from "./components/ReviewScreen";
+import { LoginScreen } from "./components/LoginScreen";
+import { UserInfo } from "./components/UserInfo";
+import { api, AuthError, credentials_store } from "./api/client";
+import type { components } from "./api/types";
 import { T } from "./theme";
 
-type Tab = "home" | "list" | "budget" | "master" | "review";
+type Tab = "home" | "list" | "budget" | "master" | "review" | "account";
+type UserProfile = components["schemas"]["UserResponse"];
 
 function LogoIcon() {
   return (
@@ -54,14 +59,53 @@ function formatMonthJP(ym: string): string {
   return `${year}年${month}月`;
 }
 
+interface UserPillProps {
+  user: UserProfile;
+  active: boolean;
+  onClick: () => void;
+}
+
+function UserPill({ user, active, onClick }: UserPillProps) {
+  const display = user.display_name?.trim() || user.email.split("@")[0];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="アカウント"
+      style={{
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "6px 14px 6px 6px", borderRadius: 999,
+        border: `1.5px solid ${active ? T.ink : T.hair}`,
+        background: active ? T.ink : T.card,
+        color: active ? "#fff" : T.ink,
+        fontFamily: "inherit", fontWeight: 600, fontSize: 13,
+        cursor: "pointer",
+      }}
+    >
+      <span style={{
+        width: 28, height: 28, borderRadius: "50%",
+        background: T.coral, color: "#fff",
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        fontSize: 13, fontWeight: 800,
+      }}>
+        {display.slice(0, 1).toUpperCase()}
+      </span>
+      <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {display}
+      </span>
+    </button>
+  );
+}
+
 interface NavBarProps {
   active: Tab;
   onChange: (tab: Tab) => void;
   listYearMonth: string;
   onListMonthChange: (ym: string) => void;
+  user: UserProfile;
 }
 
-function NavBar({ active, onChange, listYearMonth, onListMonthChange }: NavBarProps) {
+function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: NavBarProps) {
   const isCurrent = listYearMonth >= currentMonthJST();
 
   return (
@@ -72,6 +116,7 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange }: NavBarPr
       borderBottom: `1px solid ${T.hair}`,
       boxShadow: "0 2px 12px -8px rgba(80,40,10,0.12)",
       position: "sticky", top: 0, zIndex: 100,
+      gap: 16,
     }}>
       {/* Logo */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -110,8 +155,8 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange }: NavBarPr
         ))}
       </nav>
 
-      {/* Right: month nav (list/review) or date */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      {/* Right: month nav (list) + user pill */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {active === "list" && (
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <button
@@ -139,15 +184,76 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange }: NavBarPr
             >›</button>
           </div>
         )}
+        <UserPill
+          user={user}
+          active={active === "account"}
+          onClick={() => onChange("account")}
+        />
       </div>
     </header>
   );
 }
 
+type AuthState =
+  | { status: "checking" }
+  | { status: "anonymous" }
+  | { status: "authenticated"; user: UserProfile };
+
 export default function App() {
+  const [auth_state, setAuthState] = useState<AuthState>(() =>
+    credentials_store.load() ? { status: "checking" } : { status: "anonymous" },
+  );
   const [active_tab, setActiveTab] = useState<Tab>("home");
   const [refresh_token, setRefreshToken] = useState(0);
   const [list_year_month, setListYearMonth] = useState(currentMonthJST());
+
+  // On first load with stored credentials, verify them by fetching /users/me.
+  // If the creds are stale/wrong, fall back to login.
+  useEffect(() => {
+    if (auth_state.status !== "checking") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const user = await api.getCurrentUser();
+        if (!cancelled) setAuthState({ status: "authenticated", user });
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof AuthError) {
+          credentials_store.clear();
+        }
+        setAuthState({ status: "anonymous" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [auth_state.status]);
+
+  function handleLogout() {
+    credentials_store.clear();
+    setActiveTab("home");
+    setAuthState({ status: "anonymous" });
+  }
+
+  if (auth_state.status === "checking") {
+    return (
+      <div style={{
+        minHeight: "100vh", background: T.bg,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: T.inkSoft, fontSize: 14,
+      }}>
+        読み込み中…
+      </div>
+    );
+  }
+
+  if (auth_state.status === "anonymous") {
+    return (
+      <LoginScreen
+        onSuccess={(user) => setAuthState({ status: "authenticated", user })}
+      />
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: T.bg }}>
@@ -156,6 +262,7 @@ export default function App() {
         onChange={setActiveTab}
         listYearMonth={list_year_month}
         onListMonthChange={setListYearMonth}
+        user={auth_state.user}
       />
 
       <main style={{ flex: 1, padding: "32px 36px", maxWidth: 1280, width: "100%", margin: "0 auto", alignSelf: "stretch" }}>
@@ -191,6 +298,10 @@ export default function App() {
         {active_tab === "budget" && <BudgetSettings />}
 
         {active_tab === "master" && <MasterManagement />}
+
+        {active_tab === "account" && (
+          <UserInfo user={auth_state.user} onLogout={handleLogout} />
+        )}
       </main>
     </div>
   );
