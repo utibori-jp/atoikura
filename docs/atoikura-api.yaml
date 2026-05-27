@@ -25,7 +25,9 @@ components:
         `Basic {Base64(email:password)}` を付与する。
         バックエンドはヘッダーをデコードしてDBのユーザーと照合し、
         一致すれば処理続行、不一致なら401を返す。
-        毎リクエストで認証情報を検証するため、ログイン用エンドポイントは存在しない。
+        毎リクエストで認証情報を検証する。
+        `POST /auth/login` はログイン画面用の検証プローブとして任意で利用できる
+        （セッションは発行しない）。
 
   responses:
     Unauthorized:
@@ -563,7 +565,81 @@ components:
           items:
             $ref: '#/components/schemas/DailyNote'
 
+    UserResponse:
+      type: object
+      required:
+        - id
+        - email
+        - display_name
+        - last_login_at
+      properties:
+        id:
+          type: integer
+          description: ユーザーID
+          example: 1
+        email:
+          type: string
+          format: email
+          description: メールアドレス（ログインID）
+          example: "dev@atoikura.local"
+        display_name:
+          type: string
+          nullable: true
+          description: 表示名
+          example: "Dev User"
+        last_login_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 最終ログイン日時（ISO 8601）
+          example: "2026-05-27T09:12:34+09:00"
+
 paths:
+  /auth/login:
+    post:
+      summary: ログイン検証
+      description: |
+        Basic認証ヘッダーで送られた資格情報を検証するためのプローブエンドポイント。
+        成功時は `last_login_at` を更新し、ユーザー情報を返す。失敗時は401。
+
+        通常のリクエストはBasic認証ミドルウェアが毎回検証するため、このエンドポイントは
+        ログイン画面でフォーム入力された資格情報を「先に試す」ためだけに使う。
+      operationId: login
+      tags:
+        - auth
+      responses:
+        '200':
+          description: 認証成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /users/me:
+    get:
+      summary: 現在のユーザー情報取得
+      description: |
+        Basic認証で認証中のユーザー情報を返す。
+        ユーザー情報画面で利用する。
+      operationId: getCurrentUser
+      tags:
+        - users
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /expenses/daily-cumulative:
     get:
       summary: グラフ用日次累積取得
