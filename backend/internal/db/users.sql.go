@@ -10,6 +10,37 @@ import (
 	"time"
 )
 
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (email, display_name, password_hash)
+VALUES ($1, $2, $3)
+RETURNING id, email, display_name, last_login_at
+`
+
+type CreateUserParams struct {
+	Email        string  `json:"email"`
+	DisplayName  *string `json:"display_name"`
+	PasswordHash string  `json:"password_hash"`
+}
+
+type CreateUserRow struct {
+	ID          int32      `json:"id"`
+	Email       string     `json:"email"`
+	DisplayName *string    `json:"display_name"`
+	LastLoginAt *time.Time `json:"last_login_at"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
+	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.DisplayName, arg.PasswordHash)
+	var i CreateUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.DisplayName,
+		&i.LastLoginAt,
+	)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, display_name, password_hash, last_login_at
 FROM users
@@ -62,6 +93,19 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (GetUserByIDRow, er
 	return i, err
 }
 
+const getUserPasswordHashByID = `-- name: GetUserPasswordHashByID :one
+SELECT password_hash
+FROM users
+WHERE id = $1 AND is_deleted = false
+`
+
+func (q *Queries) GetUserPasswordHashByID(ctx context.Context, id int32) (string, error) {
+	row := q.db.QueryRow(ctx, getUserPasswordHashByID, id)
+	var password_hash string
+	err := row.Scan(&password_hash)
+	return password_hash, err
+}
+
 const updateUserLastLogin = `-- name: UpdateUserLastLogin :exec
 UPDATE users
 SET last_login_at = NOW(),
@@ -72,4 +116,25 @@ WHERE id = $1
 func (q *Queries) UpdateUserLastLogin(ctx context.Context, id int32) error {
 	_, err := q.db.Exec(ctx, updateUserLastLogin, id)
 	return err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :execrows
+UPDATE users
+SET password_hash = $2,
+    updated_at    = NOW(),
+    version       = version + 1
+WHERE id = $1 AND is_deleted = false
+`
+
+type UpdateUserPasswordParams struct {
+	ID           int32  `json:"id"`
+	PasswordHash string `json:"password_hash"`
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateUserPassword, arg.ID, arg.PasswordHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

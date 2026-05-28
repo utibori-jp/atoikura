@@ -106,12 +106,20 @@ func parseBasicAuthHeader(header string) (string, string, bool) {
 	return string(decoded[:sep]), string(decoded[sep+1:]), true
 }
 
+// publicPaths bypass Basic auth entirely. /auth/login verifies credentials
+// itself inside the handler; /auth/signup is for users who have no account yet.
+var publicPaths = map[string]bool{
+	"/health":      true,
+	"/auth/login":  true,
+	"/auth/signup": true,
+}
+
 // RequireBasicAuth enforces Basic auth on every protected request and injects user_id into the context.
-// Public endpoints (CORS preflight, /health) bypass auth.
+// Public endpoints (CORS preflight, /health, /auth/*) bypass auth.
 func RequireBasicAuth(repo *repository.Repository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodOptions || r.URL.Path == "/health" {
+			if r.Method == http.MethodOptions || publicPaths[r.URL.Path] {
 				next.ServeHTTP(w, r)
 				return
 			}

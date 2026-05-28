@@ -9,7 +9,10 @@ import (
 var (
 	yearMonthPattern = regexp.MustCompile(`^\d{4}-\d{2}$`)
 	datePattern      = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	emailPattern     = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
 )
+
+const minPasswordLength = 8
 
 func parsePathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
