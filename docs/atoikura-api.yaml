@@ -594,7 +594,92 @@ components:
           description: 最終ログイン日時（ISO 8601）
           example: "2026-05-27T09:12:34+09:00"
 
+    SignupRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: メールアドレス（ログインID）。登録済みの場合は409
+          example: "alice@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: パスワード（8文字以上）
+          example: "correct horse"
+        display_name:
+          type: string
+          nullable: true
+          maxLength: 50
+          description: 表示名（任意・50文字以内）
+          example: "Alice"
+
+    PasswordChangeRequest:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          format: password
+          description: 現在のパスワード
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+          description: 新しいパスワード（8文字以上）
+
 paths:
+  /auth/signup:
+    post:
+      summary: 新規ユーザー登録
+      description: |
+        新規アカウントを作成し、デフォルトの大分類・生活区分マスタを自動でシードする。
+        作成後はそのままログイン状態として扱える（レスポンスはログインと同形式）。
+        認証不要のエンドポイント。
+      operationId: signup
+      tags:
+        - auth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: 登録成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: 入力値が不正（メール形式・パスワード長など）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "パスワードは8文字以上で入力してください"
+        '409':
+          description: メールアドレスが登録済み
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: EMAIL_TAKEN
+                message: "このメールアドレスは既に登録されています"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /auth/login:
     post:
       summary: ログイン検証
@@ -635,6 +720,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /users/me/password:
+    put:
+      summary: パスワード変更
+      description: |
+        認証中ユーザーのパスワードを変更する。
+        `current_password` が現在のパスワードと一致しない場合は400。
+      operationId: changePassword
+      tags:
+        - users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+      responses:
+        '204':
+          description: 変更成功
+        '400':
+          description: 現在のパスワード不一致、または新パスワードが要件未満
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: INVALID_CURRENT_PASSWORD
+                message: "現在のパスワードが正しくありません"
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
