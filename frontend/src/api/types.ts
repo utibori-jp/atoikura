@@ -4,6 +4,28 @@
  */
 
 export interface paths {
+    "/auth/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 新規ユーザー登録
+         * @description 新規アカウントを作成し、デフォルトの大分類・生活区分マスタを自動でシードする。
+         *     作成後はそのままログイン状態として扱える（レスポンスはログインと同形式）。
+         *     認証不要のエンドポイント。
+         */
+        post: operations["signup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -42,6 +64,27 @@ export interface paths {
          */
         get: operations["getCurrentUser"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * パスワード変更
+         * @description 認証中ユーザーのパスワードを変更する。
+         *     `current_password` が現在のパスワードと一致しない場合は400。
+         */
+        put: operations["changePassword"];
         post?: never;
         delete?: never;
         options?: never;
@@ -915,6 +958,37 @@ export interface components {
              */
             last_login_at: string | null;
         };
+        SignupRequest: {
+            /**
+             * Format: email
+             * @description メールアドレス（ログインID）。登録済みの場合は409
+             * @example alice@example.com
+             */
+            email: string;
+            /**
+             * Format: password
+             * @description パスワード（8文字以上）
+             * @example correct horse
+             */
+            password: string;
+            /**
+             * @description 表示名（任意・50文字以内）
+             * @example Alice
+             */
+            display_name?: string | null;
+        };
+        PasswordChangeRequest: {
+            /**
+             * Format: password
+             * @description 現在のパスワード
+             */
+            current_password: string;
+            /**
+             * Format: password
+             * @description 新しいパスワード（8文字以上）
+             */
+            new_password: string;
+        };
     };
     responses: {
         /** @description 認証失敗 */
@@ -955,6 +1029,61 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    signup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupRequest"];
+            };
+        };
+        responses: {
+            /** @description 登録成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description 入力値が不正（メール形式・パスワード長など） */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "BAD_REQUEST",
+                     *       "message": "パスワードは8文字以上で入力してください"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description メールアドレスが登録済み */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "EMAIL_TAKEN",
+                     *       "message": "このメールアドレスは既に登録されています"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -993,6 +1122,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description 変更成功 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 現在のパスワード不一致、または新パスワードが要件未満 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "INVALID_CURRENT_PASSWORD",
+                     *       "message": "現在のパスワードが正しくありません"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];

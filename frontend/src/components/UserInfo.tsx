@@ -1,5 +1,6 @@
 import { T, btnPrimary } from "../theme";
 import type { components } from "../api/types";
+import { PasswordChangeForm } from "./PasswordChangeForm";
 
 type UserProfile = components["schemas"]["UserResponse"];
 
@@ -134,6 +135,8 @@ export function UserInfo({ user, onLogout }: UserInfoProps) {
           ログアウト
         </button>
       </div>
+
+      <PasswordChangeForm />
     </div>
   );
 }

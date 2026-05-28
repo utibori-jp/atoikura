@@ -90,8 +90,22 @@ export const api = {
       { method: "POST" },
       encodeBasicAuth(email, password),
     ),
+  // Creates an account (no auth header needed). On success the caller stores
+  // the same credentials, same as login.
+  signup: (body: components["schemas"]["SignupRequest"]) =>
+    request<components["schemas"]["UserResponse"]>(
+      "/auth/signup",
+      { method: "POST", body: JSON.stringify(body) },
+    ),
   getCurrentUser: () =>
     request<components["schemas"]["UserResponse"]>("/users/me"),
+  changePassword: (
+    body: components["schemas"]["PasswordChangeRequest"],
+  ) =>
+    request<void>("/users/me/password", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
   listCategoryGroups: () =>
     request<components["schemas"]["CategoryGroupListResponse"]>(
       "/category-groups",

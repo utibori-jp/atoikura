@@ -4,16 +4,25 @@ import { T, btnPrimary } from "../theme";
 import type { components } from "../api/types";
 
 type UserProfile = components["schemas"]["UserResponse"];
+type Mode = "login" | "signup";
 
 interface LoginScreenProps {
   onSuccess: (user: UserProfile) => void;
 }
 
 export function LoginScreen({ onSuccess }: LoginScreenProps) {
+  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [display_name, setDisplayName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error_message, setErrorMessage] = useState<string | null>(null);
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setErrorMessage(null);
+    setPassword("");
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -21,18 +30,33 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
       setErrorMessage("メールアドレスとパスワードを入力してください");
       return;
     }
+    if (mode === "signup" && password.length < 8) {
+      setErrorMessage("パスワードは8文字以上で入力してください");
+      return;
+    }
     setSubmitting(true);
     setErrorMessage(null);
     try {
-      const user = await api.login(email, password);
+      const user =
+        mode === "login"
+          ? await api.login(email, password)
+          : await api.signup({
+              email,
+              password,
+              display_name: display_name.trim() || null,
+            });
       credentials_store.save(email, password);
       onSuccess(user);
     } catch (err) {
-      if (err instanceof AuthError) {
+      if (mode === "login" && err instanceof AuthError) {
         setErrorMessage("メールアドレスまたはパスワードが正しくありません");
       } else {
         setErrorMessage(
-          err instanceof Error ? err.message : "ログインに失敗しました",
+          err instanceof Error
+            ? err.message
+            : mode === "login"
+              ? "ログインに失敗しました"
+              : "登録に失敗しました",
         );
       }
     } finally {
@@ -61,6 +85,8 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
     marginBottom: 6,
   };
 
+  const is_signup = mode === "signup";
+
   return (
     <div
       style={{
@@ -82,7 +108,7 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
           boxShadow: T.cardShadow,
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: 28 }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
           <div
             style={{
               width: 56,
@@ -137,17 +163,52 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
               marginBottom: 0,
             }}
           >
-            ログインしてください
+            {is_signup ? "アカウントを作成" : "ログインしてください"}
           </p>
+        </div>
+
+        {/* Mode toggle */}
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            background: T.bgSoft,
+            borderRadius: 999,
+            padding: 4,
+            marginBottom: 24,
+          }}
+        >
+          {(["login", "signup"] as Mode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => switchMode(m)}
+              style={{
+                flex: 1,
+                padding: "9px 0",
+                borderRadius: 999,
+                border: "none",
+                background: mode === m ? T.card : "transparent",
+                color: mode === m ? T.ink : T.inkSoft,
+                fontWeight: 700,
+                fontSize: 13,
+                fontFamily: "inherit",
+                cursor: "pointer",
+                boxShadow: mode === m ? T.cardShadow : "none",
+              }}
+            >
+              {m === "login" ? "ログイン" : "新規登録"}
+            </button>
+          ))}
         </div>
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 16 }}>
-            <label style={label_style} htmlFor="login-email">
+            <label style={label_style} htmlFor="auth-email">
               メールアドレス
             </label>
             <input
-              id="login-email"
+              id="auth-email"
               type="email"
               autoComplete="username"
               value={email}
@@ -157,14 +218,31 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
             />
           </div>
 
+          {is_signup && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={label_style} htmlFor="auth-display-name">
+                表示名（任意）
+              </label>
+              <input
+                id="auth-display-name"
+                type="text"
+                autoComplete="nickname"
+                value={display_name}
+                onChange={(e) => setDisplayName(e.target.value)}
+                maxLength={50}
+                style={input_style}
+              />
+            </div>
+          )}
+
           <div style={{ marginBottom: 20 }}>
-            <label style={label_style} htmlFor="login-password">
-              パスワード
+            <label style={label_style} htmlFor="auth-password">
+              パスワード{is_signup ? "（8文字以上）" : ""}
             </label>
             <input
-              id="login-password"
+              id="auth-password"
               type="password"
-              autoComplete="current-password"
+              autoComplete={is_signup ? "new-password" : "current-password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={input_style}
@@ -200,7 +278,13 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
               cursor: submitting ? "default" : "pointer",
             }}
           >
-            {submitting ? "ログイン中…" : "ログイン"}
+            {submitting
+              ? is_signup
+                ? "登録中…"
+                : "ログイン中…"
+              : is_signup
+                ? "アカウント作成"
+                : "ログイン"}
           </button>
         </form>
       </div>
