@@ -177,7 +177,6 @@ export function JournalEntryList({ year_month, refresh_token }: Props) {
 
   useEffect(() => {
     let is_cancelled = false;
-    setEntries(null);
     setErrorMessage('');
     setEditingNoteDate(null);
     Promise.all([api.listJournalEntries(year_month), api.getDailyNotes(year_month)])

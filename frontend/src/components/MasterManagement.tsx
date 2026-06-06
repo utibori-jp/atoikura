@@ -230,7 +230,7 @@ interface ExpenseCategoriesTabProps {
 
 function ExpenseCategoriesTab({ categories, groups, onRefresh }: ExpenseCategoriesTabProps) {
   const [add_name, setAddName] = useState("");
-  const [add_group_id, setAddGroupId] = useState<number>(groups[0]?.id ?? 0);
+  const [add_group_id, setAddGroupId] = useState<number>(0);
   const [add_desc, setAddDesc] = useState("");
   const [add_error, setAddError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -241,21 +241,17 @@ function ExpenseCategoriesTab({ categories, groups, onRefresh }: ExpenseCategori
   const [edit_desc, setEditDesc] = useState("");
   const [edit_error, setEditError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (add_group_id === 0 && groups.length > 0) {
-      setAddGroupId(groups[0].id);
-    }
-  }, [groups, add_group_id]);
+  const effective_add_group_id = add_group_id !== 0 ? add_group_id : (groups[0]?.id ?? 0);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!add_name.trim() || add_group_id === 0) return;
+    if (!add_name.trim() || effective_add_group_id === 0) return;
     setAdding(true);
     setAddError(null);
     try {
       await api.createExpenseCategory({
         category_name: add_name.trim(),
-        group_id: add_group_id,
+        group_id: effective_add_group_id,
         description: add_desc.trim() || undefined,
       });
       setAddName("");
@@ -312,7 +308,7 @@ function ExpenseCategoriesTab({ categories, groups, onRefresh }: ExpenseCategori
         <div style={{ fontSize: 13, color: T.inkSoft, fontWeight: 600, marginBottom: 12 }}>生活区分を追加</div>
         <form onSubmit={handleAdd} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
           <input style={{ ...INPUT_STYLE, flex: "1 1 140px" }} placeholder="生活区分名 *" value={add_name} onChange={(e) => setAddName(e.target.value)} maxLength={100} required />
-          <select style={{ ...INPUT_STYLE, flex: "1 1 140px" }} value={add_group_id} onChange={(e) => setAddGroupId(Number(e.target.value))}>
+          <select style={{ ...INPUT_STYLE, flex: "1 1 140px" }} value={effective_add_group_id} onChange={(e) => setAddGroupId(Number(e.target.value))}>
             {groups.map((g) => (<option key={g.id} value={g.id}>{g.group_name}</option>))}
           </select>
           <input style={{ ...INPUT_STYLE, flex: "2 1 180px" }} placeholder="説明（任意）" value={add_desc} onChange={(e) => setAddDesc(e.target.value)} maxLength={200} />
@@ -398,8 +394,8 @@ export function MasterManagement() {
   const [load_error, setLoadError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
-    setLoadError(null);
     try {
+      setLoadError(null);
       const [groups_res, cats_res, types_res] = await Promise.all([
         api.listCategoryGroups(),
         api.listExpenseCategories(),
