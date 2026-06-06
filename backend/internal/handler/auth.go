@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -13,51 +14,75 @@ import (
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
 
-type loginResponseJSON struct {
+// authRepository is the subset of repository.Repository used by auth handlers.
+// Defined as an interface to allow unit testing without a real database.
+type authRepository interface {
+	GetUserByEmail(ctx context.Context, email string) (*repository.UserAuthRecord, error)
+	UpdateUserLastLogin(ctx context.Context, user_id int64) error
+	CreateUserWithDefaults(ctx context.Context, email string, display_name *string, password_hash string) (*repository.UserProfile, error)
+}
+
+type authResponseJSON struct {
+	Token       string     `json:"token"`
 	ID          int64      `json:"id"`
 	Email       string     `json:"email"`
 	DisplayName *string    `json:"display_name"`
 	LastLoginAt *time.Time `json:"last_login_at"`
 }
 
-// LoginHandler is a probe endpoint: it does its own credential check against
-// the Authorization header (so it can run outside the auth-protected middleware
-// chain) and, on success, refreshes last_login_at and returns the user profile.
-func LoginHandler(repo *repository.Repository) http.HandlerFunc {
+// LoginHandler verifies email/password from the JSON body and returns a JWT on success.
+func LoginHandler(repo authRepository, jwt_secret []byte) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user_id, err := VerifyBasicAuth(r, repo)
+		type loginRequestJSON struct {
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		}
+		var req loginRequestJSON
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "リクエストの形式が不正です")
+			return
+		}
+
+		user, err := repo.GetUserByEmail(r.Context(), strings.TrimSpace(req.Email))
+		if errors.Is(err, repository.ErrUserNotFound) {
+			WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "認証情報が不正です")
+			return
+		}
 		if err != nil {
-			w.Header().Set("WWW-Authenticate", `Basic realm="atoikura"`)
+			slog.Error("fetching user for login", "error", err)
+			WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 			WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "認証情報が不正です")
 			return
 		}
 
-		if err := repo.UpdateUserLastLogin(r.Context(), user_id); err != nil {
+		if err := repo.UpdateUserLastLogin(r.Context(), user.ID); err != nil {
 			slog.Error("updating last_login_at", "error", err)
 			WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
 			return
 		}
 
-		profile, err := repo.GetUserByID(r.Context(), user_id)
+		token, err := IssueJWT(user.ID, jwt_secret)
 		if err != nil {
-			slog.Error("fetching user after login", "error", err)
+			slog.Error("issuing JWT", "error", err)
 			WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
 			return
 		}
 
-		WriteJSON(w, http.StatusOK, loginResponseJSON{
-			ID:          profile.ID,
-			Email:       profile.Email,
-			DisplayName: profile.DisplayName,
-			LastLoginAt: profile.LastLoginAt,
+		WriteJSON(w, http.StatusOK, authResponseJSON{
+			Token:       token,
+			ID:          user.ID,
+			Email:       user.Email,
+			DisplayName: user.DisplayName,
+			LastLoginAt: user.LastLoginAt,
 		})
 	}
 }
 
-// SignupHandler creates a new account with default categories and returns the
-// profile. Runs outside the auth-protected chain (the user has no credentials
-// yet). On success the client stores the same credentials it just submitted.
-func SignupHandler(repo *repository.Repository) http.HandlerFunc {
+// SignupHandler creates a new account with default categories and returns a JWT.
+func SignupHandler(repo authRepository, jwt_secret []byte) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type signupRequestJSON struct {
 			Email       string  `json:"email"`
@@ -110,7 +135,15 @@ func SignupHandler(repo *repository.Repository) http.HandlerFunc {
 			return
 		}
 
-		WriteJSON(w, http.StatusCreated, loginResponseJSON{
+		token, err := IssueJWT(profile.ID, jwt_secret)
+		if err != nil {
+			slog.Error("issuing JWT", "error", err)
+			WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
+			return
+		}
+
+		WriteJSON(w, http.StatusCreated, authResponseJSON{
+			Token:       token,
 			ID:          profile.ID,
 			Email:       profile.Email,
 			DisplayName: profile.DisplayName,
