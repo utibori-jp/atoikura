@@ -1,0 +1,52 @@
+name: Feature Request
+description: Implement a new feature
+labels: ["feature"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What needs to be built and why?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - backend
+        - frontend
+        - both
+        - infra
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        Conditions that must be true for this to be considered done.
+        Write each as a checkable item the AI can verify.
+      placeholder: |
+        - [ ] GET /endpoint returns 200 with { "field": "value" }
+        - [ ] Error case returns 400 with code "BAD_REQUEST"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reference_docs
+    attributes:
+      label: Reference Documents
+      description: Spec sections, OpenAPI paths, DB tables, or design files relevant to this feature.
+      placeholder: |
+        - docs/spec.md §3.2
+        - docs/atoikura-api.yaml: POST /journal-entries
+        - docs/atoikura.dbml: journal_entries table
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of Scope
+      description: What should explicitly NOT be implemented in this issue?
