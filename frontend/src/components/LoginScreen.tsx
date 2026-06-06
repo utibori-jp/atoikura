@@ -56,7 +56,7 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
             ? err.message
             : mode === "login"
               ? "ログインに失敗しました"
-              : "登録に失敗しました",
+              : "登録に失敗しました"
         );
       }
     } finally {
@@ -123,14 +123,7 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
             }}
           >
             <svg width="32" height="32" viewBox="0 0 26 26" fill="none">
-              <circle
-                cx="13"
-                cy="13"
-                r="9"
-                fill={T.mustard}
-                stroke="#fff"
-                strokeWidth="2"
-              />
+              <circle cx="13" cy="13" r="9" fill={T.mustard} stroke="#fff" strokeWidth="2" />
               <circle cx="10" cy="11" r="1.4" fill={T.coralDeep} />
               <circle cx="16" cy="11" r="1.4" fill={T.coralDeep} />
               <path
@@ -144,8 +137,7 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
           </div>
           <h1
             style={{
-              fontFamily:
-                "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
               fontWeight: 900,
               fontSize: 26,
               letterSpacing: "-0.01em",

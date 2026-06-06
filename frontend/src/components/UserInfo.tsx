@@ -77,8 +77,7 @@ export function UserInfo({ user, onLogout }: UserInfoProps) {
               color: "#fff",
               fontWeight: 800,
               fontSize: 26,
-              fontFamily:
-                "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
             }}
           >
             {initial}
@@ -86,8 +85,7 @@ export function UserInfo({ user, onLogout }: UserInfoProps) {
           <div>
             <div
               style={{
-                fontFamily:
-                  "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
                 fontWeight: 800,
                 fontSize: 22,
                 color: T.ink,
@@ -95,9 +93,7 @@ export function UserInfo({ user, onLogout }: UserInfoProps) {
             >
               {display_name}
             </div>
-            <div style={{ fontSize: 13, color: T.inkSoft, marginTop: 2 }}>
-              {user.email}
-            </div>
+            <div style={{ fontSize: 13, color: T.inkSoft, marginTop: 2 }}>{user.email}</div>
           </div>
         </div>
 
@@ -116,9 +112,7 @@ export function UserInfo({ user, onLogout }: UserInfoProps) {
           </div>
           <div style={{ ...row_style, borderBottom: "none" }}>
             <span style={label_style}>最終ログイン</span>
-            <span style={value_style}>
-              {formatLastLogin(user.last_login_at)}
-            </span>
+            <span style={value_style}>{formatLastLogin(user.last_login_at)}</span>
           </div>
         </div>
 

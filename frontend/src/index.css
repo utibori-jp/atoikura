@@ -1,25 +1,29 @@
 :root {
-  --bg: #FFF4E8;
-  --bg-soft: #FFFAF2;
-  --card: #FFFFFF;
-  --ink: #2A2520;
-  --ink-soft: #7A6B5E;
-  --hair: #F2E4D2;
-  --coral: #FF8A5C;
-  --coral-deep: #F26B3F;
-  --mustard: #FFC247;
-  --sage: #7BC4A4;
-  --sage-deep: #4FA481;
-  --sky: #A6C9E2;
-  --excluded: #C9B7A1;
-  --card-shadow: 0 8px 24px -16px rgba(80,40,10,0.18);
+  --bg: #fff4e8;
+  --bg-soft: #fffaf2;
+  --card: #ffffff;
+  --ink: #2a2520;
+  --ink-soft: #7a6b5e;
+  --hair: #f2e4d2;
+  --coral: #ff8a5c;
+  --coral-deep: #f26b3f;
+  --mustard: #ffc247;
+  --sage: #7bc4a4;
+  --sage-deep: #4fa481;
+  --sky: #a6c9e2;
+  --excluded: #c9b7a1;
+  --card-shadow: 0 8px 24px -16px rgba(80, 40, 10, 0.18);
 
-  font: 14px/1.5 'M PLUS Rounded 1c', system-ui, sans-serif;
+  font:
+    14px/1.5 "M PLUS Rounded 1c",
+    system-ui,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   color-scheme: light;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   height: 100%;
   background: var(--bg);
@@ -36,7 +40,9 @@ html, body {
   box-sizing: border-box;
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   margin: 0;
 }
 

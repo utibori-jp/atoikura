@@ -24,8 +24,14 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: golangci-lint
+        run: golangci-lint run ./...
+
       - name: go test
-        run: go test ./...
+        run: go test -coverprofile=coverage.out ./...
 
   frontend:
     name: Frontend
@@ -51,9 +57,24 @@ jobs:
       - name: ESLint
         run: npx eslint .
 
+      - name: Prettier
+        run: npm run format:check
+
       - name: Vitest
-        run: npm test
+        run: npm test -- --coverage
 
       - name: Validate OpenAPI spec
         working-directory: .
         run: npx --yes @redocly/cli lint docs/atoikura-api.yaml
+
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build backend/
+
+      - name: Build frontend image
+        run: docker build frontend/
