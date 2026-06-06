@@ -395,12 +395,12 @@ export function MasterManagement() {
 
   const fetchAll = useCallback(async () => {
     try {
-      setLoadError(null);
       const [groups_res, cats_res, types_res] = await Promise.all([
         api.listCategoryGroups(),
         api.listExpenseCategories(),
         api.listStatementTypes(),
       ]);
+      setLoadError(null);
       setGroups(groups_res.category_groups);
       setCategories(cats_res.expense_categories);
       setStatementTypes(types_res.statement_types);
@@ -412,8 +412,27 @@ export function MasterManagement() {
   }, []);
 
   useEffect(() => {
-    void fetchAll();
-  }, [fetchAll]);
+    let is_cancelled = false;
+    Promise.all([
+      api.listCategoryGroups(),
+      api.listExpenseCategories(),
+      api.listStatementTypes(),
+    ])
+      .then(([groups_res, cats_res, types_res]) => {
+        if (is_cancelled) return;
+        setLoadError(null);
+        setGroups(groups_res.category_groups);
+        setCategories(cats_res.expense_categories);
+        setStatementTypes(types_res.statement_types);
+      })
+      .catch((err: unknown) => {
+        if (!is_cancelled) setLoadError(err instanceof Error ? err.message : "読み込みに失敗しました");
+      })
+      .finally(() => {
+        if (!is_cancelled) setLoading(false);
+      });
+    return () => { is_cancelled = true; };
+  }, []);
 
   const category_count_map: Record<number, number> = {};
   for (const cat of categories) {
