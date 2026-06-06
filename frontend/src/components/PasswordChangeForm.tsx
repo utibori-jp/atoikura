@@ -43,9 +43,7 @@ export function PasswordChangeForm() {
       if (err instanceof AuthError) {
         setErrorMessage("認証に失敗しました。再ログインしてください");
       } else {
-        setErrorMessage(
-          err instanceof Error ? err.message : "パスワードの変更に失敗しました",
-        );
+        setErrorMessage(err instanceof Error ? err.message : "パスワードの変更に失敗しました");
       }
     } finally {
       setSubmitting(false);

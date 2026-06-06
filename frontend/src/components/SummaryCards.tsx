@@ -6,15 +6,11 @@ import { T } from "../theme";
 type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
 
 function currentMonthJST(): string {
-  return new Date()
-    .toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" })
-    .slice(0, 7);
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(0, 7);
 }
 
 function todayDayJST(): number {
-  return Number(
-    new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(8, 10),
-  );
+  return Number(new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(8, 10));
 }
 
 function daysInMonthJST(): number {
@@ -32,17 +28,25 @@ function computeSummary(data: DailyCumulativeResponse) {
   const days_left = days_in_month - today_day;
   const daily_available = days_left > 0 ? Math.floor(remaining_budget / days_left) : 0;
   const monthly_budget = data.monthly_budget;
-  const baseline_today = monthly_budget > 0 ? Math.round((monthly_budget / days_in_month) * today_day) : 0;
+  const baseline_today =
+    monthly_budget > 0 ? Math.round((monthly_budget / days_in_month) * today_day) : 0;
   const budget_margin = baseline_today - total_spend;
-  return { total_spend, remaining_budget, daily_available, days_left, monthly_budget, budget_margin };
+  return {
+    total_spend,
+    remaining_budget,
+    daily_available,
+    days_left,
+    monthly_budget,
+    budget_margin,
+  };
 }
 
 type Tone = "coral" | "mustard" | "sage";
 
 const TONE_COLORS: Record<Tone, { bg: string; fg: string }> = {
-  coral:   { bg: "#FFE8DD", fg: T.coralDeep },
+  coral: { bg: "#FFE8DD", fg: T.coralDeep },
   mustard: { bg: "#FFF1CC", fg: "#A3791F" },
-  sage:    { bg: "#DEF1E6", fg: T.sageDeep },
+  sage: { bg: "#DEF1E6", fg: T.sageDeep },
 };
 
 interface StatPillProps {
@@ -55,14 +59,29 @@ interface StatPillProps {
 function StatPill({ tone, label, value, sub }: StatPillProps) {
   const { bg, fg } = TONE_COLORS[tone];
   return (
-    <div style={{
-      background: bg, borderRadius: 24, padding: "18px 22px", flex: 1, minWidth: 0,
-    }}>
-      <div style={{ fontSize: 12, color: fg, fontWeight: 700, letterSpacing: "0.04em" }}>{label}</div>
-      <div style={{
-        fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 26,
-        color: T.ink, marginTop: 4,
-      }}>{value}</div>
+    <div
+      style={{
+        background: bg,
+        borderRadius: 24,
+        padding: "18px 22px",
+        flex: 1,
+        minWidth: 0,
+      }}
+    >
+      <div style={{ fontSize: 12, color: fg, fontWeight: 700, letterSpacing: "0.04em" }}>
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: "'DM Sans', sans-serif",
+          fontWeight: 700,
+          fontSize: 26,
+          color: T.ink,
+          marginTop: 4,
+        }}
+      >
+        {value}
+      </div>
       {sub && <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 2 }}>{sub}</div>}
     </div>
   );
@@ -70,10 +89,15 @@ function StatPill({ tone, label, value, sub }: StatPillProps) {
 
 function SkeletonPill() {
   return (
-    <div style={{
-      flex: 1, height: 88, borderRadius: 24,
-      background: "#F2E4D2", opacity: 0.5,
-    }} />
+    <div
+      style={{
+        flex: 1,
+        height: 88,
+        borderRadius: 24,
+        background: "#F2E4D2",
+        opacity: 0.5,
+      }}
+    />
   );
 }
 
@@ -81,18 +105,30 @@ export function SummaryCards() {
   const [data, setData] = useState<DailyCumulativeResponse | null>(null);
 
   useEffect(() => {
-    api.getDailyCumulative(currentMonthJST()).then(setData).catch(() => {});
+    api
+      .getDailyCumulative(currentMonthJST())
+      .then(setData)
+      .catch(() => {});
   }, []);
 
   if (!data) {
     return (
       <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
-        <SkeletonPill /><SkeletonPill /><SkeletonPill />
+        <SkeletonPill />
+        <SkeletonPill />
+        <SkeletonPill />
       </div>
     );
   }
 
-  const { total_spend, remaining_budget, daily_available, days_left, monthly_budget, budget_margin } = computeSummary(data);
+  const {
+    total_spend,
+    remaining_budget,
+    daily_available,
+    days_left,
+    monthly_budget,
+    budget_margin,
+  } = computeSummary(data);
   const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 
   return (
@@ -107,7 +143,11 @@ export function SummaryCards() {
         tone="mustard"
         label="残り予算"
         value={yen(remaining_budget)}
-        sub={budget_margin >= 0 ? `基準より ${yen(budget_margin)} 余裕` : `基準より ${yen(-budget_margin)} オーバー`}
+        sub={
+          budget_margin >= 0
+            ? `基準より ${yen(budget_margin)} 余裕`
+            : `基準より ${yen(-budget_margin)} オーバー`
+        }
       />
       <StatPill
         tone="sage"

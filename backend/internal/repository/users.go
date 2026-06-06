@@ -84,7 +84,7 @@ func (r *Repository) CreateUserWithDefaults(ctx context.Context, email string, d
 	if err != nil {
 		return nil, fmt.Errorf("beginning signup transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 

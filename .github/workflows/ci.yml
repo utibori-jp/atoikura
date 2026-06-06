@@ -24,8 +24,13 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: backend
+
       - name: go test
-        run: go test ./...
+        run: go test -coverprofile=coverage.out ./...
 
   frontend:
     name: Frontend
@@ -51,8 +56,11 @@ jobs:
       - name: ESLint
         run: npx eslint .
 
+      - name: Prettier
+        run: npm run format:check
+
       - name: Vitest
-        run: npm test
+        run: npm test -- --coverage
 
       - name: Validate OpenAPI spec
         working-directory: .

@@ -43,19 +43,25 @@ const BTN_GHOST: React.CSSProperties = {
 };
 
 const STATEMENT_TYPE_STYLES: Record<string, { bg: string; fg: string }> = {
-  "変動費":  { bg: "#FFF1CC", fg: "#A3791F" },
-  "固定費":  { bg: "#DEF1E6", fg: T.sageDeep },
-  "対象外":  { bg: "#F4E9DC", fg: T.inkSoft },
+  変動費: { bg: "#FFF1CC", fg: "#A3791F" },
+  固定費: { bg: "#DEF1E6", fg: T.sageDeep },
+  対象外: { bg: "#F4E9DC", fg: T.inkSoft },
 };
 
 function statementTypePill(name: string) {
   const style = STATEMENT_TYPE_STYLES[name] ?? { bg: "#E5EEF7", fg: "#3F6B91" };
   return (
-    <span style={{
-      padding: "4px 10px", borderRadius: 999,
-      background: style.bg, color: style.fg,
-      fontSize: 11, fontWeight: 700, flexShrink: 0,
-    }}>
+    <span
+      style={{
+        padding: "4px 10px",
+        borderRadius: 999,
+        background: style.bg,
+        color: style.fg,
+        fontSize: 11,
+        fontWeight: 700,
+        flexShrink: 0,
+      }}
+    >
       {name}
     </span>
   );
@@ -70,7 +76,12 @@ interface CategoryGroupsTabProps {
   onRefresh: () => void;
 }
 
-function CategoryGroupsTab({ groups, statement_types, category_count_map, onRefresh }: CategoryGroupsTabProps) {
+function CategoryGroupsTab({
+  groups,
+  statement_types,
+  category_count_map,
+  onRefresh,
+}: CategoryGroupsTabProps) {
   const [add_name, setAddName] = useState("");
   const [add_type_id, setAddTypeId] = useState<number>(statement_types[0]?.id ?? 0);
   const [add_desc, setAddDesc] = useState("");
@@ -147,16 +158,46 @@ function CategoryGroupsTab({ groups, statement_types, category_count_map, onRefr
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Add form */}
       <div style={{ background: T.card, borderRadius: 24, padding: 20, boxShadow: T.cardShadow }}>
-        <div style={{ fontSize: 13, color: T.inkSoft, fontWeight: 600, marginBottom: 12 }}>大分類を追加</div>
-        <form onSubmit={handleAdd} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <input style={{ ...INPUT_STYLE, flex: "1 1 140px" }} placeholder="大分類名 *" value={add_name} onChange={(e) => setAddName(e.target.value)} maxLength={100} required />
-          <select style={{ ...INPUT_STYLE, flex: "1 1 120px" }} value={add_type_id} onChange={(e) => setAddTypeId(Number(e.target.value))}>
-            {statement_types.map((t) => (<option key={t.id} value={t.id}>{t.statement_type_name}</option>))}
+        <div style={{ fontSize: 13, color: T.inkSoft, fontWeight: 600, marginBottom: 12 }}>
+          大分類を追加
+        </div>
+        <form
+          onSubmit={handleAdd}
+          style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}
+        >
+          <input
+            style={{ ...INPUT_STYLE, flex: "1 1 140px" }}
+            placeholder="大分類名 *"
+            value={add_name}
+            onChange={(e) => setAddName(e.target.value)}
+            maxLength={100}
+            required
+          />
+          <select
+            style={{ ...INPUT_STYLE, flex: "1 1 120px" }}
+            value={add_type_id}
+            onChange={(e) => setAddTypeId(Number(e.target.value))}
+          >
+            {statement_types.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.statement_type_name}
+              </option>
+            ))}
           </select>
-          <input style={{ ...INPUT_STYLE, flex: "2 1 180px" }} placeholder="説明（任意）" value={add_desc} onChange={(e) => setAddDesc(e.target.value)} maxLength={200} />
-          <button type="submit" style={BTN_PRIMARY} disabled={adding}>{adding ? "追加中..." : "＋ 追加"}</button>
+          <input
+            style={{ ...INPUT_STYLE, flex: "2 1 180px" }}
+            placeholder="説明（任意）"
+            value={add_desc}
+            onChange={(e) => setAddDesc(e.target.value)}
+            maxLength={200}
+          />
+          <button type="submit" style={BTN_PRIMARY} disabled={adding}>
+            {adding ? "追加中..." : "＋ 追加"}
+          </button>
         </form>
-        {add_error && <p style={{ color: T.coralDeep, fontSize: 12, margin: "8px 0 0" }}>{add_error}</p>}
+        {add_error && (
+          <p style={{ color: T.coralDeep, fontSize: 12, margin: "8px 0 0" }}>{add_error}</p>
+        )}
       </div>
 
       {/* 2-column grid list */}
@@ -167,31 +208,70 @@ function CategoryGroupsTab({ groups, statement_types, category_count_map, onRefr
           {groups.map((g) => (
             <div key={g.id}>
               {editing_id === g.id ? (
-                <div style={{ background: T.card, borderRadius: 20, padding: "16px 18px", boxShadow: T.cardShadow }}>
+                <div
+                  style={{
+                    background: T.card,
+                    borderRadius: 20,
+                    padding: "16px 18px",
+                    boxShadow: T.cardShadow,
+                  }}
+                >
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <input style={{ ...INPUT_STYLE, flex: "1 1 120px" }} value={edit_name} onChange={(e) => setEditName(e.target.value)} maxLength={100} />
-                      <select style={{ ...INPUT_STYLE, flex: "1 1 100px" }} value={edit_type_id} onChange={(e) => setEditTypeId(Number(e.target.value))}>
-                        {statement_types.map((t) => (<option key={t.id} value={t.id}>{t.statement_type_name}</option>))}
+                      <input
+                        style={{ ...INPUT_STYLE, flex: "1 1 120px" }}
+                        value={edit_name}
+                        onChange={(e) => setEditName(e.target.value)}
+                        maxLength={100}
+                      />
+                      <select
+                        style={{ ...INPUT_STYLE, flex: "1 1 100px" }}
+                        value={edit_type_id}
+                        onChange={(e) => setEditTypeId(Number(e.target.value))}
+                      >
+                        {statement_types.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.statement_type_name}
+                          </option>
+                        ))}
                       </select>
-                      <input style={{ ...INPUT_STYLE, flex: "2 1 160px" }} placeholder="説明（任意）" value={edit_desc} onChange={(e) => setEditDesc(e.target.value)} maxLength={200} />
+                      <input
+                        style={{ ...INPUT_STYLE, flex: "2 1 160px" }}
+                        placeholder="説明（任意）"
+                        value={edit_desc}
+                        onChange={(e) => setEditDesc(e.target.value)}
+                        maxLength={200}
+                      />
                     </div>
-                    {edit_error && <p style={{ color: T.coralDeep, fontSize: 12, margin: 0 }}>{edit_error}</p>}
+                    {edit_error && (
+                      <p style={{ color: T.coralDeep, fontSize: 12, margin: 0 }}>{edit_error}</p>
+                    )}
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button style={BTN_PRIMARY} onClick={() => handleSaveEdit(g.id)}>保存</button>
-                      <button style={BTN_GHOST} onClick={() => setEditingId(null)}>キャンセル</button>
+                      <button style={BTN_PRIMARY} onClick={() => handleSaveEdit(g.id)}>
+                        保存
+                      </button>
+                      <button style={BTN_GHOST} onClick={() => setEditingId(null)}>
+                        キャンセル
+                      </button>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div style={{
-                  background: T.bgSoft, borderRadius: 20,
-                  border: `1.5px solid ${T.hair}`,
-                  padding: "16px 18px",
-                  display: "flex", alignItems: "center", gap: 14,
-                }}>
+                <div
+                  style={{
+                    background: T.bgSoft,
+                    borderRadius: 20,
+                    border: `1.5px solid ${T.hair}`,
+                    padding: "16px 18px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                  }}
+                >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: T.ink }}>{g.group_name}</div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: T.ink }}>
+                      {g.group_name}
+                    </div>
                     <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 2 }}>
                       {category_count_map[g.id] ?? 0} 区分
                     </div>
@@ -200,18 +280,40 @@ function CategoryGroupsTab({ groups, statement_types, category_count_map, onRefr
                   <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                     <button
                       onClick={() => startEdit(g)}
-                      style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", color: T.inkSoft, fontSize: 13 }}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "4px 6px",
+                        color: T.inkSoft,
+                        fontSize: 13,
+                      }}
                       title="編集"
-                    >✏</button>
+                    >
+                      ✏
+                    </button>
                     <button
                       onClick={() => handleDelete(g.id)}
-                      style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", color: T.coralDeep, fontSize: 13 }}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "4px 6px",
+                        color: T.coralDeep,
+                        fontSize: 13,
+                      }}
                       title="削除"
-                    >🗑</button>
+                    >
+                      🗑
+                    </button>
                   </div>
                 </div>
               )}
-              {row_error[g.id] && <p style={{ color: T.coralDeep, fontSize: 12, margin: "6px 0 0" }}>{row_error[g.id]}</p>}
+              {row_error[g.id] && (
+                <p style={{ color: T.coralDeep, fontSize: 12, margin: "6px 0 0" }}>
+                  {row_error[g.id]}
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -305,17 +407,51 @@ function ExpenseCategoriesTab({ categories, groups, onRefresh }: ExpenseCategori
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Add form */}
       <div style={{ background: T.card, borderRadius: 24, padding: 20, boxShadow: T.cardShadow }}>
-        <div style={{ fontSize: 13, color: T.inkSoft, fontWeight: 600, marginBottom: 12 }}>生活区分を追加</div>
-        <form onSubmit={handleAdd} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <input style={{ ...INPUT_STYLE, flex: "1 1 140px" }} placeholder="生活区分名 *" value={add_name} onChange={(e) => setAddName(e.target.value)} maxLength={100} required />
-          <select style={{ ...INPUT_STYLE, flex: "1 1 140px" }} value={effective_add_group_id} onChange={(e) => setAddGroupId(Number(e.target.value))}>
-            {groups.map((g) => (<option key={g.id} value={g.id}>{g.group_name}</option>))}
+        <div style={{ fontSize: 13, color: T.inkSoft, fontWeight: 600, marginBottom: 12 }}>
+          生活区分を追加
+        </div>
+        <form
+          onSubmit={handleAdd}
+          style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}
+        >
+          <input
+            style={{ ...INPUT_STYLE, flex: "1 1 140px" }}
+            placeholder="生活区分名 *"
+            value={add_name}
+            onChange={(e) => setAddName(e.target.value)}
+            maxLength={100}
+            required
+          />
+          <select
+            style={{ ...INPUT_STYLE, flex: "1 1 140px" }}
+            value={effective_add_group_id}
+            onChange={(e) => setAddGroupId(Number(e.target.value))}
+          >
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.group_name}
+              </option>
+            ))}
           </select>
-          <input style={{ ...INPUT_STYLE, flex: "2 1 180px" }} placeholder="説明（任意）" value={add_desc} onChange={(e) => setAddDesc(e.target.value)} maxLength={200} />
-          <button type="submit" style={BTN_PRIMARY} disabled={adding || groups.length === 0}>{adding ? "追加中..." : "＋ 追加"}</button>
+          <input
+            style={{ ...INPUT_STYLE, flex: "2 1 180px" }}
+            placeholder="説明（任意）"
+            value={add_desc}
+            onChange={(e) => setAddDesc(e.target.value)}
+            maxLength={200}
+          />
+          <button type="submit" style={BTN_PRIMARY} disabled={adding || groups.length === 0}>
+            {adding ? "追加中..." : "＋ 追加"}
+          </button>
         </form>
-        {add_error && <p style={{ color: T.coralDeep, fontSize: 12, margin: "8px 0 0" }}>{add_error}</p>}
-        {groups.length === 0 && <p style={{ color: T.inkSoft, fontSize: 12, margin: "8px 0 0" }}>先に大分類を追加してください</p>}
+        {add_error && (
+          <p style={{ color: T.coralDeep, fontSize: 12, margin: "8px 0 0" }}>{add_error}</p>
+        )}
+        {groups.length === 0 && (
+          <p style={{ color: T.inkSoft, fontSize: 12, margin: "8px 0 0" }}>
+            先に大分類を追加してください
+          </p>
+        )}
       </div>
 
       {/* Grouped pill chips */}
@@ -324,49 +460,118 @@ function ExpenseCategoriesTab({ categories, groups, onRefresh }: ExpenseCategori
           <p style={{ color: T.inkSoft, fontSize: 13, margin: 0 }}>生活区分が登録されていません</p>
         </div>
       ) : (
-        <div style={{ background: T.card, borderRadius: 24, padding: 24, boxShadow: T.cardShadow, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div
+          style={{
+            background: T.card,
+            borderRadius: 24,
+            padding: 24,
+            boxShadow: T.cardShadow,
+            display: "flex",
+            flexDirection: "column",
+            gap: 20,
+          }}
+        >
           {group_order.map((g) => {
             const group_cats = categories.filter((c) => c.group_id === g.id);
             return (
               <div key={g.id}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: T.ink, marginBottom: 10 }}>{g.group_name}</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: T.ink, marginBottom: 10 }}>
+                  {g.group_name}
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingLeft: 4 }}>
                   {group_cats.map((c) => (
                     <div key={c.id}>
                       {editing_id === c.id ? (
-                        <div style={{ background: T.bgSoft, borderRadius: 16, padding: "12px 16px", border: `1.5px solid ${T.hair}`, display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div
+                          style={{
+                            background: T.bgSoft,
+                            borderRadius: 16,
+                            padding: "12px 16px",
+                            border: `1.5px solid ${T.hair}`,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 8,
+                          }}
+                        >
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <input style={{ ...INPUT_STYLE, flex: "1 1 120px" }} value={edit_name} onChange={(e) => setEditName(e.target.value)} maxLength={100} />
-                            <select style={{ ...INPUT_STYLE, flex: "1 1 120px" }} value={edit_group_id} onChange={(e) => setEditGroupId(Number(e.target.value))}>
-                              {groups.map((g2) => (<option key={g2.id} value={g2.id}>{g2.group_name}</option>))}
+                            <input
+                              style={{ ...INPUT_STYLE, flex: "1 1 120px" }}
+                              value={edit_name}
+                              onChange={(e) => setEditName(e.target.value)}
+                              maxLength={100}
+                            />
+                            <select
+                              style={{ ...INPUT_STYLE, flex: "1 1 120px" }}
+                              value={edit_group_id}
+                              onChange={(e) => setEditGroupId(Number(e.target.value))}
+                            >
+                              {groups.map((g2) => (
+                                <option key={g2.id} value={g2.id}>
+                                  {g2.group_name}
+                                </option>
+                              ))}
                             </select>
                           </div>
-                          {edit_error && <p style={{ color: T.coralDeep, fontSize: 12, margin: 0 }}>{edit_error}</p>}
+                          {edit_error && (
+                            <p style={{ color: T.coralDeep, fontSize: 12, margin: 0 }}>
+                              {edit_error}
+                            </p>
+                          )}
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button style={BTN_PRIMARY} onClick={() => handleSaveEdit(c.id)}>保存</button>
-                            <button style={BTN_GHOST} onClick={() => setEditingId(null)}>キャンセル</button>
+                            <button style={BTN_PRIMARY} onClick={() => handleSaveEdit(c.id)}>
+                              保存
+                            </button>
+                            <button style={BTN_GHOST} onClick={() => setEditingId(null)}>
+                              キャンセル
+                            </button>
                           </div>
                         </div>
                       ) : (
-                        <div style={{
-                          display: "inline-flex", alignItems: "center", gap: 6,
-                          padding: "8px 14px",
-                          borderRadius: 999,
-                          background: T.bgSoft,
-                          border: `1.5px solid ${T.hair}`,
-                          fontSize: 13, fontWeight: 500, color: T.ink,
-                        }}>
+                        <div
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "8px 14px",
+                            borderRadius: 999,
+                            background: T.bgSoft,
+                            border: `1.5px solid ${T.hair}`,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            color: T.ink,
+                          }}
+                        >
                           <span>{c.category_name}</span>
                           <button
                             onClick={() => startEdit(c)}
-                            style={{ background: "transparent", border: "none", cursor: "pointer", padding: "0 2px", color: T.inkSoft, fontSize: 12, lineHeight: 1 }}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              cursor: "pointer",
+                              padding: "0 2px",
+                              color: T.inkSoft,
+                              fontSize: 12,
+                              lineHeight: 1,
+                            }}
                             title="編集"
-                          >✏</button>
+                          >
+                            ✏
+                          </button>
                           <button
                             onClick={() => handleDelete(c.id)}
-                            style={{ background: "transparent", border: "none", cursor: "pointer", padding: "0 2px", color: T.coralDeep, fontSize: 12, lineHeight: 1 }}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              cursor: "pointer",
+                              padding: "0 2px",
+                              color: T.coralDeep,
+                              fontSize: 12,
+                              lineHeight: 1,
+                            }}
                             title="削除"
-                          >🗑</button>
+                          >
+                            🗑
+                          </button>
                         </div>
                       )}
                     </div>
@@ -413,11 +618,7 @@ export function MasterManagement() {
 
   useEffect(() => {
     let is_cancelled = false;
-    Promise.all([
-      api.listCategoryGroups(),
-      api.listExpenseCategories(),
-      api.listStatementTypes(),
-    ])
+    Promise.all([api.listCategoryGroups(), api.listExpenseCategories(), api.listStatementTypes()])
       .then(([groups_res, cats_res, types_res]) => {
         if (is_cancelled) return;
         setLoadError(null);
@@ -426,12 +627,15 @@ export function MasterManagement() {
         setStatementTypes(types_res.statement_types);
       })
       .catch((err: unknown) => {
-        if (!is_cancelled) setLoadError(err instanceof Error ? err.message : "読み込みに失敗しました");
+        if (!is_cancelled)
+          setLoadError(err instanceof Error ? err.message : "読み込みに失敗しました");
       })
       .finally(() => {
         if (!is_cancelled) setLoading(false);
       });
-    return () => { is_cancelled = true; };
+    return () => {
+      is_cancelled = true;
+    };
   }, []);
 
   const category_count_map: Record<number, number> = {};
@@ -449,10 +653,20 @@ export function MasterManagement() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
-        <h1 style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 30, fontWeight: 900, color: T.ink, letterSpacing: "-0.01em" }}>
+        <h1
+          style={{
+            fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+            fontSize: 30,
+            fontWeight: 900,
+            color: T.ink,
+            letterSpacing: "-0.01em",
+          }}
+        >
           マスタ管理
         </h1>
-        <p style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>自分らしいカテゴリで管理しよう</p>
+        <p style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>
+          自分らしいカテゴリで管理しよう
+        </p>
       </div>
 
       {/* Tab pills */}
@@ -465,8 +679,12 @@ export function MasterManagement() {
               border: `1.5px solid ${active_tab === tab ? T.coral : T.hair}`,
               background: active_tab === tab ? T.coral : T.card,
               color: active_tab === tab ? "#fff" : T.ink,
-              padding: "10px 22px", borderRadius: 999, fontFamily: "inherit",
-              fontSize: 13, fontWeight: 700, cursor: "pointer",
+              padding: "10px 22px",
+              borderRadius: 999,
+              fontFamily: "inherit",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
               boxShadow: active_tab === tab ? `0 3px 0 ${T.coralDeep}` : "none",
             }}
           >
@@ -484,11 +702,7 @@ export function MasterManagement() {
         />
       )}
       {active_tab === "生活区分" && (
-        <ExpenseCategoriesTab
-          categories={categories}
-          groups={groups}
-          onRefresh={fetchAll}
-        />
+        <ExpenseCategoriesTab categories={categories} groups={groups} onRefresh={fetchAll} />
       )}
     </div>
   );
