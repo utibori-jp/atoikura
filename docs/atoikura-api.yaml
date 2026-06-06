@@ -1,4 +1,4 @@
-openapi: 3.1.0
+﻿openapi: 3.1.0
 
 info:
   title: atoikura API
@@ -164,8 +164,7 @@ components:
         statement_type:
           $ref: '#/components/schemas/StatementTypeSummary'
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 説明
           example: "日常の食費全般"
 
@@ -196,8 +195,7 @@ components:
           description: 生活区分名
           example: "スーパー"
         category_code:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 生活区分コード
           example: "food_super"
         group_id:
@@ -209,8 +207,7 @@ components:
           description: 紐づく大分類名
           example: "食費"
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 説明
           example: null
 
@@ -238,8 +235,7 @@ components:
           description: 取引日（YYYY-MM-DD）
           example: "2025-05-05"
         item:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 項目名（コンビニ、ランチ代など）
           example: "コンビニ"
         amount:
@@ -257,8 +253,7 @@ components:
             true にすると変動費集計から除外される（特別出費など）。デフォルトはfalse（集計対象）
           example: true
         note:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 補足コメント
           example: "昼飯"
 
@@ -285,8 +280,7 @@ components:
           description: 取引日（YYYY-MM-DD）
           example: "2025-05-05"
         item:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 項目名
           example: "コンビニ"
         amount:
@@ -314,8 +308,7 @@ components:
           description: 集計除外フラグ（trueで集計から除外）
           example: true
         note:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 補足コメント
           example: "昼飯"
         created_at:
@@ -339,8 +332,7 @@ components:
           description: 変動費分析用グループID（statement_types.id）
           example: 2
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 説明
           example: "シャンプーや洗剤など"
 
@@ -359,8 +351,7 @@ components:
           description: 紐づく大分類ID
           example: 3
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 説明
           example: "日用品の購入など"
 
@@ -429,18 +420,15 @@ components:
       type: object
       properties:
         monthly_budget:
-          type: integer
-          nullable: true
+          type: [integer, "null"]
           description: 月次変動費予算（円）。未設定時はnull
           example: 150000
         goal_text:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 貯金目標テキスト。未設定時はnull
           example: "夏までに旅行費を貯める"
         goal_amount:
-          type: integer
-          nullable: true
+          type: [integer, "null"]
           description: 目標金額（円）。未設定時はnull
           example: 300000
 
@@ -448,18 +436,15 @@ components:
       type: object
       properties:
         monthly_budget:
-          type: integer
-          nullable: true
+          type: [integer, "null"]
           description: 月次変動費予算（円）。nullで未設定に戻る。1以上の整数のみ許容
           example: 120000
         goal_text:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 貯金目標テキスト。nullで未設定に戻る
           example: "夏までに旅行費を貯める"
         goal_amount:
-          type: integer
-          nullable: true
+          type: [integer, "null"]
           description: 目標金額（円）。nullで未設定に戻る
           example: 300000
 
@@ -543,8 +528,7 @@ components:
           description: 日付（YYYY-MM-DD）
           example: "2025-05-05"
         note:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: コメントテキスト。空文字送信後の削除状態ではnullを返す
           example: "ディズニー行ったから出費多め"
 
@@ -583,14 +567,12 @@ components:
           description: メールアドレス（ログインID）
           example: "dev@atoikura.local"
         display_name:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 表示名
           example: "Dev User"
         last_login_at:
-          type: string
+          type: [string, "null"]
           format: date-time
-          nullable: true
           description: 最終ログイン日時（ISO 8601）
           example: "2026-05-27T09:12:34+09:00"
 
@@ -612,8 +594,7 @@ components:
           description: パスワード（8文字以上）
           example: "correct horse"
         display_name:
-          type: string
-          nullable: true
+          type: [string, "null"]
           maxLength: 50
           description: 表示名（任意・50文字以内）
           example: "Alice"
