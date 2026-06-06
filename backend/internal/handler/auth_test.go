@@ -53,13 +53,6 @@ func hashPassword(t *testing.T, password string) string {
 
 var authTestSecret = []byte("auth-handler-test-secret")
 
-// decodeAuthResponse decodes the authResponseJSON from the response body.
-func decodeAuthResponse(t *testing.T, w interface{ Body() interface{ String() string } }) authResponseJSON {
-	t.Helper()
-	// handled via testutil.DecodeJSON pattern — use json.Decoder directly
-	return authResponseJSON{}
-}
-
 func TestLoginHandler(t *testing.T) {
 	displayName := "Alice"
 	now := time.Now()
