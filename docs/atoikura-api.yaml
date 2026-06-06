@@ -12,22 +12,20 @@ servers:
     description: ローカル開発環境
 
 security:
-  - basicAuth: []
+  - bearerAuth: []
 
 components:
   securitySchemes:
-    basicAuth:
+    bearerAuth:
       type: http
-      scheme: basic
+      scheme: bearer
+      bearerFormat: JWT
       description: |
-        Basic認証（Ver1）。
-        クライアントはすべてのリクエストの `Authorization` ヘッダーに
-        `Basic {Base64(email:password)}` を付与する。
-        バックエンドはヘッダーをデコードしてDBのユーザーと照合し、
-        一致すれば処理続行、不一致なら401を返す。
-        毎リクエストで認証情報を検証する。
-        `POST /auth/login` はログイン画面用の検証プローブとして任意で利用できる
-        （セッションは発行しない）。
+        JWT Bearer認証。
+        `POST /auth/login` または `POST /auth/signup` で取得したJWTを
+        すべてのリクエストの `Authorization: Bearer <token>` ヘッダーに付与する。
+        トークンはHS256署名、有効期限24時間。
+        トークンが無効または期限切れの場合は401を返す。
 
   responses:
     Unauthorized:
@@ -549,6 +547,38 @@ components:
           items:
             $ref: '#/components/schemas/DailyNote'
 
+    LoginResponse:
+      type: object
+      required:
+        - token
+        - id
+        - email
+        - display_name
+        - last_login_at
+      properties:
+        token:
+          type: string
+          description: JWT access token (HS256、有効期限24時間)
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        id:
+          type: integer
+          description: ユーザーID
+          example: 1
+        email:
+          type: string
+          format: email
+          description: メールアドレス
+          example: "dev@atoikura.local"
+        display_name:
+          type: [string, "null"]
+          description: 表示名
+          example: "Dev User"
+        last_login_at:
+          type: [string, "null"]
+          format: date-time
+          description: 最終ログイン日時（ISO 8601）
+          example: "2026-05-27T09:12:34+09:00"
+
     UserResponse:
       type: object
       required:
@@ -621,7 +651,7 @@ paths:
       summary: 新規ユーザー登録
       description: |
         新規アカウントを作成し、デフォルトの大分類・生活区分マスタを自動でシードする。
-        作成後はそのままログイン状態として扱える（レスポンスはログインと同形式）。
+        成功時はJWTとユーザー情報を返す（ログインと同形式）。
         認証不要のエンドポイント。
       operationId: signup
       tags:
@@ -639,7 +669,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserResponse'
+                $ref: '#/components/schemas/LoginResponse'
         '400':
           description: 入力値が不正（メール形式・パスワード長など）
           content:
@@ -663,23 +693,39 @@ paths:
 
   /auth/login:
     post:
-      summary: ログイン検証
+      summary: ログイン
       description: |
-        Basic認証ヘッダーで送られた資格情報を検証するためのプローブエンドポイント。
-        成功時は `last_login_at` を更新し、ユーザー情報を返す。失敗時は401。
-
-        通常のリクエストはBasic認証ミドルウェアが毎回検証するため、このエンドポイントは
-        ログイン画面でフォーム入力された資格情報を「先に試す」ためだけに使う。
+        メールアドレスとパスワードを検証し、成功時にJWTとユーザー情報を返す。
+        発行されたトークンを以降のリクエストの `Authorization: Bearer <token>` ヘッダーに付与する。
       operationId: login
       tags:
         - auth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "alice@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "correct horse"
       responses:
         '200':
           description: 認証成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserResponse'
+                $ref: '#/components/schemas/LoginResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':

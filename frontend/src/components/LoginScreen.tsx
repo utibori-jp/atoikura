@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { api, AuthError, credentials_store } from "../api/client";
+import { api, AuthError, token_store } from "../api/client";
 import { T, btnPrimary } from "../theme";
 import type { components } from "../api/types";
 
@@ -37,7 +37,7 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
     setSubmitting(true);
     setErrorMessage(null);
     try {
-      const user =
+      const result =
         mode === "login"
           ? await api.login(email, password)
           : await api.signup({
@@ -45,7 +45,8 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
               password,
               display_name: display_name.trim() || null,
             });
-      credentials_store.save(email, password);
+      token_store.save(result.token);
+      const { token: _token, ...user } = result;
       onSuccess(user);
     } catch (err) {
       if (mode === "login" && err instanceof AuthError) {

@@ -8,7 +8,7 @@ import { MasterManagement } from "./components/MasterManagement";
 import { ReviewScreen } from "./components/ReviewScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { UserInfo } from "./components/UserInfo";
-import { api, AuthError, credentials_store } from "./api/client";
+import { api, AuthError, token_store } from "./api/client";
 import type { components } from "./api/types";
 import { T } from "./theme";
 
@@ -201,7 +201,7 @@ type AuthState =
 
 export default function App() {
   const [auth_state, setAuthState] = useState<AuthState>(() =>
-    credentials_store.load() ? { status: "checking" } : { status: "anonymous" },
+    token_store.load() ? { status: "checking" } : { status: "anonymous" },
   );
   const [active_tab, setActiveTab] = useState<Tab>("home");
   const [refresh_token, setRefreshToken] = useState(0);
@@ -219,7 +219,7 @@ export default function App() {
       } catch (err) {
         if (cancelled) return;
         if (err instanceof AuthError) {
-          credentials_store.clear();
+          token_store.clear();
         }
         setAuthState({ status: "anonymous" });
       }
@@ -230,7 +230,7 @@ export default function App() {
   }, [auth_state.status]);
 
   function handleLogout() {
-    credentials_store.clear();
+    token_store.clear();
     setActiveTab("home");
     setAuthState({ status: "anonymous" });
   }

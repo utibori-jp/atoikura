@@ -16,7 +16,7 @@ export interface paths {
         /**
          * 新規ユーザー登録
          * @description 新規アカウントを作成し、デフォルトの大分類・生活区分マスタを自動でシードする。
-         *     作成後はそのままログイン状態として扱える（レスポンスはログインと同形式）。
+         *     成功時はJWTとユーザー情報を返す（ログインと同形式）。
          *     認証不要のエンドポイント。
          */
         post: operations["signup"];
@@ -36,12 +36,9 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * ログイン検証
-         * @description Basic認証ヘッダーで送られた資格情報を検証するためのプローブエンドポイント。
-         *     成功時は `last_login_at` を更新し、ユーザー情報を返す。失敗時は401。
-         *
-         *     通常のリクエストはBasic認証ミドルウェアが毎回検証するため、このエンドポイントは
-         *     ログイン画面でフォーム入力された資格情報を「先に試す」ためだけに使う。
+         * ログイン
+         * @description メールアドレスとパスワードを検証し、成功時にJWTとユーザー情報を返す。
+         *     発行されたトークンを以降のリクエストの `Authorization: Bearer <token>` ヘッダーに付与する。
          */
         post: operations["login"];
         delete?: never;
@@ -934,6 +931,35 @@ export interface components {
             /** @description 日付ごとのコメント一覧。コメントなし月は空配列 */
             notes: components["schemas"]["DailyNote"][];
         };
+        LoginResponse: {
+            /**
+             * @description JWT access token (HS256、有効期限24時間)
+             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+             */
+            token: string;
+            /**
+             * @description ユーザーID
+             * @example 1
+             */
+            id: number;
+            /**
+             * Format: email
+             * @description メールアドレス
+             * @example dev@atoikura.local
+             */
+            email: string;
+            /**
+             * @description 表示名
+             * @example Dev User
+             */
+            display_name: string | null;
+            /**
+             * Format: date-time
+             * @description 最終ログイン日時（ISO 8601）
+             * @example 2026-05-27T09:12:34+09:00
+             */
+            last_login_at: string | null;
+        };
         UserResponse: {
             /**
              * @description ユーザーID
@@ -1048,7 +1074,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserResponse"];
+                    "application/json": components["schemas"]["LoginResponse"];
                 };
             };
             /** @description 入力値が不正（メール形式・パスワード長など） */
@@ -1091,7 +1117,22 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: email
+                     * @example alice@example.com
+                     */
+                    email: string;
+                    /**
+                     * Format: password
+                     * @example correct horse
+                     */
+                    password: string;
+                };
+            };
+        };
         responses: {
             /** @description 認証成功 */
             200: {
@@ -1099,7 +1140,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserResponse"];
+                    "application/json": components["schemas"]["LoginResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
