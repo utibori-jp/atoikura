@@ -65,3 +65,15 @@ jobs:
       - name: Validate OpenAPI spec
         working-directory: .
         run: npx --yes @redocly/cli lint docs/atoikura-api.yaml
+
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build backend/
+
+      - name: Build frontend image
+        run: docker build frontend/
