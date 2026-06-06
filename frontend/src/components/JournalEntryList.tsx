@@ -177,12 +177,11 @@ export function JournalEntryList({ year_month, refresh_token }: Props) {
 
   useEffect(() => {
     let is_cancelled = false;
-    setEntries(null);
-    setErrorMessage('');
-    setEditingNoteDate(null);
     Promise.all([api.listJournalEntries(year_month), api.getDailyNotes(year_month)])
       .then(([entries_res, notes_res]) => {
         if (is_cancelled) return;
+        setErrorMessage('');
+        setEditingNoteDate(null);
         setEntries(entries_res.entries);
         const notes_map: Record<string, string> = {};
         for (const n of notes_res.notes) {
