@@ -46,8 +46,7 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
               display_name: display_name.trim() || null,
             });
       token_store.save(result.token);
-      const { token: _token, ...user } = result;
-      onSuccess(user);
+      onSuccess(result);
     } catch (err) {
       if (mode === "login" && err instanceof AuthError) {
         setErrorMessage("メールアドレスまたはパスワードが正しくありません");
