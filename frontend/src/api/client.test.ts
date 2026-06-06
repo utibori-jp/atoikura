@@ -45,7 +45,7 @@ describe("api requests", () => {
       new Response(JSON.stringify(body), {
         status,
         headers: { "Content-Type": "application/json" },
-      }),
+      })
     );
   }
 
@@ -82,12 +82,18 @@ describe("api requests", () => {
     respond({ code: "BAD_REQUEST", message: "year_monthはYYYY-MM形式で指定してください" }, 400);
 
     await expect(api.getDailyCumulative("bad-format")).rejects.toThrow(
-      "year_monthはYYYY-MM形式で指定してください",
+      "year_monthはYYYY-MM形式で指定してください"
     );
   });
 
   it("login sends email and password as JSON body", async () => {
-    respond({ token: "jwt.token.here", id: 1, email: "u@example.com", display_name: null, last_login_at: null });
+    respond({
+      token: "jwt.token.here",
+      id: 1,
+      email: "u@example.com",
+      display_name: null,
+      last_login_at: null,
+    });
 
     await api.login("u@example.com", "mypassword");
 

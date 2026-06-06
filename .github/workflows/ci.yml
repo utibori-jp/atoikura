@@ -28,6 +28,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           working-directory: backend
+          args: --go=1.24
 
       - name: go test
         run: go test -coverprofile=coverage.out ./...

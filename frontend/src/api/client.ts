@@ -1,7 +1,7 @@
 import type { components } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
-const CREDENTIALS_STORAGE_KEY = "atoikura.basic_auth";
+const TOKEN_STORAGE_KEY = "atoikura.jwt_token";
 
 export class AuthError extends Error {
   constructor(message: string) {
@@ -10,58 +10,27 @@ export class AuthError extends Error {
   }
 }
 
-interface StoredCredentials {
-  email: string;
-  // Pre-encoded `Basic <base64(email:password)>` value so we never keep the raw password in app state.
-  authorization_header: string;
-}
-
-function encodeBasicAuth(email: string, password: string): string {
-  // btoa expects Latin-1; passwords with non-ASCII chars need UTF-8 encoding first.
-  const utf8_bytes = new TextEncoder().encode(`${email}:${password}`);
-  let binary_string = "";
-  for (const byte of utf8_bytes) {
-    binary_string += String.fromCharCode(byte);
-  }
-  return `Basic ${btoa(binary_string)}`;
-}
-
-export const credentials_store = {
-  save(email: string, password: string): StoredCredentials {
-    const entry: StoredCredentials = {
-      email,
-      authorization_header: encodeBasicAuth(email, password),
-    };
-    sessionStorage.setItem(CREDENTIALS_STORAGE_KEY, JSON.stringify(entry));
-    return entry;
+export const token_store = {
+  save(token: string): void {
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
   },
-  load(): StoredCredentials | null {
-    const raw = sessionStorage.getItem(CREDENTIALS_STORAGE_KEY);
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as StoredCredentials;
-    } catch {
-      return null;
-    }
+  load(): string | null {
+    return sessionStorage.getItem(TOKEN_STORAGE_KEY);
   },
   clear(): void {
-    sessionStorage.removeItem(CREDENTIALS_STORAGE_KEY);
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
   },
 };
 
-async function request<TResponse>(
-  path: string,
-  init?: RequestInit,
-  override_auth_header?: string
-): Promise<TResponse> {
-  const auth_header = override_auth_header ?? credentials_store.load()?.authorization_header;
+async function request<TResponse>(path: string, init?: RequestInit): Promise<TResponse> {
+  const stored_token = token_store.load();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(init?.headers as Record<string, string> | undefined),
   };
-  if (auth_header) {
-    headers["Authorization"] = auth_header;
+  if (stored_token) {
+    headers["Authorization"] = `Bearer ${stored_token}`;
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
@@ -81,18 +50,13 @@ async function request<TResponse>(
 }
 
 export const api = {
-  // Auth probe: verifies the supplied creds without persisting them. On success
-  // the caller is responsible for calling credentials_store.save().
   login: (email: string, password: string) =>
-    request<components["schemas"]["UserResponse"]>(
-      "/auth/login",
-      { method: "POST" },
-      encodeBasicAuth(email, password)
-    ),
-  // Creates an account (no auth header needed). On success the caller stores
-  // the same credentials, same as login.
+    request<components["schemas"]["LoginResponse"]>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
   signup: (body: components["schemas"]["SignupRequest"]) =>
-    request<components["schemas"]["UserResponse"]>("/auth/signup", {
+    request<components["schemas"]["LoginResponse"]>("/auth/signup", {
       method: "POST",
       body: JSON.stringify(body),
     }),
