@@ -179,10 +179,10 @@ func DeleteCategoryGroupHandler(repo *repository.Repository) http.HandlerFunc {
 }
 
 type categoryGroupResponse struct {
-	ID            int32              `json:"id"`
-	GroupName     string             `json:"group_name"`
-	StatementType statementTypeResp  `json:"statement_type"`
-	Description   *string            `json:"description"`
+	ID            int32             `json:"id"`
+	GroupName     string            `json:"group_name"`
+	StatementType statementTypeResp `json:"statement_type"`
+	Description   *string           `json:"description"`
 }
 
 type statementTypeResp struct {
