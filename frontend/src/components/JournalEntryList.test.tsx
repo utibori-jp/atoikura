@@ -94,11 +94,11 @@ describe("JournalEntryList", () => {
     render(<JournalEntryList year_month="2026-06" refresh_token={0} />);
 
     await waitFor(() => {
-      expect(screen.getByText("今月の合計（変動費）")).toBeInTheDocument();
+      expect(screen.getByText("6月の変動費")).toBeInTheDocument();
     });
 
     // The monthly total pill shows ¥1,000 (excluding the ¥5,000 is_excluded entry)
-    const totalPill = screen.getByText("今月の合計（変動費）").parentElement!;
+    const totalPill = screen.getByText("6月の変動費").parentElement!;
     expect(totalPill).toHaveTextContent("¥1,000");
   });
 });
