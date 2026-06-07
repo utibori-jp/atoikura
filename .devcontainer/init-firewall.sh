@@ -64,7 +64,7 @@ while read -r cidr; do
     echo "ERROR: invalid CIDR from GitHub meta: $cidr"
     exit 1
   fi
-  ipset add allowed-domains "$cidr"
+  ipset add --exist allowed-domains "$cidr"
 done < <(echo "$gh_ranges" | jq -r '(.web + .api + .git)[]' | aggregate -q)
 
 # Other allowed domains. Add new ones with a one-line comment explaining why.
@@ -86,11 +86,11 @@ for domain in \
   echo "Resolving $domain..."
   ips=$(dig +noall +answer A "$domain" | awk '$4 == "A" {print $5}')
   if [ -z "$ips" ]; then
-    echo "ERROR: failed to resolve $domain"
-    exit 1
+    echo "WARNING: failed to resolve $domain, skipping"
+    continue
   fi
   while read -r ip; do
-    ipset add allowed-domains "$ip"
+    ipset add --exist allowed-domains "$ip"
   done <<< "$ips"
 done
 

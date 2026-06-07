@@ -5,7 +5,7 @@
     "docker-compose.dev.yml"
   ],
   "service": "dev",
-  "workspaceFolder": "/workspace",
+  "workspaceFolder": "/workspace/atoikura",
   "runServices": ["db", "adminer"],
   "remoteUser": "node",
   "shutdownAction": "stopCompose",
