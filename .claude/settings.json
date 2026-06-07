@@ -51,6 +51,7 @@
       "Bash(curl -s http://localhost:8080/*)",
 
       "Bash(mkdir*)",
+      "Bash(bash scripts/*)",
       "Read(CLAUDE.md)",
       "Edit(CLAUDE.md)"
     ]

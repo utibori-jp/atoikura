@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -12,6 +13,12 @@ import (
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
 
+type userRepo interface {
+	GetUserByID(ctx context.Context, user_id int64) (*repository.UserProfile, error)
+	GetUserPasswordHash(ctx context.Context, user_id int64) (string, error)
+	UpdateUserPassword(ctx context.Context, user_id int64, password_hash string) error
+}
+
 type userMeResponseJSON struct {
 	ID          int64      `json:"id"`
 	Email       string     `json:"email"`
@@ -19,7 +26,7 @@ type userMeResponseJSON struct {
 	LastLoginAt *time.Time `json:"last_login_at"`
 }
 
-func GetCurrentUserHandler(repo *repository.Repository) http.HandlerFunc {
+func GetCurrentUserHandler(repo userRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
@@ -47,7 +54,7 @@ func GetCurrentUserHandler(repo *repository.Repository) http.HandlerFunc {
 	}
 }
 
-func ChangePasswordHandler(repo *repository.Repository) http.HandlerFunc {
+func ChangePasswordHandler(repo userRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {

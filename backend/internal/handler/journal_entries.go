@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -8,6 +9,14 @@ import (
 
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
+
+type journalEntryRepo interface {
+	GetActiveExpenseCategory(ctx context.Context, id int64, user_id int64) (*repository.ExpenseCategoryView, error)
+	CreateJournalEntry(ctx context.Context, params repository.CreateJournalEntryParams) (*repository.JournalEntryView, error)
+	ListJournalEntriesByMonth(ctx context.Context, user_id int64, first_day time.Time) ([]repository.JournalEntryView, error)
+	UpdateJournalEntry(ctx context.Context, params repository.UpdateJournalEntryParams) (*repository.JournalEntryView, error)
+	DeleteJournalEntry(ctx context.Context, id int64, user_id int64) (bool, error)
+}
 
 type journalEntryJSON struct {
 	ID              int32   `json:"id"`
@@ -39,7 +48,7 @@ func viewToJournalEntryJSON(e repository.JournalEntryView) journalEntryJSON {
 	}
 }
 
-func CreateJournalEntryHandler(repo *repository.Repository) http.HandlerFunc {
+func CreateJournalEntryHandler(repo journalEntryRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
@@ -122,7 +131,7 @@ func CreateJournalEntryHandler(repo *repository.Repository) http.HandlerFunc {
 	}
 }
 
-func ListJournalEntriesHandler(repo *repository.Repository) http.HandlerFunc {
+func ListJournalEntriesHandler(repo journalEntryRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
@@ -183,7 +192,7 @@ func ListJournalEntriesHandler(repo *repository.Repository) http.HandlerFunc {
 	}
 }
 
-func UpdateJournalEntryHandler(repo *repository.Repository) http.HandlerFunc {
+func UpdateJournalEntryHandler(repo journalEntryRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
@@ -276,7 +285,7 @@ func UpdateJournalEntryHandler(repo *repository.Repository) http.HandlerFunc {
 	}
 }
 
-func DeleteJournalEntryHandler(repo *repository.Repository) http.HandlerFunc {
+func DeleteJournalEntryHandler(repo journalEntryRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
