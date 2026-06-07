@@ -31,12 +31,6 @@ describe("JournalEntryForm", () => {
     render(<JournalEntryForm onSuccess={onSuccess} />);
 
     await waitFor(() => {
-      expect(screen.getByText("食費")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText("食費"));
-
-    await waitFor(() => {
       expect(screen.getByText("スーパー")).toBeInTheDocument();
     });
 
@@ -52,12 +46,6 @@ describe("JournalEntryForm", () => {
 
   it("calls onSuccess after successful submit", async () => {
     render(<JournalEntryForm onSuccess={onSuccess} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("食費")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText("食費"));
 
     await waitFor(() => {
       expect(screen.getByText("スーパー")).toBeInTheDocument();
