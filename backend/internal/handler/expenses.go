@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -8,6 +9,12 @@ import (
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 	"github.com/utibori-jp/atoikura/backend/internal/service"
 )
+
+type expenseRepo interface {
+	ListMonthlyBreakdown(ctx context.Context, user_id int64, first_day time.Time) ([]repository.MonthlyBreakdownItem, error)
+	ListDailyExpenseSumsForMonth(ctx context.Context, user_id int64, first_day time.Time) ([]repository.DailyExpenseSum, error)
+	GetBudgetByUser(ctx context.Context, user_id int64) (*repository.BudgetResult, error)
+}
 
 type monthlyBreakdownItemJSON struct {
 	CategoryID        int32  `json:"category_id"`
@@ -24,7 +31,7 @@ type monthlyBreakdownResponseJSON struct {
 	Breakdown []monthlyBreakdownItemJSON `json:"breakdown"`
 }
 
-func GetMonthlyBreakdownHandler(repo *repository.Repository) http.HandlerFunc {
+func GetMonthlyBreakdownHandler(repo expenseRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
@@ -78,7 +85,7 @@ type dailyCumulativeResponseJSON struct {
 	Days          []service.DailyEntry `json:"days"`
 }
 
-func GetDailyCumulativeHandler(repo *repository.Repository) http.HandlerFunc {
+func GetDailyCumulativeHandler(repo expenseRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
