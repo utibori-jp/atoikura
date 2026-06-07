@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { server } from "../test/server";
-import { SummaryCards } from "./SummaryCards";
+import { SummaryCards, dailyAvailableTone } from "./SummaryCards";
 import type { components } from "../api/types";
 
 const API_BASE = "http://localhost:8080";
@@ -74,5 +74,24 @@ describe("SummaryCards", () => {
     });
 
     expect(screen.getByText(/¥6,300/)).toBeInTheDocument();
+  });
+});
+
+describe("dailyAvailableTone", () => {
+  it("returns sage when daily_available is >= 50% of daily_budget", () => {
+    expect(dailyAvailableTone(5000, 5000)).toBe("sage");
+    expect(dailyAvailableTone(2500, 5000)).toBe("sage");
+    expect(dailyAvailableTone(3000, 4000)).toBe("sage");
+  });
+
+  it("returns mustard when daily_available is < 50% of daily_budget but >= 0", () => {
+    expect(dailyAvailableTone(2499, 5000)).toBe("mustard");
+    expect(dailyAvailableTone(1, 5000)).toBe("mustard");
+    expect(dailyAvailableTone(0, 5000)).toBe("mustard");
+  });
+
+  it("returns danger when daily_available is < 0", () => {
+    expect(dailyAvailableTone(-1, 5000)).toBe("danger");
+    expect(dailyAvailableTone(-5000, 5000)).toBe("danger");
   });
 });
