@@ -1,10 +1,9 @@
 # atoikura
 
-A personal-budget app focused on one question: **how much can I still spend this month?**
+**How much can I still spend this month?** That's the only question that matters.
 
-It tracks the gap between a monthly variable-expense budget and cumulative spending. Income is intentionally excluded from the calculation.
-
-Designed for family-internal use, deployed to a self-hosted K3s cluster reachable over Tailscale.
+atoikura tracks the gap between your monthly variable-expense budget and
+cumulative spending — no income tracking, no complexity, just your number.
 
 The UI is in Japanese (the target users are native Japanese speakers); the codebase, docs, and tooling are in English.
 
@@ -21,7 +20,7 @@ The UI is in Japanese (the target users are native Japanese speakers); the codeb
 
 ## Development
 
-The devcontainer is the recommended path — it pins all toolchains, runs an egress firewall, and works the same on every machine.
+The devcontainer is the recommended path — it pins all toolchains and works the same on every machine.
 
 ### Option A: Devcontainer (recommended)
 
@@ -39,8 +38,6 @@ The devcontainer is the recommended path — it pins all toolchains, runs an egr
    ```
 
 The `db` and `adminer` services come up automatically alongside the devcontainer. Adminer is at http://localhost:8001.
-
-On container start, an egress firewall (`.devcontainer/init-firewall.sh`) blocks all outbound traffic except an allowlist (GitHub, npm registry, Go module proxy, Anthropic API, VS Code marketplace, etc.). If you add a dependency hosted somewhere new, update the allowlist in that script.
 
 ### Option B: Run locally without the devcontainer
 
