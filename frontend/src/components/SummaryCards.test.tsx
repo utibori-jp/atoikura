@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { server } from "../test/server";
-import { SummaryCards, dailyAvailableTone } from "./SummaryCards";
+import { SummaryCards } from "./SummaryCards";
+import { dailyAvailableTone } from "./SummaryCards.utils";
 import type { components } from "../api/types";
 
 const API_BASE = "http://localhost:8080";

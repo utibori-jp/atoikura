@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { components } from "../api/types";
 import { T } from "../theme";
+import { dailyAvailableTone } from "./SummaryCards.utils";
 
 type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
 
@@ -41,12 +42,6 @@ function computeSummary(data: DailyCumulativeResponse) {
     daily_budget,
     budget_margin,
   };
-}
-
-export function dailyAvailableTone(daily_available: number, daily_budget: number): Tone {
-  if (daily_available < 0) return "danger";
-  if (daily_available < daily_budget * 0.5) return "mustard";
-  return "sage";
 }
 
 type Tone = "coral" | "mustard" | "sage" | "danger";
