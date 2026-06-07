@@ -104,7 +104,7 @@ export function BudgetSettings() {
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: 20 }}>
+      <div className="budget-cards-row" style={{ display: "flex", gap: 20 }}>
         {/* Savings goal card */}
         <div
           style={{

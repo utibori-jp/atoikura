@@ -120,3 +120,37 @@ body {
     padding-bottom: max(env(safe-area-inset-bottom), 16px);
   }
 }
+
+/* ── Mobile responsive overrides (< 1024 px) ─────────────────────── */
+@media (max-width: 1023px) {
+  /* Form top row: date + amount + item stacks to 2 columns */
+  .form-top-row {
+    flex-wrap: wrap !important;
+  }
+  .form-top-row > * {
+    flex: 1 1 140px !important;
+  }
+
+  /* Budget settings: 2 cards become single column */
+  .budget-cards-row {
+    flex-direction: column !important;
+  }
+
+  /* Inline edit form: 3 columns → 2 columns */
+  .edit-form-grid-3 {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .edit-form-grid-3 > :last-child {
+    grid-column: span 2;
+  }
+
+  /* Summary card values: reduce font-size for 375 px */
+  .stat-pill-value {
+    font-size: 20px !important;
+  }
+
+  /* HomeGraph: ensure no overflow */
+  .home-graph-card {
+    overflow-x: hidden;
+  }
+}

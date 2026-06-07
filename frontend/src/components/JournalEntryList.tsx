@@ -134,6 +134,7 @@ function InlineEditForm({
       }}
     >
       <div
+        className="edit-form-grid-3"
         style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
