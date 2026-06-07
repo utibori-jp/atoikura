@@ -21,6 +21,7 @@ services:
       DATABASE_URL: postgres://atoikura:dev_password@db:5432/atoikura?sslmode=disable
       PORT: 8080
       CORS_ALLOWED_ORIGIN: http://localhost:3000
+      JWT_SECRET: dev-jwt-secret-change-in-production
     ports:
       - "8080:8080"
     depends_on:
@@ -28,9 +29,12 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
-    environment:
-      VITE_API_URL: http://localhost:8080
+    build:
+      context: ./frontend
+      args:
+        # Vite inlines env vars at build time, so VITE_API_URL must be a build
+        # arg (a runtime `environment:` value has no effect on the static bundle).
+        VITE_API_URL: http://localhost:8080
     ports:
       - "3000:80"
     depends_on:

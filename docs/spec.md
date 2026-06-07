@@ -18,7 +18,7 @@
 | フロントエンド | React |
 | データベース | PostgreSQL |
 | DB設計 | dbdiagram.io（DBML記法） |
-| 認証（Ver1） | Basic認証 |
+| 認証（Ver1） | JWT Bearer認証（HS256、有効期限24時間） |
 
 ### 1-3. バージョンスコープ
 
@@ -107,7 +107,7 @@ Ver1スコープ（本仕様書の対象）：
 
 | 項目 | 決定内容 |
 |---|---|
-| 認証 | Basic認証。毎リクエストの `Authorization` ヘッダーでID/Passを送信。バックエンドがDBと照合。ログイン用エンドポイントは存在しない |
+| 認証 | JWT Bearer認証。`POST /auth/login` でトークンを発行し、以降のリクエストは `Authorization: Bearer <token>` で送信。トークンはHS256署名・有効期限24時間 |
 | ユーザーID取得 | セッション/トークンから取得。パスに `{user_id}` は含めない |
 | 他ユーザーリソース | 404を返す（リソースの存在を露出しない） |
 | budgets PUT | upsert（レコードがなければINSERT、あればUPDATE） |
@@ -162,7 +162,7 @@ Ver1スコープ（本仕様書の対象）：
 
 | # | メソッド | パス | 概要 | 状態 |
 |---|---|---|---|---|
-| 1 | — | — | Basic認証のためログインエンドポイントは存在しない | 対象外 |
+| 1 | POST | `/auth/login` | JWT発行（ログイン） | 完了 |
 | 2 | GET | `/expenses/daily-cumulative` | ホームグラフ用日次累積取得 | 完了 |
 | 3 | GET | `/category-groups` | 大分類一覧取得 | 完了 |
 | 4 | GET | `/expense-categories` | 生活区分一覧取得 | 完了 |
@@ -209,5 +209,5 @@ Ver1スコープ（本仕様書の対象）：
 ## 7. Ver2以降の拡張方針
 
 - 口座管理・収入管理・投資管理を追加（`accounts` テーブル等は既にDBスキーマに定義済み）
-- 認証をBasic認証からJWT等に移行する場合、`POST /auth/login` エンドポイントを新設する
+- 認証はJWT Bearer認証（HS256）で実装済み。Ver2での拡張時はリフレッシュトークンの追加を検討する
 - バックエンドは `statement_types.type_code` で分岐しているため、IDのズレを気にせず環境を跨いだデプロイが可能

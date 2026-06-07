@@ -1,15 +1,20 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"regexp"
 
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
 
-var datePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+type noteRepo interface {
+	GetMonthlyReviewNotes(ctx context.Context, user_id int64, year_month string) ([]repository.MonthlyReviewNote, error)
+	UpsertMonthlyReviewNotes(ctx context.Context, user_id int64, year_month string, notes []repository.MonthlyReviewNote) ([]repository.MonthlyReviewNote, error)
+	GetDailyNotesByMonth(ctx context.Context, user_id int64, year_month string) ([]repository.DailyNote, error)
+	UpsertDailyNote(ctx context.Context, user_id int64, date string, note_text string) (*repository.DailyNote, error)
+}
 
 type monthlyReviewNoteJSON struct {
 	CategoryID int32  `json:"category_id"`
@@ -21,7 +26,7 @@ type monthlyReviewResponseJSON struct {
 	Notes     []monthlyReviewNoteJSON `json:"notes"`
 }
 
-func GetMonthlyReviewsHandler(repo *repository.Repository) http.HandlerFunc {
+func GetMonthlyReviewsHandler(repo noteRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
@@ -59,7 +64,7 @@ type monthlyReviewRequestJSON struct {
 	Notes     []monthlyReviewNoteJSON `json:"notes"`
 }
 
-func UpdateMonthlyReviewsHandler(repo *repository.Repository) http.HandlerFunc {
+func UpdateMonthlyReviewsHandler(repo noteRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
@@ -112,7 +117,7 @@ type dailyNoteListResponseJSON struct {
 	Notes     []dailyNoteJSON `json:"notes"`
 }
 
-func GetDailyNotesHandler(repo *repository.Repository) http.HandlerFunc {
+func GetDailyNotesHandler(repo noteRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
@@ -145,7 +150,7 @@ func GetDailyNotesHandler(repo *repository.Repository) http.HandlerFunc {
 	}
 }
 
-func UpdateDailyNoteHandler(repo *repository.Repository) http.HandlerFunc {
+func UpdateDailyNoteHandler(repo noteRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {

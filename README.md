@@ -1,57 +1,65 @@
 # atoikura
 
-A personal budget management application. It allows users to see "how much more can be spent this month" at a glance.
+**How much can I still spend this month?** That's the only question that matters.
+
+atoikura tracks the gap between your monthly variable-expense budget and
+cumulative spending — no income tracking, no complexity, just your number.
+
+The UI is in Japanese (the target users are native Japanese speakers); the codebase, docs, and tooling are in English.
 
 ---
 
 ## Requirements
 
-* Docker / Docker Compose
-* Go 1.25+ (for local development)
-* Node.js 20+ (for local development)
+- Docker / Docker Compose
+- Either:
+  - VS Code with the **Dev Containers** extension (recommended; everything is bundled in `.devcontainer/`)
+  - Or, for local development: Go 1.25+ and Node 24+
 
 ---
 
 ## Development
 
-### Start the database
+The devcontainer is the recommended path — it pins all toolchains and works the same on every machine.
 
-```bash
-docker compose up -d db
+### Option A: Devcontainer (recommended)
+
+1. Open the repository in VS Code.
+2. Run **Dev Containers: Reopen in Container** from the command palette.
+3. First-time build takes 5–10 minutes. When it's done, a shell inside the container opens.
+4. Inside the container, apply migrations:
+   ```
+   cd backend && make migrate-up
+   ```
+5. Start the backend and frontend in separate terminals:
+   ```
+   cd backend && make run                       # http://localhost:8080
+   cd frontend && npm install && npm run dev    # http://localhost:3000
+   ```
+
+The `db` and `adminer` services come up automatically alongside the devcontainer. Adminer is at http://localhost:8001.
+
+### Option B: Run locally without the devcontainer
 
 ```
-
-### Run migrations
-
-```bash
+docker compose up -d db                       # start just the database
 cd backend && make migrate-up
-
+cd backend && make run                        # http://localhost:8080
+cd frontend && npm install && npm run dev     # http://localhost:3000
 ```
-
-### Run the frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-
-```
-
-The app will be available at http://localhost:3000.
 
 ### Stop everything
 
-```bash
+```
 docker compose down
-
 ```
 
 ---
 
 ## Docs
 
-* `docs/spec.md` — Specifications
-* `docs/architecture.md` — Tech stack and architecture
-* `docs/atoikura.dbml` — DB schema
-* `docs/atoikura-api.yaml` — OpenAPI spec
-* `docs/prompts/README.md` — Implementation roadmap for Claude Code
+- `docs/spec.md` — product specification (in Japanese)
+- `docs/architecture.md` — tech stack and repository layout
+- `docs/atoikura.dbml` — database schema
+- `docs/atoikura-api.yaml` — OpenAPI spec
+- `docs/prompts/README.md` — implementation roadmap for Claude Code

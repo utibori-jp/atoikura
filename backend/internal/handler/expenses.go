@@ -1,13 +1,20 @@
 package handler
 
 import (
+	"context"
 	"log/slog"
-	"math"
 	"net/http"
 	"time"
 
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
+	"github.com/utibori-jp/atoikura/backend/internal/service"
 )
+
+type expenseRepo interface {
+	ListMonthlyBreakdown(ctx context.Context, user_id int64, first_day time.Time) ([]repository.MonthlyBreakdownItem, error)
+	ListDailyExpenseSumsForMonth(ctx context.Context, user_id int64, first_day time.Time) ([]repository.DailyExpenseSum, error)
+	GetBudgetByUser(ctx context.Context, user_id int64) (*repository.BudgetResult, error)
+}
 
 type monthlyBreakdownItemJSON struct {
 	CategoryID        int32  `json:"category_id"`
@@ -24,7 +31,7 @@ type monthlyBreakdownResponseJSON struct {
 	Breakdown []monthlyBreakdownItemJSON `json:"breakdown"`
 }
 
-func GetMonthlyBreakdownHandler(repo *repository.Repository) http.HandlerFunc {
+func GetMonthlyBreakdownHandler(repo expenseRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
@@ -71,83 +78,14 @@ func GetMonthlyBreakdownHandler(repo *repository.Repository) http.HandlerFunc {
 	}
 }
 
-type dailyEntryJSON struct {
-	Date     string `json:"date"`
-	Food     int32  `json:"food"`
-	Other    int32  `json:"other"`
-	Total    int32  `json:"total"`
-	IsActual bool   `json:"is_actual"`
-}
-
 type dailyCumulativeResponseJSON struct {
-	YearMonth     string           `json:"year_month"`
-	MonthlyBudget int32            `json:"monthly_budget"`
-	DailyBudget   int32            `json:"daily_budget"`
-	Days          []dailyEntryJSON `json:"days"`
+	YearMonth     string               `json:"year_month"`
+	MonthlyBudget int32                `json:"monthly_budget"`
+	DailyBudget   int32                `json:"daily_budget"`
+	Days          []service.DailyEntry `json:"days"`
 }
 
-func buildDaysArray(
-	actual_sums map[string]map[string]int32,
-	first_day time.Time,
-	days_in_month int,
-	today_str string,
-	today_day_num int,
-	is_past_month bool,
-) []dailyEntryJSON {
-	days := make([]dailyEntryJSON, days_in_month)
-
-	var cumulative_food, cumulative_other int32
-	var cumulative_food_today, cumulative_other_today int32
-	pace_computed := false
-	var pace_food, pace_other float64
-
-	for day_num := 1; day_num <= days_in_month; day_num++ {
-		date_str := first_day.AddDate(0, 0, day_num-1).Format("2006-01-02")
-
-		if is_past_month || date_str <= today_str {
-			cumulative_food += actual_sums[date_str]["food"]
-			cumulative_other += actual_sums[date_str]["other"]
-
-			days[day_num-1] = dailyEntryJSON{
-				Date:     date_str,
-				Food:     cumulative_food,
-				Other:    cumulative_other,
-				Total:    cumulative_food + cumulative_other,
-				IsActual: true,
-			}
-
-			if !is_past_month && date_str == today_str {
-				cumulative_food_today = cumulative_food
-				cumulative_other_today = cumulative_other
-			}
-		} else {
-			if !pace_computed {
-				days_elapsed := today_day_num
-				if days_elapsed > 0 && (cumulative_food_today != 0 || cumulative_other_today != 0) {
-					pace_food = float64(cumulative_food_today) / float64(days_elapsed)
-					pace_other = float64(cumulative_other_today) / float64(days_elapsed)
-				}
-				pace_computed = true
-			}
-
-			days_ahead := day_num - today_day_num
-			forecast_food := cumulative_food_today + int32(math.Floor(pace_food*float64(days_ahead)))
-			forecast_other := cumulative_other_today + int32(math.Floor(pace_other*float64(days_ahead)))
-
-			days[day_num-1] = dailyEntryJSON{
-				Date:     date_str,
-				Food:     forecast_food,
-				Other:    forecast_other,
-				Total:    forecast_food + forecast_other,
-				IsActual: false,
-			}
-		}
-	}
-
-	return days
-}
-
-func GetDailyCumulativeHandler(repo *repository.Repository) http.HandlerFunc {
+func GetDailyCumulativeHandler(repo expenseRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
@@ -201,7 +139,7 @@ func GetDailyCumulativeHandler(repo *repository.Repository) http.HandlerFunc {
 		today_t, _ := time.Parse("2006-01-02", today_str)
 		today_day_num := today_t.Day()
 
-		days := buildDaysArray(actual_sums, first_day, days_in_month, today_str, today_day_num, is_past_month)
+		days := service.BuildDailyEntries(actual_sums, first_day, days_in_month, today_str, today_day_num, is_past_month)
 
 		var daily_budget int32
 		if budget.MonthlyBudget > 0 {

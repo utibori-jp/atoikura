@@ -32,6 +32,12 @@ func run(parent_ctx context.Context) error {
 	if database_url == "" {
 		return errors.New("DATABASE_URL is required")
 	}
+	jwt_secret_str := os.Getenv("JWT_SECRET")
+	if jwt_secret_str == "" {
+		return errors.New("JWT_SECRET is required")
+	}
+	jwt_secret := []byte(jwt_secret_str)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -51,12 +57,14 @@ func run(parent_ctx context.Context) error {
 	}
 	slog.Info("connected to database")
 
+	repo := repository.New(db_pool)
+
 	mux := http.NewServeMux()
-	registerRoutes(mux, db_pool)
+	registerRoutes(mux, repo, jwt_secret)
 
 	h := handler.ChainMiddleware(mux,
 		handler.LogRequest,
-		handler.InjectHardcodedUser,
+		handler.RequireBearerAuth(jwt_secret),
 		handler.RecoverPanic,
 		handler.AllowCORS,
 	)
@@ -87,14 +95,16 @@ func run(parent_ctx context.Context) error {
 	return http_server.Shutdown(shutdown_ctx)
 }
 
-func registerRoutes(mux *http.ServeMux, db_pool *pgxpool.Pool) {
-	repo := repository.New(db_pool)
-
+func registerRoutes(mux *http.ServeMux, repo *repository.Repository, jwt_secret []byte) {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+	mux.Handle("POST /auth/login", handler.LoginHandler(repo, jwt_secret))
+	mux.Handle("POST /auth/signup", handler.SignupHandler(repo, jwt_secret))
+	mux.Handle("GET /users/me", handler.GetCurrentUserHandler(repo))
+	mux.Handle("PUT /users/me/password", handler.ChangePasswordHandler(repo))
 	mux.Handle("GET /category-groups", handler.ListCategoryGroupsHandler(repo))
 	mux.Handle("POST /category-groups", handler.CreateCategoryGroupHandler(repo))
 	mux.Handle("PUT /category-groups/{id}", handler.UpdateCategoryGroupHandler(repo))

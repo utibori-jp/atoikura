@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -8,13 +9,18 @@ import (
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
 
+type budgetRepo interface {
+	GetBudgetByUser(ctx context.Context, user_id int64) (*repository.BudgetResult, error)
+	UpsertBudget(ctx context.Context, user_id int64, monthly_budget int32, goal_text *string, goal_amount int32) (*repository.BudgetResult, error)
+}
+
 type budgetResponseJSON struct {
 	MonthlyBudget int32   `json:"monthly_budget"`
 	GoalText      *string `json:"goal_text"`
 	GoalAmount    int32   `json:"goal_amount"`
 }
 
-func GetBudgetsHandler(repo *repository.Repository) http.HandlerFunc {
+func GetBudgetsHandler(repo budgetRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {
@@ -37,7 +43,7 @@ func GetBudgetsHandler(repo *repository.Repository) http.HandlerFunc {
 	}
 }
 
-func UpdateBudgetsHandler(repo *repository.Repository) http.HandlerFunc {
+func UpdateBudgetsHandler(repo budgetRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
 		if !ok {

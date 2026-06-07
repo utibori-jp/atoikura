@@ -1,0 +1,16 @@
+pre-commit:
+  parallel: true
+  commands:
+    go-vet:
+      root: "backend/"
+      run: go vet ./...
+    go-fmt:
+      root: "backend/"
+      run: gofmt -w .
+    tsc:
+      root: "frontend/"
+      run: npx tsc --noEmit
+    eslint:
+      root: "frontend/"
+      glob: "src/**/*.{ts,tsx}"
+      run: npx eslint {staged_files}

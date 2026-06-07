@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -61,11 +62,42 @@ func AllowCORS(next http.Handler) http.Handler {
 	})
 }
 
-func InjectHardcodedUser(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := WithUserID(r.Context(), 1)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+// publicPaths bypass JWT auth entirely. /auth/login and /auth/signup are
+// open endpoints; the former verifies credentials itself.
+var publicPaths = map[string]bool{
+	"/health":      true,
+	"/auth/login":  true,
+	"/auth/signup": true,
+}
+
+// RequireBearerAuth enforces JWT Bearer auth on every protected request and
+// injects user_id into the context. Public endpoints and CORS preflight bypass auth.
+func RequireBearerAuth(jwt_secret []byte) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodOptions || publicPaths[r.URL.Path] {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			auth_header := r.Header.Get("Authorization")
+			const prefix = "Bearer "
+			if !strings.HasPrefix(auth_header, prefix) {
+				WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "認証情報が不正です")
+				return
+			}
+			token := auth_header[len(prefix):]
+
+			user_id, err := VerifyJWT(token, jwt_secret)
+			if err != nil {
+				WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "認証情報が不正です")
+				return
+			}
+
+			ctx := WithUserID(r.Context(), user_id)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
 func ChainMiddleware(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.Handler {

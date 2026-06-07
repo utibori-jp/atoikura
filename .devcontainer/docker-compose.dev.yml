@@ -1,0 +1,37 @@
+# Compose override that adds a `dev` service for the devcontainer.
+# Combined with the root docker-compose.yml via devcontainer.json's
+# dockerComposeFile list, so the existing db / backend / frontend / adminer
+# services are unchanged.
+#
+# `runServices: ["db", "adminer"]` in devcontainer.json keeps the heavier
+# backend/frontend compose services from starting automatically — they're
+# meant for production-style previews, not the dev loop. Inside the
+# devcontainer you run `make run` (backend) and `npm run dev` (frontend)
+# natively.
+services:
+  dev:
+    build:
+      context: .devcontainer
+      dockerfile: Dockerfile
+    # NET_ADMIN + NET_RAW are required for init-firewall.sh (iptables/ipset).
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ..:/workspace:cached
+      - claude-code-bashhistory:/commandhistory
+      - claude-code-config:/home/node/.claude
+    environment:
+      DATABASE_URL: postgres://atoikura:dev_password@db:5432/atoikura?sslmode=disable
+      PORT: 8080
+      VITE_API_URL: http://localhost:8080
+      CORS_ALLOWED_ORIGIN: http://localhost:3000
+    # Keep the container alive so VS Code can attach.
+    command: sleep infinity
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  claude-code-bashhistory:
+  claude-code-config:

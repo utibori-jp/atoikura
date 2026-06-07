@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
@@ -101,9 +100,8 @@ func UpdateExpenseCategoryHandler(repo *repository.Repository) http.HandlerFunc 
 			return
 		}
 
-		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if err != nil {
-			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "idが不正です")
+		id, ok := parsePathID(w, r)
+		if !ok {
 			return
 		}
 
@@ -156,9 +154,8 @@ func DeleteExpenseCategoryHandler(repo *repository.Repository) http.HandlerFunc 
 			return
 		}
 
-		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if err != nil {
-			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "idが不正です")
+		id, ok := parsePathID(w, r)
+		if !ok {
 			return
 		}
 

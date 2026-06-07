@@ -1,4 +1,4 @@
-openapi: 3.1.0
+﻿openapi: 3.1.0
 
 info:
   title: atoikura API
@@ -12,20 +12,20 @@ servers:
     description: ローカル開発環境
 
 security:
-  - basicAuth: []
+  - bearerAuth: []
 
 components:
   securitySchemes:
-    basicAuth:
+    bearerAuth:
       type: http
-      scheme: basic
+      scheme: bearer
+      bearerFormat: JWT
       description: |
-        Basic認証（Ver1）。
-        クライアントはすべてのリクエストの `Authorization` ヘッダーに
-        `Basic {Base64(email:password)}` を付与する。
-        バックエンドはヘッダーをデコードしてDBのユーザーと照合し、
-        一致すれば処理続行、不一致なら401を返す。
-        毎リクエストで認証情報を検証するため、ログイン用エンドポイントは存在しない。
+        JWT Bearer認証。
+        `POST /auth/login` または `POST /auth/signup` で取得したJWTを
+        すべてのリクエストの `Authorization: Bearer <token>` ヘッダーに付与する。
+        トークンはHS256署名、有効期限24時間。
+        トークンが無効または期限切れの場合は401を返す。
 
   responses:
     Unauthorized:
@@ -162,8 +162,7 @@ components:
         statement_type:
           $ref: '#/components/schemas/StatementTypeSummary'
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 説明
           example: "日常の食費全般"
 
@@ -194,8 +193,7 @@ components:
           description: 生活区分名
           example: "スーパー"
         category_code:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 生活区分コード
           example: "food_super"
         group_id:
@@ -207,8 +205,7 @@ components:
           description: 紐づく大分類名
           example: "食費"
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 説明
           example: null
 
@@ -236,8 +233,7 @@ components:
           description: 取引日（YYYY-MM-DD）
           example: "2025-05-05"
         item:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 項目名（コンビニ、ランチ代など）
           example: "コンビニ"
         amount:
@@ -255,8 +251,7 @@ components:
             true にすると変動費集計から除外される（特別出費など）。デフォルトはfalse（集計対象）
           example: true
         note:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 補足コメント
           example: "昼飯"
 
@@ -283,8 +278,7 @@ components:
           description: 取引日（YYYY-MM-DD）
           example: "2025-05-05"
         item:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 項目名
           example: "コンビニ"
         amount:
@@ -312,8 +306,7 @@ components:
           description: 集計除外フラグ（trueで集計から除外）
           example: true
         note:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 補足コメント
           example: "昼飯"
         created_at:
@@ -337,8 +330,7 @@ components:
           description: 変動費分析用グループID（statement_types.id）
           example: 2
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 説明
           example: "シャンプーや洗剤など"
 
@@ -357,8 +349,7 @@ components:
           description: 紐づく大分類ID
           example: 3
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 説明
           example: "日用品の購入など"
 
@@ -427,18 +418,15 @@ components:
       type: object
       properties:
         monthly_budget:
-          type: integer
-          nullable: true
+          type: [integer, "null"]
           description: 月次変動費予算（円）。未設定時はnull
           example: 150000
         goal_text:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 貯金目標テキスト。未設定時はnull
           example: "夏までに旅行費を貯める"
         goal_amount:
-          type: integer
-          nullable: true
+          type: [integer, "null"]
           description: 目標金額（円）。未設定時はnull
           example: 300000
 
@@ -446,18 +434,15 @@ components:
       type: object
       properties:
         monthly_budget:
-          type: integer
-          nullable: true
+          type: [integer, "null"]
           description: 月次変動費予算（円）。nullで未設定に戻る。1以上の整数のみ許容
           example: 120000
         goal_text:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: 貯金目標テキスト。nullで未設定に戻る
           example: "夏までに旅行費を貯める"
         goal_amount:
-          type: integer
-          nullable: true
+          type: [integer, "null"]
           description: 目標金額（円）。nullで未設定に戻る
           example: 300000
 
@@ -541,8 +526,7 @@ components:
           description: 日付（YYYY-MM-DD）
           example: "2025-05-05"
         note:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: コメントテキスト。空文字送信後の削除状態ではnullを返す
           example: "ディズニー行ったから出費多め"
 
@@ -563,7 +547,243 @@ components:
           items:
             $ref: '#/components/schemas/DailyNote'
 
+    LoginResponse:
+      type: object
+      required:
+        - token
+        - id
+        - email
+        - display_name
+        - last_login_at
+      properties:
+        token:
+          type: string
+          description: JWT access token (HS256、有効期限24時間)
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        id:
+          type: integer
+          description: ユーザーID
+          example: 1
+        email:
+          type: string
+          format: email
+          description: メールアドレス
+          example: "dev@atoikura.local"
+        display_name:
+          type: [string, "null"]
+          description: 表示名
+          example: "Dev User"
+        last_login_at:
+          type: [string, "null"]
+          format: date-time
+          description: 最終ログイン日時（ISO 8601）
+          example: "2026-05-27T09:12:34+09:00"
+
+    UserResponse:
+      type: object
+      required:
+        - id
+        - email
+        - display_name
+        - last_login_at
+      properties:
+        id:
+          type: integer
+          description: ユーザーID
+          example: 1
+        email:
+          type: string
+          format: email
+          description: メールアドレス（ログインID）
+          example: "dev@atoikura.local"
+        display_name:
+          type: [string, "null"]
+          description: 表示名
+          example: "Dev User"
+        last_login_at:
+          type: [string, "null"]
+          format: date-time
+          description: 最終ログイン日時（ISO 8601）
+          example: "2026-05-27T09:12:34+09:00"
+
+    SignupRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: メールアドレス（ログインID）。登録済みの場合は409
+          example: "alice@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: パスワード（8文字以上）
+          example: "correct horse"
+        display_name:
+          type: [string, "null"]
+          maxLength: 50
+          description: 表示名（任意・50文字以内）
+          example: "Alice"
+
+    PasswordChangeRequest:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          format: password
+          description: 現在のパスワード
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+          description: 新しいパスワード（8文字以上）
+
 paths:
+  /auth/signup:
+    post:
+      summary: 新規ユーザー登録
+      description: |
+        新規アカウントを作成し、デフォルトの大分類・生活区分マスタを自動でシードする。
+        成功時はJWTとユーザー情報を返す（ログインと同形式）。
+        認証不要のエンドポイント。
+      operationId: signup
+      tags:
+        - auth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: 登録成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: 入力値が不正（メール形式・パスワード長など）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: BAD_REQUEST
+                message: "パスワードは8文字以上で入力してください"
+        '409':
+          description: メールアドレスが登録済み
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: EMAIL_TAKEN
+                message: "このメールアドレスは既に登録されています"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/login:
+    post:
+      summary: ログイン
+      description: |
+        メールアドレスとパスワードを検証し、成功時にJWTとユーザー情報を返す。
+        発行されたトークンを以降のリクエストの `Authorization: Bearer <token>` ヘッダーに付与する。
+      operationId: login
+      tags:
+        - auth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "alice@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "correct horse"
+      responses:
+        '200':
+          description: 認証成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /users/me:
+    get:
+      summary: 現在のユーザー情報取得
+      description: |
+        Basic認証で認証中のユーザー情報を返す。
+        ユーザー情報画面で利用する。
+      operationId: getCurrentUser
+      tags:
+        - users
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /users/me/password:
+    put:
+      summary: パスワード変更
+      description: |
+        認証中ユーザーのパスワードを変更する。
+        `current_password` が現在のパスワードと一致しない場合は400。
+      operationId: changePassword
+      tags:
+        - users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+      responses:
+        '204':
+          description: 変更成功
+        '400':
+          description: 現在のパスワード不一致、または新パスワードが要件未満
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: INVALID_CURRENT_PASSWORD
+                message: "現在のパスワードが正しくありません"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /expenses/daily-cumulative:
     get:
       summary: グラフ用日次累積取得
