@@ -63,28 +63,27 @@ const defaultUser: components["schemas"]["UserResponse"] = {
   last_login_at: null,
 };
 
-const defaultDailyCumulative: components["schemas"]["DailyCumulativeResponse"] =
-  {
-    year_month: "2026-06",
-    monthly_budget: 150000,
-    daily_budget: 5000,
-    days: [
-      {
-        date: "2026-06-01",
-        food: 1200,
-        other: 800,
-        total: 2000,
-        is_actual: true,
-      },
-      {
-        date: "2026-06-02",
-        food: 2500,
-        other: 500,
-        total: 3000,
-        is_actual: true,
-      },
-    ],
-  };
+const defaultDailyCumulative: components["schemas"]["DailyCumulativeResponse"] = {
+  year_month: "2026-06",
+  monthly_budget: 150000,
+  daily_budget: 5000,
+  days: [
+    {
+      date: "2026-06-01",
+      food: 1200,
+      other: 800,
+      total: 2000,
+      is_actual: true,
+    },
+    {
+      date: "2026-06-02",
+      food: 2500,
+      other: 500,
+      total: 3000,
+      is_actual: true,
+    },
+  ],
+};
 
 const defaultDailyNotes: components["schemas"]["DailyNoteListResponse"] = {
   year_month: "2026-06",
@@ -108,15 +107,11 @@ export const handlers = [
 
   http.post(`${API_BASE}/auth/login`, () => HttpResponse.json(defaultUser)),
 
-  http.post(`${API_BASE}/auth/signup`, () =>
-    HttpResponse.json(defaultUser, { status: 201 }),
-  ),
+  http.post(`${API_BASE}/auth/signup`, () => HttpResponse.json(defaultUser, { status: 201 })),
 
   http.get(`${API_BASE}/expenses/daily-cumulative`, () =>
-    HttpResponse.json(defaultDailyCumulative),
+    HttpResponse.json(defaultDailyCumulative)
   ),
 
-  http.get(`${API_BASE}/notes/daily`, () =>
-    HttpResponse.json(defaultDailyNotes),
-  ),
+  http.get(`${API_BASE}/notes/daily`, () => HttpResponse.json(defaultDailyNotes)),
 ];

@@ -11,9 +11,7 @@ describe("JournalEntryList", () => {
     render(<JournalEntryList year_month="2026-06" refresh_token={0} />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("この月はまだ仕訳が登録されていません"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("この月はまだ仕訳が登録されていません")).toBeInTheDocument();
     });
   });
 
@@ -42,11 +40,7 @@ describe("JournalEntryList", () => {
       ],
     };
 
-    server.use(
-      http.get(`${API_BASE}/journal-entries`, () =>
-        HttpResponse.json(entryList),
-      ),
-    );
+    server.use(http.get(`${API_BASE}/journal-entries`, () => HttpResponse.json(entryList)));
 
     render(<JournalEntryList year_month="2026-06" refresh_token={0} />);
 
@@ -95,11 +89,7 @@ describe("JournalEntryList", () => {
       ],
     };
 
-    server.use(
-      http.get(`${API_BASE}/journal-entries`, () =>
-        HttpResponse.json(entryList),
-      ),
-    );
+    server.use(http.get(`${API_BASE}/journal-entries`, () => HttpResponse.json(entryList)));
 
     render(<JournalEntryList year_month="2026-06" refresh_token={0} />);
 

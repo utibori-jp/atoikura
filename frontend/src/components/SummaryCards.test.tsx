@@ -7,7 +7,7 @@ import type { components } from "../api/types";
 const API_BASE = "http://localhost:8080";
 
 function makeDailyCumulative(
-  overrides: Partial<components["schemas"]["DailyCumulativeResponse"]> = {},
+  overrides: Partial<components["schemas"]["DailyCumulativeResponse"]> = {}
 ): components["schemas"]["DailyCumulativeResponse"] {
   return {
     year_month: "2026-06",
@@ -47,8 +47,8 @@ describe("SummaryCards", () => {
   it("shows correct total spend from last actual day", async () => {
     server.use(
       http.get(`${API_BASE}/expenses/daily-cumulative`, () =>
-        HttpResponse.json(makeDailyCumulative()),
-      ),
+        HttpResponse.json(makeDailyCumulative())
+      )
     );
 
     render(<SummaryCards />);
@@ -63,8 +63,8 @@ describe("SummaryCards", () => {
   it("shows remaining budget as monthly_budget minus total_spend", async () => {
     server.use(
       http.get(`${API_BASE}/expenses/daily-cumulative`, () =>
-        HttpResponse.json(makeDailyCumulative({ monthly_budget: 10000 })),
-      ),
+        HttpResponse.json(makeDailyCumulative({ monthly_budget: 10000 }))
+      )
     );
 
     render(<SummaryCards />);

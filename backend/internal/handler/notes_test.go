@@ -10,10 +10,10 @@ import (
 )
 
 type fakeNoteRepo struct {
-	getMonthlyReviewNotes   func(context.Context, int64, string) ([]repository.MonthlyReviewNote, error)
+	getMonthlyReviewNotes    func(context.Context, int64, string) ([]repository.MonthlyReviewNote, error)
 	upsertMonthlyReviewNotes func(context.Context, int64, string, []repository.MonthlyReviewNote) ([]repository.MonthlyReviewNote, error)
-	getDailyNotesByMonth    func(context.Context, int64, string) ([]repository.DailyNote, error)
-	upsertDailyNote         func(context.Context, int64, string, string) (*repository.DailyNote, error)
+	getDailyNotesByMonth     func(context.Context, int64, string) ([]repository.DailyNote, error)
+	upsertDailyNote          func(context.Context, int64, string, string) (*repository.DailyNote, error)
 }
 
 func (f *fakeNoteRepo) GetMonthlyReviewNotes(ctx context.Context, user_id int64, year_month string) ([]repository.MonthlyReviewNote, error) {

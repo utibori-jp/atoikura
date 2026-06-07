@@ -2,9 +2,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { LoginScreen } from "./LoginScreen";
 
 function getSubmitButton() {
-  return screen
-    .getAllByRole("button")
-    .find((btn) => btn.getAttribute("type") === "submit")!;
+  return screen.getAllByRole("button").find((btn) => btn.getAttribute("type") === "submit")!;
 }
 
 describe("LoginScreen", () => {
@@ -26,9 +24,7 @@ describe("LoginScreen", () => {
     // Use fireEvent.submit to bypass HTML5 required validation in jsdom
     fireEvent.submit(getSubmitButton().closest("form")!);
     await waitFor(() => {
-      expect(
-        screen.getByText("メールアドレスとパスワードを入力してください"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("メールアドレスとパスワードを入力してください")).toBeInTheDocument();
     });
   });
 
@@ -53,9 +49,7 @@ describe("LoginScreen", () => {
     fireEvent.click(getSubmitButton());
 
     await waitFor(() => {
-      expect(
-        screen.getByText("パスワードは8文字以上で入力してください"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("パスワードは8文字以上で入力してください")).toBeInTheDocument();
     });
   });
 

@@ -11,9 +11,9 @@ import (
 )
 
 type fakeExpenseRepo struct {
-	listMonthlyBreakdown        func(context.Context, int64, time.Time) ([]repository.MonthlyBreakdownItem, error)
+	listMonthlyBreakdown         func(context.Context, int64, time.Time) ([]repository.MonthlyBreakdownItem, error)
 	listDailyExpenseSumsForMonth func(context.Context, int64, time.Time) ([]repository.DailyExpenseSum, error)
-	getBudgetByUser             func(context.Context, int64) (*repository.BudgetResult, error)
+	getBudgetByUser              func(context.Context, int64) (*repository.BudgetResult, error)
 }
 
 func (f *fakeExpenseRepo) ListMonthlyBreakdown(ctx context.Context, user_id int64, first_day time.Time) ([]repository.MonthlyBreakdownItem, error) {

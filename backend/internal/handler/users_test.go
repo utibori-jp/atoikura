@@ -12,7 +12,7 @@ import (
 )
 
 type fakeUserRepo struct {
-	getUserByID        func(context.Context, int64) (*repository.UserProfile, error)
+	getUserByID         func(context.Context, int64) (*repository.UserProfile, error)
 	getUserPasswordHash func(context.Context, int64) (string, error)
 	updateUserPassword  func(context.Context, int64, string) error
 }
