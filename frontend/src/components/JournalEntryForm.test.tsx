@@ -47,7 +47,9 @@ describe("JournalEntryForm", () => {
     fireEvent.click(screen.getByText("スーパー"));
 
     // Leave amount empty — use fireEvent.submit to bypass HTML5 required validation in jsdom
-    fireEvent.submit(screen.getByRole("button", { name: /記録する/ }).closest("form")!);
+    fireEvent.submit(
+      screen.getByRole("button", { name: /記録する/ }).closest("form")!,
+    );
 
     await waitFor(() => {
       expect(

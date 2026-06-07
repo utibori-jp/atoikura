@@ -69,8 +69,20 @@ const defaultDailyCumulative: components["schemas"]["DailyCumulativeResponse"] =
     monthly_budget: 150000,
     daily_budget: 5000,
     days: [
-      { date: "2026-06-01", food: 1200, other: 800, total: 2000, is_actual: true },
-      { date: "2026-06-02", food: 2500, other: 500, total: 3000, is_actual: true },
+      {
+        date: "2026-06-01",
+        food: 1200,
+        other: 800,
+        total: 2000,
+        is_actual: true,
+      },
+      {
+        date: "2026-06-02",
+        food: 2500,
+        other: 500,
+        total: 3000,
+        is_actual: true,
+      },
     ],
   };
 
