@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { components } from "../api/types";
 import { T } from "../theme";
+import { dailyAvailableTone } from "./SummaryCards.utils";
 
 type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
 
@@ -28,6 +29,7 @@ function computeSummary(data: DailyCumulativeResponse) {
   const days_left = days_in_month - today_day;
   const daily_available = days_left > 0 ? Math.floor(remaining_budget / days_left) : 0;
   const monthly_budget = data.monthly_budget;
+  const daily_budget = data.daily_budget;
   const baseline_today =
     monthly_budget > 0 ? Math.round((monthly_budget / days_in_month) * today_day) : 0;
   const budget_margin = baseline_today - total_spend;
@@ -37,16 +39,18 @@ function computeSummary(data: DailyCumulativeResponse) {
     daily_available,
     days_left,
     monthly_budget,
+    daily_budget,
     budget_margin,
   };
 }
 
-type Tone = "coral" | "mustard" | "sage";
+type Tone = "coral" | "mustard" | "sage" | "danger";
 
 const TONE_COLORS: Record<Tone, { bg: string; fg: string }> = {
   coral: { bg: "#FFE8DD", fg: T.coralDeep },
   mustard: { bg: "#FFF1CC", fg: "#A3791F" },
   sage: { bg: "#DEF1E6", fg: T.sageDeep },
+  danger: { bg: "#FEE2E2", fg: "#B91C1C" },
 };
 
 interface StatPillProps {
@@ -127,6 +131,7 @@ export function SummaryCards() {
     daily_available,
     days_left,
     monthly_budget,
+    daily_budget,
     budget_margin,
   } = computeSummary(data);
   const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
@@ -150,7 +155,7 @@ export function SummaryCards() {
         }
       />
       <StatPill
-        tone="sage"
+        tone={dailyAvailableTone(daily_available, daily_budget)}
         label="1日あたり利用可能額"
         value={yen(daily_available)}
         sub={`残り${days_left}日`}
