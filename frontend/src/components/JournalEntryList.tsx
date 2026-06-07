@@ -378,7 +378,7 @@ export function JournalEntryList({ year_month, refresh_token }: Props) {
         }}
       >
         <span style={{ fontSize: 14, color: T.sageDeep, fontWeight: 700 }}>
-          今月の合計（変動費）
+          {`${parseInt(year_month.split("-")[1], 10)}月の変動費`}
         </span>
         <span
           style={{
