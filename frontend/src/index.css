@@ -107,3 +107,16 @@ button {
   font-family: inherit;
   cursor: pointer;
 }
+
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+@media (display-mode: standalone) {
+  body {
+    padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  }
+}
