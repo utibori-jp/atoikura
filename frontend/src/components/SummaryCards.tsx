@@ -72,6 +72,7 @@ function StatPill({ tone, label, value, sub }: StatPillProps) {
         {label}
       </div>
       <div
+        className="stat-pill-value"
         style={{
           fontFamily: "'DM Sans', sans-serif",
           fontWeight: 700,

@@ -203,7 +203,7 @@ export function JournalEntryForm({ onSuccess }: Props) {
         <p style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>サクッと入力してすぐ反映</p>
       </div>
 
-      <div style={{ display: "flex", gap: 14, marginBottom: 16 }}>
+      <div className="form-top-row" style={{ display: "flex", gap: 14, marginBottom: 16 }}>
         <Field label="日付" flex="0 0 160px">
           <input
             type="date"

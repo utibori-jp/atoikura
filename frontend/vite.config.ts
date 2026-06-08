@@ -2,6 +2,10 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+// Evaluated at Node.js build time so the RegExp is serialized as a literal
+// into sw.js — avoids "process is not defined" in the service worker.
+const api_origin = process.env.VITE_API_URL ?? "http://localhost:8080";
+
 export default defineConfig({
   plugins: [
     react(),
@@ -10,15 +14,11 @@ export default defineConfig({
       workbox: {
         runtimeCaching: [
           {
-            urlPattern: ({ url }) =>
-              url.origin === process.env.VITE_API_URL &&
-              /\/(journal-entries|budgets|expenses)/.test(url.pathname),
+            urlPattern: new RegExp(`^${api_origin}/(journal-entries|budgets|expenses)`),
             handler: "NetworkFirst",
           },
           {
-            urlPattern: ({ url }) =>
-              url.origin === process.env.VITE_API_URL &&
-              /\/(category-groups|expense-categories|statement-types)/.test(url.pathname),
+            urlPattern: new RegExp(`^${api_origin}/(category-groups|expense-categories|statement-types)`),
             handler: "CacheFirst",
           },
         ],
