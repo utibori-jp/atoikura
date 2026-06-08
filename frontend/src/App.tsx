@@ -20,9 +20,7 @@ type UserProfile = components["schemas"]["UserResponse"];
 type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
 
 function useMobile(): boolean {
-  const [is_mobile, setIsMobile] = useState(
-    () => window.matchMedia("(max-width: 1023px)").matches
-  );
+  const [is_mobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 1023px)").matches);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1023px)");
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
@@ -408,7 +406,15 @@ function MobileTabBar({ active, onChange, onPlusClick }: MobileTabBarProps) {
       {MOBILE_TAB_ITEMS.map((item) => {
         if (item.id === "add") {
           return (
-            <div key="add" style={{ flex: 1, display: "flex", justifyContent: "center", transform: "translateY(-14px)" }}>
+            <div
+              key="add"
+              style={{
+                flex: 1,
+                display: "flex",
+                justifyContent: "center",
+                transform: "translateY(-14px)",
+              }}
+            >
               <button
                 type="button"
                 onClick={onPlusClick}
@@ -638,10 +644,7 @@ export default function App() {
       }}
     >
       {is_mobile ? (
-        <MobileHeader
-          user={auth_state.user}
-          onAvatarClick={() => setActiveTab("account")}
-        />
+        <MobileHeader user={auth_state.user} onAvatarClick={() => setActiveTab("account")} />
       ) : (
         <NavBar
           active={active_tab}
@@ -729,10 +732,7 @@ export default function App() {
 
         {active_tab === "home" &&
           (is_mobile ? (
-            <MobileHome
-              refresh_token={refresh_token}
-              onShowList={() => setActiveTab("list")}
-            />
+            <MobileHome refresh_token={refresh_token} onShowList={() => setActiveTab("list")} />
           ) : (
             <>
               <SummaryCards />
@@ -783,9 +783,7 @@ export default function App() {
 
         {active_tab === "master" && <MasterManagement />}
 
-        {active_tab === "account" && (
-          <UserInfo user={auth_state.user} onLogout={handleLogout} />
-        )}
+        {active_tab === "account" && <UserInfo user={auth_state.user} onLogout={handleLogout} />}
       </main>
 
       {is_mobile && (

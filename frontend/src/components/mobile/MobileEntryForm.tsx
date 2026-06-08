@@ -217,9 +217,7 @@ export function MobileEntryForm({ onSuccess, edit_entry }: Props) {
       </div>
 
       {/* 大分類 — horizontal scroll */}
-      <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600, marginBottom: 8 }}>
-        大分類
-      </div>
+      <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600, marginBottom: 8 }}>大分類</div>
       <div
         style={{
           display: "flex",

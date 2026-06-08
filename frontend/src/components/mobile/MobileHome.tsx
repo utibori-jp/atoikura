@@ -45,14 +45,26 @@ function MRing({ size, pct }: MRingProps) {
   const c = 2 * Math.PI * r;
   const spent = Math.max(0, Math.min(1, (100 - pct) / 100));
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      style={{ transform: "rotate(-90deg)" }}
+    >
       <defs>
         <linearGradient id="mRingGrad" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor={T.mustard} />
           <stop offset="100%" stopColor={T.coral} />
         </linearGradient>
       </defs>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={COLORS.coralSoft} strokeWidth={stroke} />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={COLORS.coralSoft}
+        strokeWidth={stroke}
+      />
       <circle
         cx={size / 2}
         cy={size / 2}
@@ -104,8 +116,20 @@ interface MMiniChartProps {
 }
 
 function MMiniChart(props: MMiniChartProps) {
-  const { width, height, data, monthly_budget, today_day, spent_so_far, forecast_end, days_in_month } = props;
-  const padL = 30, padR = 8, padT = 12, padB = 20;
+  const {
+    width,
+    height,
+    data,
+    monthly_budget,
+    today_day,
+    spent_so_far,
+    forecast_end,
+    days_in_month,
+  } = props;
+  const padL = 30,
+    padR = 8,
+    padT = 12,
+    padB = 20;
   const w = width - padL - padR;
   const h = height - padT - padB;
   const maxY = Math.max(monthly_budget * 1.05, 1);
@@ -137,7 +161,14 @@ function MMiniChart(props: MMiniChartProps) {
       </defs>
       {yTicks.map((t) => (
         <g key={t}>
-          <line x1={padL} x2={width - padR} y1={yAt(t)} y2={yAt(t)} stroke={T.hair} strokeDasharray="2 4" />
+          <line
+            x1={padL}
+            x2={width - padR}
+            y1={yAt(t)}
+            y2={yAt(t)}
+            stroke={T.hair}
+            strokeDasharray="2 4"
+          />
           <text
             x={padL - 6}
             y={yAt(t) + 3}
@@ -185,21 +216,30 @@ function MMiniChart(props: MMiniChartProps) {
         />
       )}
       {today_day >= 1 && today_day <= days_in_month && (
-        <circle cx={xAt(today_day)} cy={yAt(spent_so_far)} r="5" fill="#fff" stroke={T.coral} strokeWidth="3" />
+        <circle
+          cx={xAt(today_day)}
+          cy={yAt(spent_so_far)}
+          r="5"
+          fill="#fff"
+          stroke={T.coral}
+          strokeWidth="3"
+        />
       )}
-      {[1, Math.ceil(days_in_month / 3), Math.ceil((days_in_month * 2) / 3), days_in_month].map((d) => (
-        <text
-          key={d}
-          x={xAt(d)}
-          y={padT + h + 14}
-          textAnchor="middle"
-          fontFamily="DM Sans, sans-serif"
-          fontSize="9"
-          fill={T.inkSoft}
-        >
-          {d}
-        </text>
-      ))}
+      {[1, Math.ceil(days_in_month / 3), Math.ceil((days_in_month * 2) / 3), days_in_month].map(
+        (d) => (
+          <text
+            key={d}
+            x={xAt(d)}
+            y={padT + h + 14}
+            textAnchor="middle"
+            fontFamily="DM Sans, sans-serif"
+            fontSize="9"
+            fill={T.inkSoft}
+          >
+            {d}
+          </text>
+        )
+      )}
     </svg>
   );
 }
@@ -213,8 +253,7 @@ interface MMiniStatProps {
 function MMiniStat({ tone, label, value }: MMiniStatProps) {
   const bg =
     tone === "coral" ? COLORS.coralSoft : tone === "mustard" ? COLORS.mustardSoft : COLORS.sageSoft;
-  const fg =
-    tone === "coral" ? T.coralDeep : tone === "mustard" ? COLORS.mustardDeep : T.sageDeep;
+  const fg = tone === "coral" ? T.coralDeep : tone === "mustard" ? COLORS.mustardDeep : T.sageDeep;
   return (
     <div style={{ background: bg, borderRadius: 18, padding: "12px 14px", flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: fg }}>{label}</div>
@@ -290,11 +329,12 @@ export function MobileHome({ refresh_token, onShowList }: Props) {
   const today_day = todayDayJST();
   const days_left = Math.max(0, days_total - today_day);
   const monthly_budget = cumulative?.monthly_budget ?? 0;
-  const last_actual = cumulative?.days ? [...cumulative.days].reverse().find((d) => d.is_actual) : null;
+  const last_actual = cumulative?.days
+    ? [...cumulative.days].reverse().find((d) => d.is_actual)
+    : null;
   const spent_so_far = last_actual?.total ?? 0;
   const remaining = Math.max(0, monthly_budget - spent_so_far);
-  const remaining_pct =
-    monthly_budget > 0 ? Math.round((remaining / monthly_budget) * 100) : 0;
+  const remaining_pct = monthly_budget > 0 ? Math.round((remaining / monthly_budget) * 100) : 0;
   const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
   const projected_end = Math.round(daily_pace * days_total);
   const daily_left = days_left > 0 ? Math.round(remaining / days_left) : 0;
@@ -496,8 +536,7 @@ export function MobileHome({ refresh_token, onShowList }: Props) {
                   alignItems: "center",
                   gap: 12,
                   padding: "12px 0",
-                  borderBottom:
-                    i < today_entries.length - 1 ? `1px solid ${T.hair}` : "none",
+                  borderBottom: i < today_entries.length - 1 ? `1px solid ${T.hair}` : "none",
                 }}
               >
                 <div

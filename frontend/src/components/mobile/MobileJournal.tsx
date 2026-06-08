@@ -202,7 +202,9 @@ export function MobileJournal({ year_month, refresh_token, onEditEntry }: Props)
                   </div>
                 )}
                 {is_editing_note && (
-                  <div style={{ padding: "10px 0", display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div
+                    style={{ padding: "10px 0", display: "flex", flexDirection: "column", gap: 8 }}
+                  >
                     <textarea
                       value={note_draft}
                       onChange={(e) => setNoteDraft(e.target.value)}
