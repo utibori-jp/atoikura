@@ -50,6 +50,11 @@ Read additional documents based on the work area:
   - `feat(frontend/forms): add journal entry form`
   - `chore(docker): add postgres service`
 
+### Issue Lifecycle
+
+- When finishing work for an Issue (PR merged or implementation complete), apply a label for the upcoming release in the form `vX.Y.0` (e.g., `v0.3.0`). Create the label if it does not yet exist.
+- Do **not** close the Issue at that point. Issues remain open until the release containing the work has actually shipped — closing is part of the release process, not the per-PR workflow.
+
 ### General
 
 - Comments must be in English.
