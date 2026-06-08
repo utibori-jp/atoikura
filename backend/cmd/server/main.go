@@ -64,9 +64,9 @@ func run(parent_ctx context.Context) error {
 
 	h := handler.ChainMiddleware(mux,
 		handler.LogRequest,
+		handler.AllowCORS,
 		handler.RequireBearerAuth(jwt_secret),
 		handler.RecoverPanic,
-		handler.AllowCORS,
 	)
 
 	http_server := &http.Server{
