@@ -8,12 +8,16 @@ import { MasterManagement } from "./components/MasterManagement";
 import { ReviewScreen } from "./components/ReviewScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { UserInfo } from "./components/UserInfo";
+import { MobileHome } from "./components/mobile/MobileHome";
+import { MobileJournal } from "./components/mobile/MobileJournal";
+import { MobileEntryForm } from "./components/mobile/MobileEntryForm";
 import { api, AuthError, token_store } from "./api/client";
 import type { components } from "./api/types";
 import { T } from "./theme";
 
 type Tab = "home" | "list" | "budget" | "master" | "review" | "account";
 type UserProfile = components["schemas"]["UserResponse"];
+type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
 
 function useMobile(): boolean {
   const [is_mobile, setIsMobile] = useState(
@@ -465,12 +469,14 @@ function MobileTabBar({ active, onChange, onPlusClick }: MobileTabBarProps) {
 interface EntrySheetProps {
   onClose: () => void;
   onSuccess: () => void;
+  edit_entry?: JournalEntryResponse | null;
 }
 
-function EntrySheet({ onClose, onSuccess }: EntrySheetProps) {
+function EntrySheet({ onClose, onSuccess, edit_entry }: EntrySheetProps) {
+  const is_edit = !!edit_entry;
   const handle_success = () => {
     onSuccess();
-    onClose();
+    if (is_edit) onClose();
   };
 
   return (
@@ -525,7 +531,7 @@ function EntrySheet({ onClose, onSuccess }: EntrySheetProps) {
               color: T.ink,
             }}
           >
-            支出を記録
+            {is_edit ? "支出を編集" : "支出を記録"}
           </span>
           <button
             type="button"
@@ -549,7 +555,7 @@ function EntrySheet({ onClose, onSuccess }: EntrySheetProps) {
             ✕
           </button>
         </div>
-        <JournalEntryForm onSuccess={handle_success} />
+        <MobileEntryForm onSuccess={handle_success} edit_entry={edit_entry} />
       </div>
     </div>
   );
@@ -568,6 +574,7 @@ export default function App() {
   const [refresh_token, setRefreshToken] = useState(0);
   const [list_year_month, setListYearMonth] = useState(currentMonthJST());
   const [show_entry_sheet, setShowEntrySheet] = useState(false);
+  const [edit_entry, setEditEntry] = useState<JournalEntryResponse | null>(null);
   const is_mobile = useMobile();
 
   useEffect(() => {
@@ -720,24 +727,29 @@ export default function App() {
           </div>
         )}
 
-        {active_tab === "home" && (
-          <>
-            <SummaryCards />
+        {active_tab === "home" &&
+          (is_mobile ? (
+            <MobileHome
+              refresh_token={refresh_token}
+              onShowList={() => setActiveTab("list")}
+            />
+          ) : (
+            <>
+              <SummaryCards />
 
-            <div
-              style={{
-                background: T.card,
-                borderRadius: 28,
-                padding: is_mobile ? 16 : 24,
-                boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
-                marginBottom: 20,
-                overflowX: "hidden",
-              }}
-            >
-              <HomeGraph />
-            </div>
+              <div
+                style={{
+                  background: T.card,
+                  borderRadius: 28,
+                  padding: 24,
+                  boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
+                  marginBottom: 20,
+                  overflowX: "hidden",
+                }}
+              >
+                <HomeGraph />
+              </div>
 
-            {!is_mobile && (
               <div
                 style={{
                   background: T.card,
@@ -748,13 +760,22 @@ export default function App() {
               >
                 <JournalEntryForm onSuccess={() => setRefreshToken((t) => t + 1)} />
               </div>
-            )}
-          </>
-        )}
+            </>
+          ))}
 
-        {active_tab === "list" && (
-          <JournalEntryList year_month={list_year_month} refresh_token={refresh_token} />
-        )}
+        {active_tab === "list" &&
+          (is_mobile ? (
+            <MobileJournal
+              year_month={list_year_month}
+              refresh_token={refresh_token}
+              onEditEntry={(entry) => {
+                setEditEntry(entry);
+                setShowEntrySheet(true);
+              }}
+            />
+          ) : (
+            <JournalEntryList year_month={list_year_month} refresh_token={refresh_token} />
+          ))}
 
         {active_tab === "review" && <ReviewScreen />}
 
@@ -771,14 +792,21 @@ export default function App() {
         <MobileTabBar
           active={active_tab}
           onChange={setActiveTab}
-          onPlusClick={() => setShowEntrySheet(true)}
+          onPlusClick={() => {
+            setEditEntry(null);
+            setShowEntrySheet(true);
+          }}
         />
       )}
 
       {is_mobile && show_entry_sheet && (
         <EntrySheet
-          onClose={() => setShowEntrySheet(false)}
+          onClose={() => {
+            setShowEntrySheet(false);
+            setEditEntry(null);
+          }}
           onSuccess={() => setRefreshToken((t) => t + 1)}
+          edit_entry={edit_entry}
         />
       )}
     </div>
