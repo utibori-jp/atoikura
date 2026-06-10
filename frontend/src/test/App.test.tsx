@@ -48,7 +48,7 @@ describe("App — mobile layout (≤ 1023 px)", () => {
     expect(screen.getByRole("button", { name: /ホーム/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /振り返り/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /仕訳/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /目標/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /予算/ })).toBeInTheDocument();
 
     // Desktop <nav> element must not be present
     expect(document.querySelector("nav")).not.toBeInTheDocument();
