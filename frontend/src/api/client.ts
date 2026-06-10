@@ -147,4 +147,68 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ note }),
     }),
+  listRecurringExpenses: () =>
+    request<components["schemas"]["RecurringExpenseListResponse"]>("/recurring-expenses"),
+  createRecurringExpense: (body: components["schemas"]["RecurringExpenseRequest"]) =>
+    request<components["schemas"]["RecurringExpense"]>("/recurring-expenses", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateRecurringExpense: (id: number, body: components["schemas"]["RecurringExpenseRequest"]) =>
+    request<components["schemas"]["RecurringExpense"]>(`/recurring-expenses/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteRecurringExpense: (id: number) =>
+    request<void>(`/recurring-expenses/${id}`, { method: "DELETE" }),
+  listPendingRecurring: (year_month: string) =>
+    request<components["schemas"]["PendingRecurringListResponse"]>(
+      `/recurring-expenses/pending?year_month=${year_month}`
+    ),
+  listSavingsGoals: () =>
+    request<components["schemas"]["SavingsGoalListResponse"]>("/savings-goals"),
+  createSavingsGoal: (body: components["schemas"]["SavingsGoalRequest"]) =>
+    request<components["schemas"]["SavingsGoal"]>("/savings-goals", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateSavingsGoal: (id: number, body: components["schemas"]["SavingsGoalRequest"]) =>
+    request<components["schemas"]["SavingsGoal"]>(`/savings-goals/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteSavingsGoal: (id: number) =>
+    request<void>(`/savings-goals/${id}`, { method: "DELETE" }),
+  postMonthlySavings: (id: number, amount: number, year_month: string) =>
+    request<components["schemas"]["SavingsGoal"]>(`/savings-goals/${id}/post-monthly`, {
+      method: "POST",
+      body: JSON.stringify({ amount, year_month }),
+    }),
+  listIncomeRecords: (year_month: string) =>
+    request<components["schemas"]["IncomeRecordListResponse"]>(
+      `/income-records?year_month=${year_month}`
+    ),
+  createIncomeRecord: (body: components["schemas"]["IncomeRecordRequest"]) =>
+    request<components["schemas"]["IncomeRecord"]>("/income-records", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateIncomeRecord: (id: number, body: components["schemas"]["IncomeRecordRequest"]) =>
+    request<components["schemas"]["IncomeRecord"]>(`/income-records/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteIncomeRecord: (id: number) =>
+    request<void>(`/income-records/${id}`, { method: "DELETE" }),
+  getBaseIncome: () =>
+    request<components["schemas"]["BaseIncomeSetting"]>("/base-income"),
+  updateBaseIncome: (amount: number) =>
+    request<components["schemas"]["BaseIncomeSetting"]>("/base-income", {
+      method: "PUT",
+      body: JSON.stringify({ amount }),
+    }),
+  getBudgetSummary: (year_month: string) =>
+    request<components["schemas"]["BudgetSummaryResponse"]>(
+      `/budget-summary?year_month=${year_month}`
+    ),
 };

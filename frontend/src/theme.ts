@@ -11,6 +11,10 @@ export const T = {
   sage: "#7BC4A4",
   sageDeep: "#4FA481",
   sky: "#A6C9E2",
+  coralSoft:   "#FFE8DD",
+  mustardSoft: "#FFF1CC",
+  sageSoft:    "#DEF1E6",
+  mustardDeep: "#F0A92E",
   excluded: "#C9B7A1",
   cardShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
 } as const;
