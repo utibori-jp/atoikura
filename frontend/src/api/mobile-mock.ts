@@ -55,7 +55,7 @@ export const mobileApi = {
   listRecurringExpenses: () => Promise.resolve(MOCK_RECURRING),
   listPendingRecurring:  () => Promise.resolve(MOCK_PENDING),
   listSavingsGoals:      () => Promise.resolve(MOCK_SAVINGS_GOALS),
-  listIncomes:           (_year_month: string) => Promise.resolve(MOCK_INCOMES),
+  listIncomes:           (_: string) => Promise.resolve(MOCK_INCOMES),
   getBaseIncome:         () => Promise.resolve(MOCK_BASE_INCOME),
-  getBudgetSummary:      (_year_month: string) => Promise.resolve(MOCK_BUDGET_SUMMARY),
+  getBudgetSummary:      (_: string) => Promise.resolve(MOCK_BUDGET_SUMMARY),
 };
