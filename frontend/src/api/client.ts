@@ -177,8 +177,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
-  deleteSavingsGoal: (id: number) =>
-    request<void>(`/savings-goals/${id}`, { method: "DELETE" }),
+  deleteSavingsGoal: (id: number) => request<void>(`/savings-goals/${id}`, { method: "DELETE" }),
   postMonthlySavings: (id: number, amount: number, year_month: string) =>
     request<components["schemas"]["SavingsGoal"]>(`/savings-goals/${id}/post-monthly`, {
       method: "POST",
@@ -198,10 +197,8 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
-  deleteIncomeRecord: (id: number) =>
-    request<void>(`/income-records/${id}`, { method: "DELETE" }),
-  getBaseIncome: () =>
-    request<components["schemas"]["BaseIncomeSetting"]>("/base-income"),
+  deleteIncomeRecord: (id: number) => request<void>(`/income-records/${id}`, { method: "DELETE" }),
+  getBaseIncome: () => request<components["schemas"]["BaseIncomeSetting"]>("/base-income"),
   updateBaseIncome: (amount: number) =>
     request<components["schemas"]["BaseIncomeSetting"]>("/base-income", {
       method: "PUT",

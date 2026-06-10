@@ -4,3546 +4,3546 @@
  */
 
 export interface paths {
-    "/auth/signup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * 新規ユーザー登録
-         * @description 新規アカウントを作成し、デフォルトの大分類・生活区分マスタを自動でシードする。
-         *     成功時はJWTとユーザー情報を返す（ログインと同形式）。
-         *     認証不要のエンドポイント。
-         */
-        post: operations["signup"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  "/auth/signup": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * ログイン
-         * @description メールアドレスとパスワードを検証し、成功時にJWTとユーザー情報を返す。
-         *     発行されたトークンを以降のリクエストの `Authorization: Bearer <token>` ヘッダーに付与する。
-         */
-        post: operations["login"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * 新規ユーザー登録
+     * @description 新規アカウントを作成し、デフォルトの大分類・生活区分マスタを自動でシードする。
+     *     成功時はJWTとユーザー情報を返す（ログインと同形式）。
+     *     認証不要のエンドポイント。
+     */
+    post: operations["signup"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/login": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/users/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 現在のユーザー情報取得
-         * @description Basic認証で認証中のユーザー情報を返す。
-         *     ユーザー情報画面で利用する。
-         */
-        get: operations["getCurrentUser"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * ログイン
+     * @description メールアドレスとパスワードを検証し、成功時にJWTとユーザー情報を返す。
+     *     発行されたトークンを以降のリクエストの `Authorization: Bearer <token>` ヘッダーに付与する。
+     */
+    post: operations["login"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/users/me": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/users/me/password": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * パスワード変更
-         * @description 認証中ユーザーのパスワードを変更する。
-         *     `current_password` が現在のパスワードと一致しない場合は400。
-         */
-        put: operations["changePassword"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * 現在のユーザー情報取得
+     * @description Basic認証で認証中のユーザー情報を返す。
+     *     ユーザー情報画面で利用する。
+     */
+    get: operations["getCurrentUser"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/users/me/password": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/expenses/daily-cumulative": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * グラフ用日次累積取得
-         * @description ホーム画面の折れ線グラフ用データを返す。
-         *     当月1日〜末日の全日付分を返す。
-         *
-         *     **集計ルール：**
-         *     - `journal_entries.is_excluded = false` の仕訳のみ集計対象
-         *     - `statement_types.type_code` で食費（`food`）／その他（`other`）に分類
-         *     - 今日以前：実績の累積値（`is_actual: true`）
-         *     - 明日以降：今日時点の日次ペースで積み上げた予測値（`is_actual: false`）
-         *       - 例）5日時点で食費15,000円なら、6日以降は+3,000円/日で積み上げ
-         *
-         *     **基準線の計算はフロント側で処理する（`daily_budget`を使って描画）。**
-         */
-        get: operations["getDailyCumulative"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * パスワード変更
+     * @description 認証中ユーザーのパスワードを変更する。
+     *     `current_password` が現在のパスワードと一致しない場合は400。
+     */
+    put: operations["changePassword"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/expenses/daily-cumulative": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/expenses/monthly-breakdown": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 月次支出内訳取得
-         * @description 指定月の支出を生活区分単位で集計して返す。
-         *     振り返り画面の3段構成（statement_type → category_group → expense_category）への組み立てはフロント側で行う。
-         *
-         *     **集計ルール：**
-         *     - `is_excluded = false`：`statement_type` そのままで集計
-         *     - `is_excluded = true`：`statement_type` を対象外に強制上書きして集計。`group_name` は元の大分類をそのまま使う
-         *     - 論理削除済みの生活区分（`is_deleted = true`）に紐づく仕訳も集計に含める
-         *
-         *     **利用画面：**
-         *     - 振り返り画面：カテゴリ別支出内訳
-         */
-        get: operations["getMonthlyBreakdown"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * グラフ用日次累積取得
+     * @description ホーム画面の折れ線グラフ用データを返す。
+     *     当月1日〜末日の全日付分を返す。
+     *
+     *     **集計ルール：**
+     *     - `journal_entries.is_excluded = false` の仕訳のみ集計対象
+     *     - `statement_types.type_code` で食費（`food`）／その他（`other`）に分類
+     *     - 今日以前：実績の累積値（`is_actual: true`）
+     *     - 明日以降：今日時点の日次ペースで積み上げた予測値（`is_actual: false`）
+     *       - 例）5日時点で食費15,000円なら、6日以降は+3,000円/日で積み上げ
+     *
+     *     **基準線の計算はフロント側で処理する（`daily_budget`を使って描画）。**
+     */
+    get: operations["getDailyCumulative"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/expenses/monthly-breakdown": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/category-groups": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 大分類一覧取得
-         * @description ログインユーザーの大分類一覧を返す。
-         *     論理削除済み（`is_deleted = true`）は除外。
-         *     `statement_types` をJOINして返すため、フロント側での結合は不要。
-         *     `group_name` の昇順で返す。
-         *
-         *     **利用画面：**
-         *     - ホーム：仕訳入力フォームの大分類プルダウン
-         *     - マスタ管理：大分類一覧表示・編集
-         *     - 仕訳一覧：仕訳入力フォームの大分類プルダウン
-         */
-        get: operations["getCategoryGroups"];
-        put?: never;
-        /**
-         * 大分類作成
-         * @description 新しい大分類を作成する。
-         *     `group_name` はログインユーザー内でユニーク。重複時は409を返す。
-         *
-         *     **利用画面：**
-         *     - マスタ管理：大分類追加
-         */
-        post: operations["createCategoryGroup"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * 月次支出内訳取得
+     * @description 指定月の支出を生活区分単位で集計して返す。
+     *     振り返り画面の3段構成（statement_type → category_group → expense_category）への組み立てはフロント側で行う。
+     *
+     *     **集計ルール：**
+     *     - `is_excluded = false`：`statement_type` そのままで集計
+     *     - `is_excluded = true`：`statement_type` を対象外に強制上書きして集計。`group_name` は元の大分類をそのまま使う
+     *     - 論理削除済みの生活区分（`is_deleted = true`）に紐づく仕訳も集計に含める
+     *
+     *     **利用画面：**
+     *     - 振り返り画面：カテゴリ別支出内訳
+     */
+    get: operations["getMonthlyBreakdown"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/category-groups": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/category-groups/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * 大分類更新
-         * @description 指定した大分類を更新する。全フィールドを毎回送信する（PUT）。
-         *     フロント側は編集画面を開いた時点で既存値をプリフィルし、変更分だけ上書きして送る。
-         *
-         *     - 論理削除済み・他ユーザーのリソースは404を返す（リソースの存在を露出しない）
-         *
-         *     **利用画面：**
-         *     - マスタ管理：大分類編集
-         */
-        put: operations["updateCategoryGroup"];
-        post?: never;
-        /**
-         * 大分類削除
-         * @description 指定した大分類を論理削除する（`is_deleted = true`）。
-         *
-         *     - 紐づく生活区分（`expense_categories`）が1件以上存在する場合は削除を拒否し400を返す
-         *     - 論理削除済み・他ユーザーのリソースは404を返す
-         *
-         *     **利用画面：**
-         *     - マスタ管理：大分類削除
-         */
-        delete: operations["deleteCategoryGroup"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * 大分類一覧取得
+     * @description ログインユーザーの大分類一覧を返す。
+     *     論理削除済み（`is_deleted = true`）は除外。
+     *     `statement_types` をJOINして返すため、フロント側での結合は不要。
+     *     `group_name` の昇順で返す。
+     *
+     *     **利用画面：**
+     *     - ホーム：仕訳入力フォームの大分類プルダウン
+     *     - マスタ管理：大分類一覧表示・編集
+     *     - 仕訳一覧：仕訳入力フォームの大分類プルダウン
+     */
+    get: operations["getCategoryGroups"];
+    put?: never;
+    /**
+     * 大分類作成
+     * @description 新しい大分類を作成する。
+     *     `group_name` はログインユーザー内でユニーク。重複時は409を返す。
+     *
+     *     **利用画面：**
+     *     - マスタ管理：大分類追加
+     */
+    post: operations["createCategoryGroup"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/category-groups/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/expense-categories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 生活区分一覧取得
-         * @description ログインユーザーの生活区分一覧を返す。
-         *     論理削除済み（`is_deleted = true`）は除外。
-         *     `category_groups` をJOINして返すため、フロント側での結合は不要。
-         *     `group_name` → `category_name` の2段昇順ソートで返す。
-         *
-         *     **利用画面：**
-         *     - ホーム：仕訳入力フォームの生活区分プルダウン（大分類選択による絞り込みはフロント側で処理）
-         *     - マスタ管理：生活区分一覧表示・編集（大分類ごとに固まって表示）
-         *     - 仕訳一覧：仕訳入力フォームの生活区分プルダウン
-         */
-        get: operations["getExpenseCategories"];
-        put?: never;
-        /**
-         * 生活区分作成
-         * @description 新しい生活区分を作成する。
-         *     `category_name` は同一大分類内（`user_id + group_id`）でユニーク。重複時は409を返す。
-         *
-         *     **利用画面：**
-         *     - マスタ管理：生活区分追加
-         */
-        post: operations["createExpenseCategory"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * 大分類更新
+     * @description 指定した大分類を更新する。全フィールドを毎回送信する（PUT）。
+     *     フロント側は編集画面を開いた時点で既存値をプリフィルし、変更分だけ上書きして送る。
+     *
+     *     - 論理削除済み・他ユーザーのリソースは404を返す（リソースの存在を露出しない）
+     *
+     *     **利用画面：**
+     *     - マスタ管理：大分類編集
+     */
+    put: operations["updateCategoryGroup"];
+    post?: never;
+    /**
+     * 大分類削除
+     * @description 指定した大分類を論理削除する（`is_deleted = true`）。
+     *
+     *     - 紐づく生活区分（`expense_categories`）が1件以上存在する場合は削除を拒否し400を返す
+     *     - 論理削除済み・他ユーザーのリソースは404を返す
+     *
+     *     **利用画面：**
+     *     - マスタ管理：大分類削除
+     */
+    delete: operations["deleteCategoryGroup"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/expense-categories": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/expense-categories/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * 生活区分更新
-         * @description 指定した生活区分を更新する。全フィールドを毎回送信する（PUT）。
-         *     `group_id` の変更も許容する（別の大分類への付け替え）。
-         *     付け替え後は振り返り画面の集計が新しい大分類で行われる。
-         *
-         *     - 論理削除済み・他ユーザーのリソースは404を返す
-         *
-         *     **利用画面：**
-         *     - マスタ管理：生活区分編集
-         */
-        put: operations["updateExpenseCategory"];
-        post?: never;
-        /**
-         * 生活区分削除
-         * @description 指定した生活区分を論理削除する（`is_deleted = true`）。
-         *     削除後はその生活区分は新規仕訳の登録に使用できなくなる。
-         *     過去の仕訳データはそのまま保持され、仕訳一覧・振り返り画面での集計にも引き続き使用される。
-         *
-         *     - 論理削除済み・他ユーザーのリソースは404を返す
-         *
-         *     **実装上の注意：**
-         *     仕訳一覧・振り返り画面でJOINする際は `is_deleted = true` の生活区分も含めること。
-         *     除外すると過去仕訳の表示が壊れる。
-         *
-         *     **利用画面：**
-         *     - マスタ管理：生活区分削除
-         */
-        delete: operations["deleteExpenseCategory"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * 生活区分一覧取得
+     * @description ログインユーザーの生活区分一覧を返す。
+     *     論理削除済み（`is_deleted = true`）は除外。
+     *     `category_groups` をJOINして返すため、フロント側での結合は不要。
+     *     `group_name` → `category_name` の2段昇順ソートで返す。
+     *
+     *     **利用画面：**
+     *     - ホーム：仕訳入力フォームの生活区分プルダウン（大分類選択による絞り込みはフロント側で処理）
+     *     - マスタ管理：生活区分一覧表示・編集（大分類ごとに固まって表示）
+     *     - 仕訳一覧：仕訳入力フォームの生活区分プルダウン
+     */
+    get: operations["getExpenseCategories"];
+    put?: never;
+    /**
+     * 生活区分作成
+     * @description 新しい生活区分を作成する。
+     *     `category_name` は同一大分類内（`user_id + group_id`）でユニーク。重複時は409を返す。
+     *
+     *     **利用画面：**
+     *     - マスタ管理：生活区分追加
+     */
+    post: operations["createExpenseCategory"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/expense-categories/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/statement-types": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 変動費分析用グループ一覧取得
-         * @description 変動費分析用グループの一覧を返す。固定マスタのためCRUDなし。
-         *     大分類の追加・編集フォームのプルダウン表示に使用する。
-         *     `id` 昇順で返す。
-         *
-         *     **利用画面：**
-         *     - マスタ管理：大分類追加・編集フォームのプルダウン
-         */
-        get: operations["getStatementTypes"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * 生活区分更新
+     * @description 指定した生活区分を更新する。全フィールドを毎回送信する（PUT）。
+     *     `group_id` の変更も許容する（別の大分類への付け替え）。
+     *     付け替え後は振り返り画面の集計が新しい大分類で行われる。
+     *
+     *     - 論理削除済み・他ユーザーのリソースは404を返す
+     *
+     *     **利用画面：**
+     *     - マスタ管理：生活区分編集
+     */
+    put: operations["updateExpenseCategory"];
+    post?: never;
+    /**
+     * 生活区分削除
+     * @description 指定した生活区分を論理削除する（`is_deleted = true`）。
+     *     削除後はその生活区分は新規仕訳の登録に使用できなくなる。
+     *     過去の仕訳データはそのまま保持され、仕訳一覧・振り返り画面での集計にも引き続き使用される。
+     *
+     *     - 論理削除済み・他ユーザーのリソースは404を返す
+     *
+     *     **実装上の注意：**
+     *     仕訳一覧・振り返り画面でJOINする際は `is_deleted = true` の生活区分も含めること。
+     *     除外すると過去仕訳の表示が壊れる。
+     *
+     *     **利用画面：**
+     *     - マスタ管理：生活区分削除
+     */
+    delete: operations["deleteExpenseCategory"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/statement-types": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/budgets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 予算・目標取得
-         * @description ログインユーザーの予算・目標設定を返す。
-         *     レコードが未作成の場合も200を返し、全フィールドをnullで返す。
-         *
-         *     **利用画面：**
-         *     - 目標設定画面：初期表示
-         */
-        get: operations["getBudgets"];
-        /**
-         * 予算・目標更新
-         * @description ログインユーザーの予算・目標設定を更新する。
-         *     レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
-         *     全フィールド任意。変更しないフィールドは現在値をそのまま送ること。
-         *     nullを送ると未設定状態に戻る。
-         *     `monthly_budget` に0以下の値を送った場合は400を返す。
-         *
-         *     **利用画面：**
-         *     - 目標設定画面：保存
-         */
-        put: operations["updateBudgets"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * 変動費分析用グループ一覧取得
+     * @description 変動費分析用グループの一覧を返す。固定マスタのためCRUDなし。
+     *     大分類の追加・編集フォームのプルダウン表示に使用する。
+     *     `id` 昇順で返す。
+     *
+     *     **利用画面：**
+     *     - マスタ管理：大分類追加・編集フォームのプルダウン
+     */
+    get: operations["getStatementTypes"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/budgets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/journal-entries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 仕訳一覧取得
-         * @description 指定月の仕訳一覧を日付ごとにグループ化して返す。
-         *     日付降順、各日付内はid降順（登録が新しい順）。
-         *
-         *     **利用画面：**
-         *     - 仕訳一覧：指定月の仕訳履歴表示
-         */
-        get: operations["getJournalEntries"];
-        put?: never;
-        /**
-         * 仕訳登録
-         * @description 仕訳を新規登録する。
-         *
-         *     **利用画面：**
-         *     - ホーム：仕訳入力フォーム
-         *     - 仕訳一覧：仕訳追加
-         *
-         *     **フォームの操作フロー（フロント側）：**
-         *     大分類を選択 → 生活区分を大分類でフィルタリング → 生活区分を選択。
-         *     APIには選択結果の `category_id`（生活区分ID）のみ送信する。
-         */
-        post: operations["createJournalEntry"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * 予算・目標取得
+     * @description ログインユーザーの予算・目標設定を返す。
+     *     レコードが未作成の場合も200を返し、全フィールドをnullで返す。
+     *
+     *     **利用画面：**
+     *     - 目標設定画面：初期表示
+     */
+    get: operations["getBudgets"];
+    /**
+     * 予算・目標更新
+     * @description ログインユーザーの予算・目標設定を更新する。
+     *     レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
+     *     全フィールド任意。変更しないフィールドは現在値をそのまま送ること。
+     *     nullを送ると未設定状態に戻る。
+     *     `monthly_budget` に0以下の値を送った場合は400を返す。
+     *
+     *     **利用画面：**
+     *     - 目標設定画面：保存
+     */
+    put: operations["updateBudgets"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/journal-entries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/journal-entries/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * 仕訳更新
-         * @description 指定した仕訳を更新する。全フィールドを毎回送信する（PUT）。
-         *     `transaction_date` の変更も許容する（入力ミス修正のユースケースに対応）。
-         *
-         *     - 論理削除済み・他ユーザーのリソースは404を返す
-         *
-         *     **利用画面：**
-         *     - 仕訳一覧：仕訳編集・コメント修正
-         */
-        put: operations["updateJournalEntry"];
-        post?: never;
-        /**
-         * 仕訳削除
-         * @description 指定した仕訳を物理削除する。
-         *     マスタ系（生活区分・大分類）の論理削除と異なり、仕訳は他テーブルから参照されないため物理削除とする。
-         *
-         *     - 他ユーザーのリソースは404を返す
-         *
-         *     **利用画面：**
-         *     - 仕訳一覧:仕訳削除
-         */
-        delete: operations["deleteJournalEntry"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * 仕訳一覧取得
+     * @description 指定月の仕訳一覧を日付ごとにグループ化して返す。
+     *     日付降順、各日付内はid降順（登録が新しい順）。
+     *
+     *     **利用画面：**
+     *     - 仕訳一覧：指定月の仕訳履歴表示
+     */
+    get: operations["getJournalEntries"];
+    put?: never;
+    /**
+     * 仕訳登録
+     * @description 仕訳を新規登録する。
+     *
+     *     **利用画面：**
+     *     - ホーム：仕訳入力フォーム
+     *     - 仕訳一覧：仕訳追加
+     *
+     *     **フォームの操作フロー（フロント側）：**
+     *     大分類を選択 → 生活区分を大分類でフィルタリング → 生活区分を選択。
+     *     APIには選択結果の `category_id`（生活区分ID）のみ送信する。
+     */
+    post: operations["createJournalEntry"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/journal-entries/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/notes/monthly-reviews": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 月次振り返りメモ取得
-         * @description 指定月の生活区分ごとの振り返りメモ一覧を返す。
-         *     `GET /expenses/monthly-breakdown` の集計データとフロント側で `category_id` をキーに突合して表示する。
-         *
-         *     レコードが未作成の場合も200を返し、`notes` を空配列で返す。
-         *
-         *     **利用画面：**
-         *     - 振り返り画面：生活区分ごとのメモ表示
-         */
-        get: operations["getMonthlyReviews"];
-        /**
-         * 月次振り返りメモ保存
-         * @description 指定月の生活区分ごとの振り返りメモを保存する。
-         *     レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
-         *     送信内容で **全件洗い替え**（jsonbを丸ごと置き換え）。
-         *
-         *     **空文字の扱い：**
-         *     `note` が空文字のエントリはサーバー側で除外してDBに保存しない。
-         *     ユーザーがメモを空にして保存した場合、そのカテゴリのメモは削除扱いになる。
-         *
-         *     `notes` を空配列で送ると、その月のメモを全件削除する。
-         *
-         *     **利用画面：**
-         *     - 振り返り画面：生活区分ごとのメモ保存
-         */
-        put: operations["putMonthlyReviews"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * 仕訳更新
+     * @description 指定した仕訳を更新する。全フィールドを毎回送信する（PUT）。
+     *     `transaction_date` の変更も許容する（入力ミス修正のユースケースに対応）。
+     *
+     *     - 論理削除済み・他ユーザーのリソースは404を返す
+     *
+     *     **利用画面：**
+     *     - 仕訳一覧：仕訳編集・コメント修正
+     */
+    put: operations["updateJournalEntry"];
+    post?: never;
+    /**
+     * 仕訳削除
+     * @description 指定した仕訳を物理削除する。
+     *     マスタ系（生活区分・大分類）の論理削除と異なり、仕訳は他テーブルから参照されないため物理削除とする。
+     *
+     *     - 他ユーザーのリソースは404を返す
+     *
+     *     **利用画面：**
+     *     - 仕訳一覧:仕訳削除
+     */
+    delete: operations["deleteJournalEntry"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/notes/monthly-reviews": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/notes/daily": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 日次コメント一覧取得
-         * @description 指定月の日付ごとのコメント一覧を返す。
-         *     `GET /journal-entries` の仕訳一覧とフロント側で `date` をキーに突合して表示する。
-         *
-         *     コメントが存在しない月は空配列を返す。
-         *
-         *     **利用画面：**
-         *     - 仕訳一覧：日付ごとのコメント表示
-         */
-        get: operations["getDailyNotes"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * 月次振り返りメモ取得
+     * @description 指定月の生活区分ごとの振り返りメモ一覧を返す。
+     *     `GET /expenses/monthly-breakdown` の集計データとフロント側で `category_id` をキーに突合して表示する。
+     *
+     *     レコードが未作成の場合も200を返し、`notes` を空配列で返す。
+     *
+     *     **利用画面：**
+     *     - 振り返り画面：生活区分ごとのメモ表示
+     */
+    get: operations["getMonthlyReviews"];
+    /**
+     * 月次振り返りメモ保存
+     * @description 指定月の生活区分ごとの振り返りメモを保存する。
+     *     レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
+     *     送信内容で **全件洗い替え**（jsonbを丸ごと置き換え）。
+     *
+     *     **空文字の扱い：**
+     *     `note` が空文字のエントリはサーバー側で除外してDBに保存しない。
+     *     ユーザーがメモを空にして保存した場合、そのカテゴリのメモは削除扱いになる。
+     *
+     *     `notes` を空配列で送ると、その月のメモを全件削除する。
+     *
+     *     **利用画面：**
+     *     - 振り返り画面：生活区分ごとのメモ保存
+     */
+    put: operations["putMonthlyReviews"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/notes/daily": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/notes/daily/{date}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * 日次コメント保存
-         * @description 指定日付のコメントを保存する。
-         *     レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
-         *
-         *     **空文字の扱い：**
-         *     `note` が空文字の場合、レコードを物理削除する。
-         *     レスポンスは `note: null` を返す（フロント側はステータスコードで挙動を分岐しなくてよい）。
-         *
-         *     **利用画面：**
-         *     - 仕訳一覧：日付ごとのコメント入力・編集
-         */
-        put: operations["putDailyNote"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * 日次コメント一覧取得
+     * @description 指定月の日付ごとのコメント一覧を返す。
+     *     `GET /journal-entries` の仕訳一覧とフロント側で `date` をキーに突合して表示する。
+     *
+     *     コメントが存在しない月は空配列を返す。
+     *
+     *     **利用画面：**
+     *     - 仕訳一覧：日付ごとのコメント表示
+     */
+    get: operations["getDailyNotes"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/notes/daily/{date}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/recurring-expenses": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 定期支出一覧 */
-        get: operations["listRecurringExpenses"];
-        put?: never;
-        /** 定期支出追加 */
-        post: operations["createRecurringExpense"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * 日次コメント保存
+     * @description 指定日付のコメントを保存する。
+     *     レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
+     *
+     *     **空文字の扱い：**
+     *     `note` が空文字の場合、レコードを物理削除する。
+     *     レスポンスは `note: null` を返す（フロント側はステータスコードで挙動を分岐しなくてよい）。
+     *
+     *     **利用画面：**
+     *     - 仕訳一覧：日付ごとのコメント入力・編集
+     */
+    put: operations["putDailyNote"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/recurring-expenses": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/recurring-expenses/pending": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 確認待ち定期支出一覧（variable型で今月未記録） */
-        get: operations["listPendingRecurring"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 定期支出一覧 */
+    get: operations["listRecurringExpenses"];
+    put?: never;
+    /** 定期支出追加 */
+    post: operations["createRecurringExpense"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/recurring-expenses/pending": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/recurring-expenses/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** 定期支出更新 */
-        put: operations["updateRecurringExpense"];
-        post?: never;
-        /** 定期支出削除 */
-        delete: operations["deleteRecurringExpense"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 確認待ち定期支出一覧（variable型で今月未記録） */
+    get: operations["listPendingRecurring"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/recurring-expenses/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/savings-goals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 貯金目標一覧 */
-        get: operations["listSavingsGoals"];
-        put?: never;
-        /** 貯金目標追加 */
-        post: operations["createSavingsGoal"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /** 定期支出更新 */
+    put: operations["updateRecurringExpense"];
+    post?: never;
+    /** 定期支出削除 */
+    delete: operations["deleteRecurringExpense"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/savings-goals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/savings-goals/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** 貯金目標更新 */
-        put: operations["updateSavingsGoal"];
-        post?: never;
-        /** 貯金目標削除 */
-        delete: operations["deleteSavingsGoal"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 貯金目標一覧 */
+    get: operations["listSavingsGoals"];
+    put?: never;
+    /** 貯金目標追加 */
+    post: operations["createSavingsGoal"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/savings-goals/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/savings-goals/{id}/post-monthly": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 今月分の積立を記録（accumulated_amountに加算） */
-        post: operations["postMonthlySavings"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /** 貯金目標更新 */
+    put: operations["updateSavingsGoal"];
+    post?: never;
+    /** 貯金目標削除 */
+    delete: operations["deleteSavingsGoal"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/savings-goals/{id}/post-monthly": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/income-records": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 収入記録一覧 */
-        get: operations["listIncomeRecords"];
-        put?: never;
-        /** 収入記録追加 */
-        post: operations["createIncomeRecord"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** 今月分の積立を記録（accumulated_amountに加算） */
+    post: operations["postMonthlySavings"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/income-records": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/income-records/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** 収入記録更新 */
-        put: operations["updateIncomeRecord"];
-        post?: never;
-        /** 収入記録削除 */
-        delete: operations["deleteIncomeRecord"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 収入記録一覧 */
+    get: operations["listIncomeRecords"];
+    put?: never;
+    /** 収入記録追加 */
+    post: operations["createIncomeRecord"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/income-records/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/base-income": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 基準収入設定取得 */
-        get: operations["getBaseIncome"];
-        /** 基準収入設定更新 */
-        put: operations["updateBaseIncome"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /** 収入記録更新 */
+    put: operations["updateIncomeRecord"];
+    post?: never;
+    /** 収入記録削除 */
+    delete: operations["deleteIncomeRecord"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/base-income": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/budget-summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 予算サマリー取得 */
-        get: operations["getBudgetSummary"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 基準収入設定取得 */
+    get: operations["getBaseIncome"];
+    /** 基準収入設定更新 */
+    put: operations["updateBaseIncome"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/budget-summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    /** 予算サマリー取得 */
+    get: operations["getBudgetSummary"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        ErrorResponse: {
-            /** @description エラーコード */
-            code: string;
-            /** @description エラーメッセージ */
-            message: string;
-        };
-        DailyEntry: {
-            /**
-             * Format: date
-             * @description 日付（YYYY-MM-DD）
-             * @example 2025-05-05
-             */
-            date: string;
-            /**
-             * @description 当日時点の変動費食費累積額（円）
-             * @example 15000
-             */
-            food: number;
-            /**
-             * @description 当日時点の変動費その他累積額（円）
-             * @example 20000
-             */
-            other: number;
-            /**
-             * @description 当日時点の変動費合計累積額（円）
-             * @example 35000
-             */
-            total: number;
-            /**
-             * @description true = 実績値（今日以前）
-             *     false = 予測値（明日以降。今日時点の日次ペースで積み上げ）
-             * @example true
-             */
-            is_actual: boolean;
-        };
-        DailyCumulativeResponse: {
-            /**
-             * @description 対象年月（YYYY-MM）
-             * @example 2025-05
-             */
-            year_month: string;
-            /**
-             * @description 月次変動費予算（円）
-             * @example 150000
-             */
-            monthly_budget: number;
-            /**
-             * @description 日割り予算（円）
-             *     monthly_budget ÷ 当月日数、小数切り捨て
-             * @example 4839
-             */
-            daily_budget: number;
-            /** @description 当月1日〜末日の全日付分のデータ */
-            days: components["schemas"]["DailyEntry"][];
-        };
-        StatementTypeSummary: {
-            /**
-             * @description 変動費分析用グループID
-             * @example 1
-             */
-            id: number;
-            /**
-             * @description 変動費分析用グループコード
-             * @example food
-             */
-            type_code: string;
-            /**
-             * @description 変動費分析用グループ表示名
-             * @example 食費
-             */
-            statement_type_name: string;
-        };
-        CategoryGroup: {
-            /**
-             * @description 大分類ID
-             * @example 1
-             */
-            id: number;
-            /**
-             * @description 大分類名
-             * @example 食費
-             */
-            group_name: string;
-            statement_type: components["schemas"]["StatementTypeSummary"];
-            /**
-             * @description 説明
-             * @example 日常の食費全般
-             */
-            description?: string | null;
-        };
-        CategoryGroupListResponse: {
-            category_groups: components["schemas"]["CategoryGroup"][];
-        };
-        ExpenseCategory: {
-            /**
-             * @description 生活区分ID
-             * @example 1
-             */
-            id: number;
-            /**
-             * @description 生活区分名
-             * @example スーパー
-             */
-            category_name: string;
-            /**
-             * @description 生活区分コード
-             * @example food_super
-             */
-            category_code?: string | null;
-            /**
-             * @description 紐づく大分類ID
-             * @example 1
-             */
-            group_id: number;
-            /**
-             * @description 紐づく大分類名
-             * @example 食費
-             */
-            group_name: string;
-            /**
-             * @description 説明
-             * @example null
-             */
-            description?: string | null;
-        };
-        ExpenseCategoryListResponse: {
-            expense_categories: components["schemas"]["ExpenseCategory"][];
-        };
-        JournalEntryRequest: {
-            /**
-             * Format: date
-             * @description 取引日（YYYY-MM-DD）
-             * @example 2025-05-05
-             */
-            transaction_date: string;
-            /**
-             * @description 項目名（コンビニ、ランチ代など）
-             * @example コンビニ
-             */
-            item?: string | null;
-            /**
-             * @description 金額（円、正の整数）
-             * @example 650
-             */
-            amount: number;
-            /**
-             * @description 生活区分ID
-             * @example 1
-             */
-            category_id: number;
-            /**
-             * @description 集計除外フラグ。
-             *     true にすると変動費集計から除外される（特別出費など）。デフォルトはfalse（集計対象）
-             * @example true
-             */
-            is_excluded: boolean;
-            /**
-             * @description 補足コメント
-             * @example 昼飯
-             */
-            note?: string | null;
-        };
-        JournalEntryResponse: {
-            /**
-             * @description 仕訳ID
-             * @example 42
-             */
-            id: number;
-            /**
-             * Format: date
-             * @description 取引日（YYYY-MM-DD）
-             * @example 2025-05-05
-             */
-            transaction_date: string;
-            /**
-             * @description 項目名
-             * @example コンビニ
-             */
-            item?: string | null;
-            /**
-             * @description 金額（円）
-             * @example 650
-             */
-            amount: number;
-            /**
-             * @description 生活区分ID
-             * @example 1
-             */
-            category_id: number;
-            /**
-             * @description 生活区分名
-             * @example スーパー
-             */
-            category_name: string;
-            /**
-             * @description 大分類ID
-             * @example 1
-             */
-            group_id: number;
-            /**
-             * @description 大分類名
-             * @example 食費
-             */
-            group_name: string;
-            /**
-             * @description 集計除外フラグ（trueで集計から除外）
-             * @example true
-             */
-            is_excluded: boolean;
-            /**
-             * @description 補足コメント
-             * @example 昼飯
-             */
-            note?: string | null;
-            /**
-             * Format: date-time
-             * @description 登録日時（RFC3339）
-             * @example 2025-05-05T12:34:56Z
-             */
-            created_at: string;
-        };
-        CategoryGroupRequest: {
-            /**
-             * @description 大分類名(ユーザー内でユニーク)
-             * @example 日用品
-             */
-            group_name: string;
-            /**
-             * @description 変動費分析用グループID（statement_types.id）
-             * @example 2
-             */
-            statement_type_id: number;
-            /**
-             * @description 説明
-             * @example シャンプーや洗剤など
-             */
-            description?: string | null;
-        };
-        ExpenseCategoryRequest: {
-            /**
-             * @description 生活区分名（同一大分類内でユニーク）
-             * @example ドラッグストア
-             */
-            category_name: string;
-            /**
-             * @description 紐づく大分類ID
-             * @example 3
-             */
-            group_id: number;
-            /**
-             * @description 説明
-             * @example 日用品の購入など
-             */
-            description?: string | null;
-        };
-        MonthlyBreakdownItem: {
-            /**
-             * @description 生活区分ID
-             * @example 1
-             */
-            category_id: number;
-            /**
-             * @description 生活区分名
-             * @example スーパー
-             */
-            category_name: string;
-            /**
-             * @description 大分類ID
-             * @example 1
-             */
-            group_id: number;
-            /**
-             * @description 大分類名（is_excludedで対象外になった仕訳も元の大分類名をそのまま使う）
-             * @example 食費
-             */
-            group_name: string;
-            /**
-             * @description 変動費分析用グループID。
-             *     is_excluded = true の仕訳は対象外のIDに上書きされる
-             * @example 1
-             */
-            statement_type_id: number;
-            /**
-             * @description 変動費分析用グループ名。
-             *     is_excluded = true の仕訳は「対象外」に上書きされる
-             * @example 食費（変動費）
-             */
-            statement_type_name: string;
-            /**
-             * @description 合計金額（円）
-             * @example 24800
-             */
-            total: number;
-        };
-        MonthlyBreakdownResponse: {
-            /**
-             * @description 対象年月（YYYY-MM）
-             * @example 2025-04
-             */
-            year_month: string;
-            /** @description 生活区分単位の集計リスト */
-            breakdown: components["schemas"]["MonthlyBreakdownItem"][];
-        };
-        BudgetResponse: {
-            /**
-             * @description 月次変動費予算（円）。未設定時はnull
-             * @example 150000
-             */
-            monthly_budget?: number | null;
-            /**
-             * @description 貯金目標テキスト。未設定時はnull
-             * @example 夏までに旅行費を貯める
-             */
-            goal_text?: string | null;
-            /**
-             * @description 目標金額（円）。未設定時はnull
-             * @example 300000
-             */
-            goal_amount?: number | null;
-        };
-        BudgetRequest: {
-            /**
-             * @description 月次変動費予算（円）。nullで未設定に戻る。1以上の整数のみ許容
-             * @example 120000
-             */
-            monthly_budget?: number | null;
-            /**
-             * @description 貯金目標テキスト。nullで未設定に戻る
-             * @example 夏までに旅行費を貯める
-             */
-            goal_text?: string | null;
-            /**
-             * @description 目標金額（円）。nullで未設定に戻る
-             * @example 300000
-             */
-            goal_amount?: number | null;
-        };
-        MonthlyReviewNote: {
-            /**
-             * @description 生活区分ID
-             * @example 1
-             */
-            category_id: number;
-            /**
-             * @description メモテキスト
-             * @example スーパーで買いすぎた。特売につられがち
-             */
-            note: string;
-        };
-        MonthlyReviewResponse: {
-            /**
-             * @description 対象年月（YYYY-MM）
-             * @example 2025-04
-             */
-            year_month: string;
-            /**
-             * @description 生活区分ごとのメモ一覧。
-             *     メモが存在しない月は空配列を返す。
-             */
-            notes: components["schemas"]["MonthlyReviewNote"][];
-        };
-        DailyJournalEntries: {
-            /**
-             * Format: date
-             * @description 日付（YYYY-MM-DD）
-             * @example 2025-05-05
-             */
-            date: string;
-            /** @description その日の仕訳一覧（id降順） */
-            journal_entries: components["schemas"]["JournalEntryResponse"][];
-        };
-        JournalEntryListResponse: {
-            /**
-             * @description 対象年月（YYYY-MM）
-             * @example 2025-05
-             */
-            year_month: string;
-            /** @description 日付ごとの仕訳グループ（日付降順）。0件月は空配列 */
-            entries: components["schemas"]["DailyJournalEntries"][];
-        };
-        DailyNote: {
-            /**
-             * Format: date
-             * @description 日付（YYYY-MM-DD）
-             * @example 2025-05-05
-             */
-            date: string;
-            /**
-             * @description コメントテキスト。空文字送信後の削除状態ではnullを返す
-             * @example ディズニー行ったから出費多め
-             */
-            note: string | null;
-        };
-        DailyNoteListResponse: {
-            /**
-             * @description 対象年月（YYYY-MM）
-             * @example 2025-05
-             */
-            year_month: string;
-            /** @description 日付ごとのコメント一覧。コメントなし月は空配列 */
-            notes: components["schemas"]["DailyNote"][];
-        };
-        LoginResponse: {
-            /**
-             * @description JWT access token (HS256、有効期限24時間)
-             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-             */
-            token: string;
-            /**
-             * @description ユーザーID
-             * @example 1
-             */
-            id: number;
-            /**
-             * Format: email
-             * @description メールアドレス
-             * @example dev@atoikura.local
-             */
-            email: string;
-            /**
-             * @description 表示名
-             * @example Dev User
-             */
-            display_name: string | null;
-            /**
-             * Format: date-time
-             * @description 最終ログイン日時（ISO 8601）
-             * @example 2026-05-27T09:12:34+09:00
-             */
-            last_login_at: string | null;
-        };
-        UserResponse: {
-            /**
-             * @description ユーザーID
-             * @example 1
-             */
-            id: number;
-            /**
-             * Format: email
-             * @description メールアドレス（ログインID）
-             * @example dev@atoikura.local
-             */
-            email: string;
-            /**
-             * @description 表示名
-             * @example Dev User
-             */
-            display_name: string | null;
-            /**
-             * Format: date-time
-             * @description 最終ログイン日時（ISO 8601）
-             * @example 2026-05-27T09:12:34+09:00
-             */
-            last_login_at: string | null;
-        };
-        SignupRequest: {
-            /**
-             * Format: email
-             * @description メールアドレス（ログインID）。登録済みの場合は409
-             * @example alice@example.com
-             */
-            email: string;
-            /**
-             * Format: password
-             * @description パスワード（8文字以上）
-             * @example correct horse
-             */
-            password: string;
-            /**
-             * @description 表示名（任意・50文字以内）
-             * @example Alice
-             */
-            display_name?: string | null;
-        };
-        PasswordChangeRequest: {
-            /**
-             * Format: password
-             * @description 現在のパスワード
-             */
-            current_password: string;
-            /**
-             * Format: password
-             * @description 新しいパスワード（8文字以上）
-             */
-            new_password: string;
-        };
-        RecurringExpense: {
-            id: number;
-            /** @example 家賃 */
-            name: string;
-            /** @example 🏠 */
-            emoji: string;
-            /**
-             * @description 引落日（毎月何日か）
-             * @example 25
-             */
-            billing_day: number;
-            /**
-             * @description 金額（円）。nullの場合は毎月変動
-             * @example 80000
-             */
-            amount?: number | null;
-            /**
-             * @description fixed=金額固定, variable=毎月要確認
-             * @example fixed
-             * @enum {string}
-             */
-            type: "fixed" | "variable";
-            /** @example 15 */
-            category_id: number;
-            /** @example 7 */
-            group_id: number;
-            /** @example 固定費 */
-            group_name: string;
-            /** @example 家賃 */
-            category_name: string;
-        };
-        RecurringExpenseRequest: {
-            /** @example 家賃 */
-            name: string;
-            /** @example 🏠 */
-            emoji: string;
-            /** @example 25 */
-            billing_day: number;
-            /** @example 80000 */
-            amount?: number | null;
-            /**
-             * @example fixed
-             * @enum {string}
-             */
-            type: "fixed" | "variable";
-            /** @example 15 */
-            category_id: number;
-        };
-        RecurringExpenseListResponse: {
-            recurring_expenses: components["schemas"]["RecurringExpense"][];
-        };
-        PendingRecurring: {
-            id: number;
-            /** @example 電気代 */
-            name: string;
-            /** @example 💡 */
-            emoji: string;
-            /** @example 10 */
-            billing_day: number;
-            /**
-             * @description 前回記録した金額（円）
-             * @example 7480
-             */
-            last_amount: number;
-            /** @example 固定費 */
-            group_name: string;
-        };
-        PendingRecurringListResponse: {
-            pending: components["schemas"]["PendingRecurring"][];
-        };
-        SavingsGoal: {
-            id: number;
-            /** @example 旅行積立 */
-            name: string;
-            /** @example ✈️ */
-            emoji: string;
-            /**
-             * @description 毎月の積立額（円）
-             * @example 20000
-             */
-            monthly_amount: number;
-            /**
-             * @description 目標金額（円）
-             * @example 250000
-             */
-            target_amount: number;
-            /**
-             * @description 現在の積立済み金額（円）
-             * @example 170000
-             */
-            accumulated_amount: number;
-            /**
-             * @description 目標期限（YYYY/MM形式）。未設定はnull
-             * @example 2027/03
-             */
-            deadline?: string | null;
-            /** @example 北海道旅行：新幹線とホテル代 */
-            memo: string;
-            /**
-             * @description 今月分の積立が済んでいるか
-             * @example true
-             */
-            is_posted_this_month: boolean;
-        };
-        SavingsGoalRequest: {
-            /** @example 旅行積立 */
-            name: string;
-            /** @example ✈️ */
-            emoji: string;
-            /** @example 20000 */
-            monthly_amount: number;
-            /** @example 250000 */
-            target_amount: number;
-            /** @example 2027/03 */
-            deadline?: string | null;
-            /** @example 北海道旅行：新幹線とホテル代 */
-            memo?: string;
-        };
-        SavingsGoalListResponse: {
-            savings_goals: components["schemas"]["SavingsGoal"][];
-        };
-        IncomeRecord: {
-            id: number;
-            /**
-             * Format: date
-             * @example 2026-05-25
-             */
-            transaction_date: string;
-            /** @example 280000 */
-            amount: number;
-            /** @example 6月給与 */
-            name: string;
-            /**
-             * @example salary
-             * @enum {string}
-             */
-            income_type: "salary" | "side" | "bonus" | "oneoff";
-            /** @example 🏢 */
-            emoji: string;
-            /** @example  */
-            note: string;
-        };
-        IncomeRecordRequest: {
-            /**
-             * Format: date
-             * @example 2026-05-25
-             */
-            transaction_date: string;
-            /** @example 280000 */
-            amount: number;
-            /** @example 6月給与 */
-            name: string;
-            /**
-             * @example salary
-             * @enum {string}
-             */
-            income_type: "salary" | "side" | "bonus" | "oneoff";
-            /** @example 🏢 */
-            emoji: string;
-            /** @example  */
-            note?: string;
-        };
-        IncomeRecordListResponse: {
-            income_records: components["schemas"]["IncomeRecord"][];
-        };
-        BaseIncomeSetting: {
-            /**
-             * @description 基準収入（毎月の見込み額、円）
-             * @example 280000
-             */
-            amount: number;
-        };
-        BudgetHistoryItem: {
-            /** @example 2026-03 */
-            year_month: string;
-            /** @example 142000 */
-            budget: number;
-            /**
-             * @description 実際の支出合計（対象外除く）
-             * @example 131200
-             */
-            actual: number;
-        };
-        BudgetSummaryResponse: {
-            /**
-             * @description 今月の収入合計（円）
-             * @example 323200
-             */
-            income_total: number;
-            /**
-             * @description 定期支出合計（円）
-             * @example 96000
-             */
-            recurring_total: number;
-            /**
-             * @description 貯金合計（円）
-             * @example 45000
-             */
-            savings_total: number;
-            /**
-             * @description 変動費予算 = 収入 − 定期支出 − 貯金（円）
-             * @example 182200
-             */
-            variable_budget: number;
-            /**
-             * @description 1日あたりの予算（円）
-             * @example 6073
-             */
-            daily_budget: number;
-            /**
-             * @description 今月の残り日数
-             * @example 12
-             */
-            days_remaining: number;
-            history: components["schemas"]["BudgetHistoryItem"][];
-        };
+  schemas: {
+    ErrorResponse: {
+      /** @description エラーコード */
+      code: string;
+      /** @description エラーメッセージ */
+      message: string;
     };
-    responses: {
-        /** @description 認証失敗 */
-        Unauthorized: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                /**
-                 * @example {
-                 *       "code": "UNAUTHORIZED",
-                 *       "message": "認証情報が不正です"
-                 *     }
-                 */
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
-        /** @description サーバー内部エラー */
-        InternalServerError: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                /**
-                 * @example {
-                 *       "code": "INTERNAL_SERVER_ERROR",
-                 *       "message": "予期しないエラーが発生しました"
-                 *     }
-                 */
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
+    DailyEntry: {
+      /**
+       * Format: date
+       * @description 日付（YYYY-MM-DD）
+       * @example 2025-05-05
+       */
+      date: string;
+      /**
+       * @description 当日時点の変動費食費累積額（円）
+       * @example 15000
+       */
+      food: number;
+      /**
+       * @description 当日時点の変動費その他累積額（円）
+       * @example 20000
+       */
+      other: number;
+      /**
+       * @description 当日時点の変動費合計累積額（円）
+       * @example 35000
+       */
+      total: number;
+      /**
+       * @description true = 実績値（今日以前）
+       *     false = 予測値（明日以降。今日時点の日次ペースで積み上げ）
+       * @example true
+       */
+      is_actual: boolean;
     };
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    DailyCumulativeResponse: {
+      /**
+       * @description 対象年月（YYYY-MM）
+       * @example 2025-05
+       */
+      year_month: string;
+      /**
+       * @description 月次変動費予算（円）
+       * @example 150000
+       */
+      monthly_budget: number;
+      /**
+       * @description 日割り予算（円）
+       *     monthly_budget ÷ 当月日数、小数切り捨て
+       * @example 4839
+       */
+      daily_budget: number;
+      /** @description 当月1日〜末日の全日付分のデータ */
+      days: components["schemas"]["DailyEntry"][];
+    };
+    StatementTypeSummary: {
+      /**
+       * @description 変動費分析用グループID
+       * @example 1
+       */
+      id: number;
+      /**
+       * @description 変動費分析用グループコード
+       * @example food
+       */
+      type_code: string;
+      /**
+       * @description 変動費分析用グループ表示名
+       * @example 食費
+       */
+      statement_type_name: string;
+    };
+    CategoryGroup: {
+      /**
+       * @description 大分類ID
+       * @example 1
+       */
+      id: number;
+      /**
+       * @description 大分類名
+       * @example 食費
+       */
+      group_name: string;
+      statement_type: components["schemas"]["StatementTypeSummary"];
+      /**
+       * @description 説明
+       * @example 日常の食費全般
+       */
+      description?: string | null;
+    };
+    CategoryGroupListResponse: {
+      category_groups: components["schemas"]["CategoryGroup"][];
+    };
+    ExpenseCategory: {
+      /**
+       * @description 生活区分ID
+       * @example 1
+       */
+      id: number;
+      /**
+       * @description 生活区分名
+       * @example スーパー
+       */
+      category_name: string;
+      /**
+       * @description 生活区分コード
+       * @example food_super
+       */
+      category_code?: string | null;
+      /**
+       * @description 紐づく大分類ID
+       * @example 1
+       */
+      group_id: number;
+      /**
+       * @description 紐づく大分類名
+       * @example 食費
+       */
+      group_name: string;
+      /**
+       * @description 説明
+       * @example null
+       */
+      description?: string | null;
+    };
+    ExpenseCategoryListResponse: {
+      expense_categories: components["schemas"]["ExpenseCategory"][];
+    };
+    JournalEntryRequest: {
+      /**
+       * Format: date
+       * @description 取引日（YYYY-MM-DD）
+       * @example 2025-05-05
+       */
+      transaction_date: string;
+      /**
+       * @description 項目名（コンビニ、ランチ代など）
+       * @example コンビニ
+       */
+      item?: string | null;
+      /**
+       * @description 金額（円、正の整数）
+       * @example 650
+       */
+      amount: number;
+      /**
+       * @description 生活区分ID
+       * @example 1
+       */
+      category_id: number;
+      /**
+       * @description 集計除外フラグ。
+       *     true にすると変動費集計から除外される（特別出費など）。デフォルトはfalse（集計対象）
+       * @example true
+       */
+      is_excluded: boolean;
+      /**
+       * @description 補足コメント
+       * @example 昼飯
+       */
+      note?: string | null;
+    };
+    JournalEntryResponse: {
+      /**
+       * @description 仕訳ID
+       * @example 42
+       */
+      id: number;
+      /**
+       * Format: date
+       * @description 取引日（YYYY-MM-DD）
+       * @example 2025-05-05
+       */
+      transaction_date: string;
+      /**
+       * @description 項目名
+       * @example コンビニ
+       */
+      item?: string | null;
+      /**
+       * @description 金額（円）
+       * @example 650
+       */
+      amount: number;
+      /**
+       * @description 生活区分ID
+       * @example 1
+       */
+      category_id: number;
+      /**
+       * @description 生活区分名
+       * @example スーパー
+       */
+      category_name: string;
+      /**
+       * @description 大分類ID
+       * @example 1
+       */
+      group_id: number;
+      /**
+       * @description 大分類名
+       * @example 食費
+       */
+      group_name: string;
+      /**
+       * @description 集計除外フラグ（trueで集計から除外）
+       * @example true
+       */
+      is_excluded: boolean;
+      /**
+       * @description 補足コメント
+       * @example 昼飯
+       */
+      note?: string | null;
+      /**
+       * Format: date-time
+       * @description 登録日時（RFC3339）
+       * @example 2025-05-05T12:34:56Z
+       */
+      created_at: string;
+    };
+    CategoryGroupRequest: {
+      /**
+       * @description 大分類名(ユーザー内でユニーク)
+       * @example 日用品
+       */
+      group_name: string;
+      /**
+       * @description 変動費分析用グループID（statement_types.id）
+       * @example 2
+       */
+      statement_type_id: number;
+      /**
+       * @description 説明
+       * @example シャンプーや洗剤など
+       */
+      description?: string | null;
+    };
+    ExpenseCategoryRequest: {
+      /**
+       * @description 生活区分名（同一大分類内でユニーク）
+       * @example ドラッグストア
+       */
+      category_name: string;
+      /**
+       * @description 紐づく大分類ID
+       * @example 3
+       */
+      group_id: number;
+      /**
+       * @description 説明
+       * @example 日用品の購入など
+       */
+      description?: string | null;
+    };
+    MonthlyBreakdownItem: {
+      /**
+       * @description 生活区分ID
+       * @example 1
+       */
+      category_id: number;
+      /**
+       * @description 生活区分名
+       * @example スーパー
+       */
+      category_name: string;
+      /**
+       * @description 大分類ID
+       * @example 1
+       */
+      group_id: number;
+      /**
+       * @description 大分類名（is_excludedで対象外になった仕訳も元の大分類名をそのまま使う）
+       * @example 食費
+       */
+      group_name: string;
+      /**
+       * @description 変動費分析用グループID。
+       *     is_excluded = true の仕訳は対象外のIDに上書きされる
+       * @example 1
+       */
+      statement_type_id: number;
+      /**
+       * @description 変動費分析用グループ名。
+       *     is_excluded = true の仕訳は「対象外」に上書きされる
+       * @example 食費（変動費）
+       */
+      statement_type_name: string;
+      /**
+       * @description 合計金額（円）
+       * @example 24800
+       */
+      total: number;
+    };
+    MonthlyBreakdownResponse: {
+      /**
+       * @description 対象年月（YYYY-MM）
+       * @example 2025-04
+       */
+      year_month: string;
+      /** @description 生活区分単位の集計リスト */
+      breakdown: components["schemas"]["MonthlyBreakdownItem"][];
+    };
+    BudgetResponse: {
+      /**
+       * @description 月次変動費予算（円）。未設定時はnull
+       * @example 150000
+       */
+      monthly_budget?: number | null;
+      /**
+       * @description 貯金目標テキスト。未設定時はnull
+       * @example 夏までに旅行費を貯める
+       */
+      goal_text?: string | null;
+      /**
+       * @description 目標金額（円）。未設定時はnull
+       * @example 300000
+       */
+      goal_amount?: number | null;
+    };
+    BudgetRequest: {
+      /**
+       * @description 月次変動費予算（円）。nullで未設定に戻る。1以上の整数のみ許容
+       * @example 120000
+       */
+      monthly_budget?: number | null;
+      /**
+       * @description 貯金目標テキスト。nullで未設定に戻る
+       * @example 夏までに旅行費を貯める
+       */
+      goal_text?: string | null;
+      /**
+       * @description 目標金額（円）。nullで未設定に戻る
+       * @example 300000
+       */
+      goal_amount?: number | null;
+    };
+    MonthlyReviewNote: {
+      /**
+       * @description 生活区分ID
+       * @example 1
+       */
+      category_id: number;
+      /**
+       * @description メモテキスト
+       * @example スーパーで買いすぎた。特売につられがち
+       */
+      note: string;
+    };
+    MonthlyReviewResponse: {
+      /**
+       * @description 対象年月（YYYY-MM）
+       * @example 2025-04
+       */
+      year_month: string;
+      /**
+       * @description 生活区分ごとのメモ一覧。
+       *     メモが存在しない月は空配列を返す。
+       */
+      notes: components["schemas"]["MonthlyReviewNote"][];
+    };
+    DailyJournalEntries: {
+      /**
+       * Format: date
+       * @description 日付（YYYY-MM-DD）
+       * @example 2025-05-05
+       */
+      date: string;
+      /** @description その日の仕訳一覧（id降順） */
+      journal_entries: components["schemas"]["JournalEntryResponse"][];
+    };
+    JournalEntryListResponse: {
+      /**
+       * @description 対象年月（YYYY-MM）
+       * @example 2025-05
+       */
+      year_month: string;
+      /** @description 日付ごとの仕訳グループ（日付降順）。0件月は空配列 */
+      entries: components["schemas"]["DailyJournalEntries"][];
+    };
+    DailyNote: {
+      /**
+       * Format: date
+       * @description 日付（YYYY-MM-DD）
+       * @example 2025-05-05
+       */
+      date: string;
+      /**
+       * @description コメントテキスト。空文字送信後の削除状態ではnullを返す
+       * @example ディズニー行ったから出費多め
+       */
+      note: string | null;
+    };
+    DailyNoteListResponse: {
+      /**
+       * @description 対象年月（YYYY-MM）
+       * @example 2025-05
+       */
+      year_month: string;
+      /** @description 日付ごとのコメント一覧。コメントなし月は空配列 */
+      notes: components["schemas"]["DailyNote"][];
+    };
+    LoginResponse: {
+      /**
+       * @description JWT access token (HS256、有効期限24時間)
+       * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+       */
+      token: string;
+      /**
+       * @description ユーザーID
+       * @example 1
+       */
+      id: number;
+      /**
+       * Format: email
+       * @description メールアドレス
+       * @example dev@atoikura.local
+       */
+      email: string;
+      /**
+       * @description 表示名
+       * @example Dev User
+       */
+      display_name: string | null;
+      /**
+       * Format: date-time
+       * @description 最終ログイン日時（ISO 8601）
+       * @example 2026-05-27T09:12:34+09:00
+       */
+      last_login_at: string | null;
+    };
+    UserResponse: {
+      /**
+       * @description ユーザーID
+       * @example 1
+       */
+      id: number;
+      /**
+       * Format: email
+       * @description メールアドレス（ログインID）
+       * @example dev@atoikura.local
+       */
+      email: string;
+      /**
+       * @description 表示名
+       * @example Dev User
+       */
+      display_name: string | null;
+      /**
+       * Format: date-time
+       * @description 最終ログイン日時（ISO 8601）
+       * @example 2026-05-27T09:12:34+09:00
+       */
+      last_login_at: string | null;
+    };
+    SignupRequest: {
+      /**
+       * Format: email
+       * @description メールアドレス（ログインID）。登録済みの場合は409
+       * @example alice@example.com
+       */
+      email: string;
+      /**
+       * Format: password
+       * @description パスワード（8文字以上）
+       * @example correct horse
+       */
+      password: string;
+      /**
+       * @description 表示名（任意・50文字以内）
+       * @example Alice
+       */
+      display_name?: string | null;
+    };
+    PasswordChangeRequest: {
+      /**
+       * Format: password
+       * @description 現在のパスワード
+       */
+      current_password: string;
+      /**
+       * Format: password
+       * @description 新しいパスワード（8文字以上）
+       */
+      new_password: string;
+    };
+    RecurringExpense: {
+      id: number;
+      /** @example 家賃 */
+      name: string;
+      /** @example 🏠 */
+      emoji: string;
+      /**
+       * @description 引落日（毎月何日か）
+       * @example 25
+       */
+      billing_day: number;
+      /**
+       * @description 金額（円）。nullの場合は毎月変動
+       * @example 80000
+       */
+      amount?: number | null;
+      /**
+       * @description fixed=金額固定, variable=毎月要確認
+       * @example fixed
+       * @enum {string}
+       */
+      type: "fixed" | "variable";
+      /** @example 15 */
+      category_id: number;
+      /** @example 7 */
+      group_id: number;
+      /** @example 固定費 */
+      group_name: string;
+      /** @example 家賃 */
+      category_name: string;
+    };
+    RecurringExpenseRequest: {
+      /** @example 家賃 */
+      name: string;
+      /** @example 🏠 */
+      emoji: string;
+      /** @example 25 */
+      billing_day: number;
+      /** @example 80000 */
+      amount?: number | null;
+      /**
+       * @example fixed
+       * @enum {string}
+       */
+      type: "fixed" | "variable";
+      /** @example 15 */
+      category_id: number;
+    };
+    RecurringExpenseListResponse: {
+      recurring_expenses: components["schemas"]["RecurringExpense"][];
+    };
+    PendingRecurring: {
+      id: number;
+      /** @example 電気代 */
+      name: string;
+      /** @example 💡 */
+      emoji: string;
+      /** @example 10 */
+      billing_day: number;
+      /**
+       * @description 前回記録した金額（円）
+       * @example 7480
+       */
+      last_amount: number;
+      /** @example 固定費 */
+      group_name: string;
+    };
+    PendingRecurringListResponse: {
+      pending: components["schemas"]["PendingRecurring"][];
+    };
+    SavingsGoal: {
+      id: number;
+      /** @example 旅行積立 */
+      name: string;
+      /** @example ✈️ */
+      emoji: string;
+      /**
+       * @description 毎月の積立額（円）
+       * @example 20000
+       */
+      monthly_amount: number;
+      /**
+       * @description 目標金額（円）
+       * @example 250000
+       */
+      target_amount: number;
+      /**
+       * @description 現在の積立済み金額（円）
+       * @example 170000
+       */
+      accumulated_amount: number;
+      /**
+       * @description 目標期限（YYYY/MM形式）。未設定はnull
+       * @example 2027/03
+       */
+      deadline?: string | null;
+      /** @example 北海道旅行：新幹線とホテル代 */
+      memo: string;
+      /**
+       * @description 今月分の積立が済んでいるか
+       * @example true
+       */
+      is_posted_this_month: boolean;
+    };
+    SavingsGoalRequest: {
+      /** @example 旅行積立 */
+      name: string;
+      /** @example ✈️ */
+      emoji: string;
+      /** @example 20000 */
+      monthly_amount: number;
+      /** @example 250000 */
+      target_amount: number;
+      /** @example 2027/03 */
+      deadline?: string | null;
+      /** @example 北海道旅行：新幹線とホテル代 */
+      memo?: string;
+    };
+    SavingsGoalListResponse: {
+      savings_goals: components["schemas"]["SavingsGoal"][];
+    };
+    IncomeRecord: {
+      id: number;
+      /**
+       * Format: date
+       * @example 2026-05-25
+       */
+      transaction_date: string;
+      /** @example 280000 */
+      amount: number;
+      /** @example 6月給与 */
+      name: string;
+      /**
+       * @example salary
+       * @enum {string}
+       */
+      income_type: "salary" | "side" | "bonus" | "oneoff";
+      /** @example 🏢 */
+      emoji: string;
+      /** @example  */
+      note: string;
+    };
+    IncomeRecordRequest: {
+      /**
+       * Format: date
+       * @example 2026-05-25
+       */
+      transaction_date: string;
+      /** @example 280000 */
+      amount: number;
+      /** @example 6月給与 */
+      name: string;
+      /**
+       * @example salary
+       * @enum {string}
+       */
+      income_type: "salary" | "side" | "bonus" | "oneoff";
+      /** @example 🏢 */
+      emoji: string;
+      /** @example  */
+      note?: string;
+    };
+    IncomeRecordListResponse: {
+      income_records: components["schemas"]["IncomeRecord"][];
+    };
+    BaseIncomeSetting: {
+      /**
+       * @description 基準収入（毎月の見込み額、円）
+       * @example 280000
+       */
+      amount: number;
+    };
+    BudgetHistoryItem: {
+      /** @example 2026-03 */
+      year_month: string;
+      /** @example 142000 */
+      budget: number;
+      /**
+       * @description 実際の支出合計（対象外除く）
+       * @example 131200
+       */
+      actual: number;
+    };
+    BudgetSummaryResponse: {
+      /**
+       * @description 今月の収入合計（円）
+       * @example 323200
+       */
+      income_total: number;
+      /**
+       * @description 定期支出合計（円）
+       * @example 96000
+       */
+      recurring_total: number;
+      /**
+       * @description 貯金合計（円）
+       * @example 45000
+       */
+      savings_total: number;
+      /**
+       * @description 変動費予算 = 収入 − 定期支出 − 貯金（円）
+       * @example 182200
+       */
+      variable_budget: number;
+      /**
+       * @description 1日あたりの予算（円）
+       * @example 6073
+       */
+      daily_budget: number;
+      /**
+       * @description 今月の残り日数
+       * @example 12
+       */
+      days_remaining: number;
+      history: components["schemas"]["BudgetHistoryItem"][];
+    };
+  };
+  responses: {
+    /** @description 認証失敗 */
+    Unauthorized: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        /**
+         * @example {
+         *       "code": "UNAUTHORIZED",
+         *       "message": "認証情報が不正です"
+         *     }
+         */
+        "application/json": components["schemas"]["ErrorResponse"];
+      };
+    };
+    /** @description サーバー内部エラー */
+    InternalServerError: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        /**
+         * @example {
+         *       "code": "INTERNAL_SERVER_ERROR",
+         *       "message": "予期しないエラーが発生しました"
+         *     }
+         */
+        "application/json": components["schemas"]["ErrorResponse"];
+      };
+    };
+  };
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    signup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SignupRequest"];
-            };
-        };
-        responses: {
-            /** @description 登録成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LoginResponse"];
-                };
-            };
-            /** @description 入力値が不正（メール形式・パスワード長など） */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "パスワードは8文字以上で入力してください"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description メールアドレスが登録済み */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "EMAIL_TAKEN",
-                     *       "message": "このメールアドレスは既に登録されています"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
-        };
+  signup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    login: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /**
-                     * Format: email
-                     * @example alice@example.com
-                     */
-                    email: string;
-                    /**
-                     * Format: password
-                     * @example correct horse
-                     */
-                    password: string;
-                };
-            };
-        };
-        responses: {
-            /** @description 認証成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LoginResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SignupRequest"];
+      };
     };
-    getCurrentUser: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description 登録成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
+        content: {
+          "application/json": components["schemas"]["LoginResponse"];
         };
+      };
+      /** @description 入力値が不正（メール形式・パスワード長など） */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "パスワードは8文字以上で入力してください"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description メールアドレスが登録済み */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "EMAIL_TAKEN",
+           *       "message": "このメールアドレスは既に登録されています"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
     };
-    changePassword: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PasswordChangeRequest"];
-            };
-        };
-        responses: {
-            /** @description 変更成功 */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description 現在のパスワード不一致、または新パスワードが要件未満 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "INVALID_CURRENT_PASSWORD",
-                     *       "message": "現在のパスワードが正しくありません"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  login: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    getDailyCumulative: {
-        parameters: {
-            query?: {
-                /**
-                 * @description 対象年月（YYYY-MM）。省略時は当月（JST）
-                 * @example 2025-04
-                 */
-                year_month?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody: {
+      content: {
+        "application/json": {
+          /**
+           * Format: email
+           * @example alice@example.com
+           */
+          email: string;
+          /**
+           * Format: password
+           * @example correct horse
+           */
+          password: string;
         };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "year_month": "2025-05",
-                     *       "monthly_budget": 150000,
-                     *       "daily_budget": 4839,
-                     *       "days": [
-                     *         {
-                     *           "date": "2025-05-01",
-                     *           "food": 3200,
-                     *           "other": 5100,
-                     *           "total": 8300,
-                     *           "is_actual": true
-                     *         },
-                     *         {
-                     *           "date": "2025-05-05",
-                     *           "food": 15000,
-                     *           "other": 20000,
-                     *           "total": 35000,
-                     *           "is_actual": true
-                     *         },
-                     *         {
-                     *           "date": "2025-05-06",
-                     *           "food": 18000,
-                     *           "other": 24000,
-                     *           "total": 42000,
-                     *           "is_actual": false
-                     *         },
-                     *         {
-                     *           "date": "2025-05-31",
-                     *           "food": 93000,
-                     *           "other": 124000,
-                     *           "total": 217000,
-                     *           "is_actual": false
-                     *         }
-                     *       ]
-                     *     }
-                     */
-                    "application/json": components["schemas"]["DailyCumulativeResponse"];
-                };
-            };
-            /** @description year_monthの形式不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "year_monthはYYYY-MM形式で指定してください"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+      };
     };
-    getMonthlyBreakdown: {
-        parameters: {
-            query: {
-                /**
-                 * @description 対象年月（YYYY-MM）
-                 * @example 2025-04
-                 */
-                year_month: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description 認証成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "year_month": "2025-04",
-                     *       "breakdown": [
-                     *         {
-                     *           "category_id": 1,
-                     *           "category_name": "スーパー",
-                     *           "group_id": 1,
-                     *           "group_name": "食費",
-                     *           "statement_type_id": 1,
-                     *           "statement_type_name": "食費（変動費）",
-                     *           "total": 24800
-                     *         },
-                     *         {
-                     *           "category_id": 2,
-                     *           "category_name": "外食",
-                     *           "group_id": 1,
-                     *           "group_name": "食費",
-                     *           "statement_type_id": 3,
-                     *           "statement_type_name": "対象外",
-                     *           "total": 15000
-                     *         }
-                     *       ]
-                     *     }
-                     */
-                    "application/json": components["schemas"]["MonthlyBreakdownResponse"];
-                };
-            };
-            /** @description year_monthの形式不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "year_monthはYYYY-MM形式で指定してください"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
+        content: {
+          "application/json": components["schemas"]["LoginResponse"];
         };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
     };
-    getCategoryGroups: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "category_groups": [
-                     *         {
-                     *           "id": 1,
-                     *           "group_name": "食費",
-                     *           "statement_type": {
-                     *             "id": 1,
-                     *             "type_code": "food",
-                     *             "statement_type_name": "食費"
-                     *           },
-                     *           "description": "日常の食費全般"
-                     *         },
-                     *         {
-                     *           "id": 2,
-                     *           "group_name": "交通費",
-                     *           "statement_type": {
-                     *             "id": 2,
-                     *             "type_code": "other",
-                     *             "statement_type_name": "その他"
-                     *           },
-                     *           "description": null
-                     *         }
-                     *       ]
-                     *     }
-                     */
-                    "application/json": components["schemas"]["CategoryGroupListResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  getCurrentUser: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    createCategoryGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "group_name": "日用品",
-                 *       "statement_type_id": 2,
-                 *       "description": "シャンプーや洗剤など"
-                 *     }
-                 */
-                "application/json": components["schemas"]["CategoryGroupRequest"];
-            };
+        content: {
+          "application/json": components["schemas"]["UserResponse"];
         };
-        responses: {
-            /** @description 作成成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "id": 3,
-                     *       "group_name": "日用品",
-                     *       "statement_type": {
-                     *         "id": 2,
-                     *         "type_code": "other",
-                     *         "statement_type_name": "その他"
-                     *       },
-                     *       "description": "シャンプーや洗剤など"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["CategoryGroup"];
-                };
-            };
-            /** @description リクエスト不正（必須項目欠落・statement_type_idが存在しないなど） */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "group_nameは必須です"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 大分類名が重複している */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "CONFLICT",
-                     *       "message": "同名の大分類が既に存在します"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
-        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
     };
-    updateCategoryGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description 大分類ID
-                 * @example 3
-                 */
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "group_name": "日用品・消耗品",
-                 *       "statement_type_id": 2,
-                 *       "description": "シャンプーや洗剤など"
-                 *     }
-                 */
-                "application/json": components["schemas"]["CategoryGroupRequest"];
-            };
-        };
-        responses: {
-            /** @description 更新成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "id": 3,
-                     *       "group_name": "日用品・消耗品",
-                     *       "statement_type": {
-                     *         "id": 2,
-                     *         "type_code": "other",
-                     *         "statement_type_name": "その他"
-                     *       },
-                     *       "description": "シャンプーや洗剤など"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["CategoryGroup"];
-                };
-            };
-            /** @description リクエスト不正（必須項目欠落・statement_type_idが存在しないなど） */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "group_nameは必須です"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 指定した大分類が存在しない（論理削除済み・他ユーザーのリソースを含む） */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "NOT_FOUND",
-                     *       "message": "大分類が見つかりません"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description 変更後の大分類名が既存と重複している */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "CONFLICT",
-                     *       "message": "同名の大分類が既に存在します"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  changePassword: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    deleteCategoryGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description 大分類ID
-                 * @example 3
-                 */
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 削除成功（ボディなし） */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description 紐づく生活区分が存在するため削除不可 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "紐づく生活区分が存在するため削除できません"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 指定した大分類が存在しない（論理削除済み・他ユーザーのリソースを含む） */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "NOT_FOUND",
-                     *       "message": "大分類が見つかりません"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PasswordChangeRequest"];
+      };
     };
-    getExpenseCategories: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description 変更成功 */
+      204: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "expense_categories": [
-                     *         {
-                     *           "id": 1,
-                     *           "category_name": "スーパー",
-                     *           "category_code": "food_super",
-                     *           "group_id": 1,
-                     *           "group_name": "食費",
-                     *           "description": null
-                     *         },
-                     *         {
-                     *           "id": 2,
-                     *           "category_name": "外食",
-                     *           "category_code": "food_eat_out",
-                     *           "group_id": 1,
-                     *           "group_name": "食費",
-                     *           "description": "レストラン・カフェ等"
-                     *         },
-                     *         {
-                     *           "id": 3,
-                     *           "category_name": "電車・バス",
-                     *           "category_code": null,
-                     *           "group_id": 2,
-                     *           "group_name": "交通費",
-                     *           "description": null
-                     *         }
-                     *       ]
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ExpenseCategoryListResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
+        content?: never;
+      };
+      /** @description 現在のパスワード不一致、または新パスワードが要件未満 */
+      400: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          /**
+           * @example {
+           *       "code": "INVALID_CURRENT_PASSWORD",
+           *       "message": "現在のパスワードが正しくありません"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
     };
-    createExpenseCategory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "category_name": "ドラッグストア",
-                 *       "group_id": 3,
-                 *       "description": "日用品の購入など"
-                 *     }
-                 */
-                "application/json": components["schemas"]["ExpenseCategoryRequest"];
-            };
-        };
-        responses: {
-            /** @description 作成成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "id": 10,
-                     *       "category_name": "ドラッグストア",
-                     *       "category_code": null,
-                     *       "group_id": 3,
-                     *       "group_name": "日用品・消耗品",
-                     *       "description": "日用品の購入など"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ExpenseCategory"];
-                };
-            };
-            /** @description リクエスト不正（必須項目欠落・group_idが存在しないなど） */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "category_nameは必須です"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 同一大分類内で生活区分名が重複している */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "CONFLICT",
-                     *       "message": "同名の生活区分が既に存在します"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  getDailyCumulative: {
+    parameters: {
+      query?: {
+        /**
+         * @description 対象年月（YYYY-MM）。省略時は当月（JST）
+         * @example 2025-04
+         */
+        year_month?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    updateExpenseCategory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description 生活区分ID
-                 * @example 10
-                 */
-                id: number;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "category_name": "ドラッグストア・薬局",
-                 *       "group_id": 3,
-                 *       "description": "日用品の購入など"
-                 *     }
-                 */
-                "application/json": components["schemas"]["ExpenseCategoryRequest"];
-            };
+        content: {
+          /**
+           * @example {
+           *       "year_month": "2025-05",
+           *       "monthly_budget": 150000,
+           *       "daily_budget": 4839,
+           *       "days": [
+           *         {
+           *           "date": "2025-05-01",
+           *           "food": 3200,
+           *           "other": 5100,
+           *           "total": 8300,
+           *           "is_actual": true
+           *         },
+           *         {
+           *           "date": "2025-05-05",
+           *           "food": 15000,
+           *           "other": 20000,
+           *           "total": 35000,
+           *           "is_actual": true
+           *         },
+           *         {
+           *           "date": "2025-05-06",
+           *           "food": 18000,
+           *           "other": 24000,
+           *           "total": 42000,
+           *           "is_actual": false
+           *         },
+           *         {
+           *           "date": "2025-05-31",
+           *           "food": 93000,
+           *           "other": 124000,
+           *           "total": 217000,
+           *           "is_actual": false
+           *         }
+           *       ]
+           *     }
+           */
+          "application/json": components["schemas"]["DailyCumulativeResponse"];
         };
-        responses: {
-            /** @description 更新成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "id": 10,
-                     *       "category_name": "ドラッグストア・薬局",
-                     *       "category_code": null,
-                     *       "group_id": 3,
-                     *       "group_name": "日用品・消耗品",
-                     *       "description": "日用品の購入など"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ExpenseCategory"];
-                };
-            };
-            /** @description リクエスト不正（必須項目欠落・group_idが存在しないなど） */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "category_nameは必須です"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 指定した生活区分が存在しない（論理削除済み・他ユーザーのリソースを含む） */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "NOT_FOUND",
-                     *       "message": "生活区分が見つかりません"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description 変更後の生活区分名が同一大分類内で重複している */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "CONFLICT",
-                     *       "message": "同名の生活区分が既に存在します"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
+      };
+      /** @description year_monthの形式不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "year_monthはYYYY-MM形式で指定してください"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
     };
-    deleteExpenseCategory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description 生活区分ID
-                 * @example 10
-                 */
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 削除成功（ボディなし） */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 指定した生活区分が存在しない（論理削除済み・他ユーザーのリソースを含む） */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "NOT_FOUND",
-                     *       "message": "生活区分が見つかりません"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  getMonthlyBreakdown: {
+    parameters: {
+      query: {
+        /**
+         * @description 対象年月（YYYY-MM）
+         * @example 2025-04
+         */
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    getStatementTypes: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "statement_types": [
-                     *         {
-                     *           "id": 1,
-                     *           "type_code": "food",
-                     *           "statement_type_name": "食費"
-                     *         },
-                     *         {
-                     *           "id": 2,
-                     *           "type_code": "other",
-                     *           "statement_type_name": "その他"
-                     *         }
-                     *       ]
-                     *     }
-                     */
-                    "application/json": {
-                        statement_types: components["schemas"]["StatementTypeSummary"][];
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
+        content: {
+          /**
+           * @example {
+           *       "year_month": "2025-04",
+           *       "breakdown": [
+           *         {
+           *           "category_id": 1,
+           *           "category_name": "スーパー",
+           *           "group_id": 1,
+           *           "group_name": "食費",
+           *           "statement_type_id": 1,
+           *           "statement_type_name": "食費（変動費）",
+           *           "total": 24800
+           *         },
+           *         {
+           *           "category_id": 2,
+           *           "category_name": "外食",
+           *           "group_id": 1,
+           *           "group_name": "食費",
+           *           "statement_type_id": 3,
+           *           "statement_type_name": "対象外",
+           *           "total": 15000
+           *         }
+           *       ]
+           *     }
+           */
+          "application/json": components["schemas"]["MonthlyBreakdownResponse"];
         };
+      };
+      /** @description year_monthの形式不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "year_monthはYYYY-MM形式で指定してください"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
     };
-    getBudgets: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "monthly_budget": 150000,
-                     *       "goal_text": "夏までに旅行費を貯める",
-                     *       "goal_amount": 300000
-                     *     }
-                     */
-                    "application/json": components["schemas"]["BudgetResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  getCategoryGroups: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    updateBudgets: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "monthly_budget": 120000,
-                 *       "goal_text": "夏までに旅行費を貯める",
-                 *       "goal_amount": 300000
-                 *     }
-                 */
-                "application/json": components["schemas"]["BudgetRequest"];
-            };
+        content: {
+          /**
+           * @example {
+           *       "category_groups": [
+           *         {
+           *           "id": 1,
+           *           "group_name": "食費",
+           *           "statement_type": {
+           *             "id": 1,
+           *             "type_code": "food",
+           *             "statement_type_name": "食費"
+           *           },
+           *           "description": "日常の食費全般"
+           *         },
+           *         {
+           *           "id": 2,
+           *           "group_name": "交通費",
+           *           "statement_type": {
+           *             "id": 2,
+           *             "type_code": "other",
+           *             "statement_type_name": "その他"
+           *           },
+           *           "description": null
+           *         }
+           *       ]
+           *     }
+           */
+          "application/json": components["schemas"]["CategoryGroupListResponse"];
         };
-        responses: {
-            /** @description 更新成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "monthly_budget": 120000,
-                     *       "goal_text": "夏までに旅行費を貯める",
-                     *       "goal_amount": 300000
-                     *     }
-                     */
-                    "application/json": components["schemas"]["BudgetResponse"];
-                };
-            };
-            /** @description リクエスト不正（monthly_budgetが0以下など） */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "monthly_budgetは1以上の整数である必要があります"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
     };
-    getJournalEntries: {
-        parameters: {
-            query: {
-                /**
-                 * @description 対象年月（YYYY-MM）
-                 * @example 2025-05
-                 */
-                year_month: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "year_month": "2025-05",
-                     *       "entries": [
-                     *         {
-                     *           "date": "2025-05-05",
-                     *           "journal_entries": [
-                     *             {
-                     *               "id": 43,
-                     *               "transaction_date": "2025-05-05",
-                     *               "item": "ランチ",
-                     *               "amount": 1200,
-                     *               "category_id": 2,
-                     *               "category_name": "外食",
-                     *               "group_id": 1,
-                     *               "group_name": "食費",
-                     *               "is_excluded": false,
-                     *               "note": null,
-                     *               "created_at": "2025-05-05T13:00:00Z"
-                     *             },
-                     *             {
-                     *               "id": 42,
-                     *               "transaction_date": "2025-05-05",
-                     *               "item": "コンビニ",
-                     *               "amount": 650,
-                     *               "category_id": 1,
-                     *               "category_name": "スーパー",
-                     *               "group_id": 1,
-                     *               "group_name": "食費",
-                     *               "is_excluded": false,
-                     *               "note": "昼飯",
-                     *               "created_at": "2025-05-05T12:34:56Z"
-                     *             }
-                     *           ]
-                     *         },
-                     *         {
-                     *           "date": "2025-05-03",
-                     *           "journal_entries": [
-                     *             {
-                     *               "id": 41,
-                     *               "transaction_date": "2025-05-03",
-                     *               "item": "電車代",
-                     *               "amount": 480,
-                     *               "category_id": 5,
-                     *               "category_name": "電車・バス",
-                     *               "group_id": 2,
-                     *               "group_name": "交通費",
-                     *               "is_excluded": false,
-                     *               "note": null,
-                     *               "created_at": "2025-05-03T09:10:00Z"
-                     *             }
-                     *           ]
-                     *         }
-                     *       ]
-                     *     }
-                     */
-                    "application/json": components["schemas"]["JournalEntryListResponse"];
-                };
-            };
-            /** @description year_monthの形式不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "year_monthはYYYY-MM形式で指定してください"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  createCategoryGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    createJournalEntry: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "transaction_date": "2025-05-05",
-                 *       "item": "コンビニ",
-                 *       "amount": 650,
-                 *       "category_id": 1,
-                 *       "is_excluded": true,
-                 *       "note": "昼飯"
-                 *     }
-                 */
-                "application/json": components["schemas"]["JournalEntryRequest"];
-            };
-        };
-        responses: {
-            /** @description 登録成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "id": 42,
-                     *       "transaction_date": "2025-05-05",
-                     *       "item": "コンビニ",
-                     *       "amount": 650,
-                     *       "category_id": 1,
-                     *       "category_name": "スーパー",
-                     *       "group_id": 1,
-                     *       "group_name": "食費",
-                     *       "is_excluded": true,
-                     *       "note": "昼飯",
-                     *       "created_at": "2025-05-05T12:34:56Z"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["JournalEntryResponse"];
-                };
-            };
-            /** @description リクエスト不正（必須項目欠落・amountが0以下など） */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "amountは正の整数である必要があります"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "group_name": "日用品",
+         *       "statement_type_id": 2,
+         *       "description": "シャンプーや洗剤など"
+         *     }
+         */
+        "application/json": components["schemas"]["CategoryGroupRequest"];
+      };
     };
-    updateJournalEntry: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description 仕訳ID
-                 * @example 42
-                 */
-                id: number;
-            };
-            cookie?: never;
+    responses: {
+      /** @description 作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "transaction_date": "2025-05-05",
-                 *       "item": "コンビニ（修正）",
-                 *       "amount": 700,
-                 *       "category_id": 1,
-                 *       "is_excluded": false,
-                 *       "note": "昼飯のついでに買い物"
-                 *     }
-                 */
-                "application/json": components["schemas"]["JournalEntryRequest"];
-            };
+        content: {
+          /**
+           * @example {
+           *       "id": 3,
+           *       "group_name": "日用品",
+           *       "statement_type": {
+           *         "id": 2,
+           *         "type_code": "other",
+           *         "statement_type_name": "その他"
+           *       },
+           *       "description": "シャンプーや洗剤など"
+           *     }
+           */
+          "application/json": components["schemas"]["CategoryGroup"];
         };
-        responses: {
-            /** @description 更新成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "id": 42,
-                     *       "transaction_date": "2025-05-05",
-                     *       "item": "コンビニ（修正）",
-                     *       "amount": 700,
-                     *       "category_id": 1,
-                     *       "category_name": "スーパー",
-                     *       "group_id": 1,
-                     *       "group_name": "食費",
-                     *       "is_excluded": false,
-                     *       "note": "昼飯のついでに買い物",
-                     *       "created_at": "2025-05-05T12:34:56Z"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["JournalEntryResponse"];
-                };
-            };
-            /** @description リクエスト不正（必須項目欠落・amountが0以下など） */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "amountは正の整数である必要があります"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 指定した仕訳が存在しない（論理削除済み・他ユーザーのリソースを含む） */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "NOT_FOUND",
-                     *       "message": "仕訳が見つかりません"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
+      };
+      /** @description リクエスト不正（必須項目欠落・statement_type_idが存在しないなど） */
+      400: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "group_nameは必須です"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 大分類名が重複している */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "CONFLICT",
+           *       "message": "同名の大分類が既に存在します"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
     };
-    deleteJournalEntry: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description 仕訳ID
-                 * @example 42
-                 */
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 削除成功（ボディなし） */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 指定した仕訳が存在しない（他ユーザーのリソースを含む） */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "NOT_FOUND",
-                     *       "message": "仕訳が見つかりません"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  updateCategoryGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /**
+         * @description 大分類ID
+         * @example 3
+         */
+        id: number;
+      };
+      cookie?: never;
     };
-    getMonthlyReviews: {
-        parameters: {
-            query: {
-                /**
-                 * @description 対象年月（YYYY-MM）
-                 * @example 2025-04
-                 */
-                year_month: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "year_month": "2025-04",
-                     *       "notes": [
-                     *         {
-                     *           "category_id": 1,
-                     *           "note": "スーパーで買いすぎた。特売につられがち"
-                     *         },
-                     *         {
-                     *           "category_id": 3,
-                     *           "note": "今月は外食少なめで頑張れた"
-                     *         }
-                     *       ]
-                     *     }
-                     */
-                    "application/json": components["schemas"]["MonthlyReviewResponse"];
-                };
-            };
-            /** @description year_monthの形式不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "year_monthはYYYY-MM形式で指定してください"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "group_name": "日用品・消耗品",
+         *       "statement_type_id": 2,
+         *       "description": "シャンプーや洗剤など"
+         *     }
+         */
+        "application/json": components["schemas"]["CategoryGroupRequest"];
+      };
     };
-    putMonthlyReviews: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "year_month": "2025-04",
-                 *       "notes": [
-                 *         {
-                 *           "category_id": 1,
-                 *           "note": "スーパーで買いすぎた。特売につられがち"
-                 *         },
-                 *         {
-                 *           "category_id": 3,
-                 *           "note": "今月は外食少なめで頑張れた"
-                 *         },
-                 *         {
-                 *           "category_id": 5,
-                 *           "note": ""
-                 *         }
-                 *       ]
-                 *     }
-                 */
-                "application/json": {
-                    /**
-                     * @description 対象年月（YYYY-MM）
-                     * @example 2025-04
-                     */
-                    year_month: string;
-                    /**
-                     * @description 生活区分ごとのメモ一覧。空配列で全件削除。
-                     *     `note` が空文字のエントリはサーバー側で除外する。
-                     */
-                    notes: components["schemas"]["MonthlyReviewNote"][];
-                };
-            };
+        content: {
+          /**
+           * @example {
+           *       "id": 3,
+           *       "group_name": "日用品・消耗品",
+           *       "statement_type": {
+           *         "id": 2,
+           *         "type_code": "other",
+           *         "statement_type_name": "その他"
+           *       },
+           *       "description": "シャンプーや洗剤など"
+           *     }
+           */
+          "application/json": components["schemas"]["CategoryGroup"];
         };
-        responses: {
-            /** @description 保存成功（空文字エントリは除外して返す） */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "year_month": "2025-04",
-                     *       "notes": [
-                     *         {
-                     *           "category_id": 1,
-                     *           "note": "スーパーで買いすぎた。特売につられがち"
-                     *         },
-                     *         {
-                     *           "category_id": 3,
-                     *           "note": "今月は外食少なめで頑張れた"
-                     *         }
-                     *       ]
-                     *     }
-                     */
-                    "application/json": components["schemas"]["MonthlyReviewResponse"];
-                };
-            };
-            /** @description リクエスト不正（year_month形式不正・必須項目欠落など） */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "year_monthはYYYY-MM形式で指定してください"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
+      };
+      /** @description リクエスト不正（必須項目欠落・statement_type_idが存在しないなど） */
+      400: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "group_nameは必須です"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 指定した大分類が存在しない（論理削除済み・他ユーザーのリソースを含む） */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "NOT_FOUND",
+           *       "message": "大分類が見つかりません"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 変更後の大分類名が既存と重複している */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "CONFLICT",
+           *       "message": "同名の大分類が既に存在します"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
     };
-    getDailyNotes: {
-        parameters: {
-            query: {
-                /**
-                 * @description 対象年月（YYYY-MM）
-                 * @example 2025-05
-                 */
-                year_month: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "year_month": "2025-05",
-                     *       "notes": [
-                     *         {
-                     *           "date": "2025-05-05",
-                     *           "note": "ディズニー行ったから出費多め"
-                     *         },
-                     *         {
-                     *           "date": "2025-05-03",
-                     *           "note": "飲み会"
-                     *         }
-                     *       ]
-                     *     }
-                     */
-                    "application/json": components["schemas"]["DailyNoteListResponse"];
-                };
-            };
-            /** @description year_monthの形式不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "year_monthはYYYY-MM形式で指定してください"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  deleteCategoryGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /**
+         * @description 大分類ID
+         * @example 3
+         */
+        id: number;
+      };
+      cookie?: never;
     };
-    putDailyNote: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description 対象日付（YYYY-MM-DD）
-                 * @example 2025-05-05
-                 */
-                date: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description 削除成功（ボディなし） */
+      204: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "note": "ディズニー行ったから出費多め"
-                 *     }
-                 */
-                "application/json": {
-                    /**
-                     * @description コメントテキスト。空文字で削除扱い（レコードを物理削除し、nullを返す）
-                     * @example ディズニー行ったから出費多め
-                     */
-                    note: string;
-                };
-            };
+        content?: never;
+      };
+      /** @description 紐づく生活区分が存在するため削除不可 */
+      400: {
+        headers: {
+          [name: string]: unknown;
         };
-        responses: {
-            /** @description 保存成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DailyNote"];
-                };
-            };
-            /** @description リクエスト不正（dateの形式不正・必須項目欠落など） */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "code": "BAD_REQUEST",
-                     *       "message": "dateはYYYY-MM-DD形式で指定してください"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "紐づく生活区分が存在するため削除できません"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
         };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 指定した大分類が存在しない（論理削除済み・他ユーザーのリソースを含む） */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "NOT_FOUND",
+           *       "message": "大分類が見つかりません"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
     };
-    listRecurringExpenses: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RecurringExpenseListResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  getExpenseCategories: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    createRecurringExpense: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RecurringExpenseRequest"];
-            };
+        content: {
+          /**
+           * @example {
+           *       "expense_categories": [
+           *         {
+           *           "id": 1,
+           *           "category_name": "スーパー",
+           *           "category_code": "food_super",
+           *           "group_id": 1,
+           *           "group_name": "食費",
+           *           "description": null
+           *         },
+           *         {
+           *           "id": 2,
+           *           "category_name": "外食",
+           *           "category_code": "food_eat_out",
+           *           "group_id": 1,
+           *           "group_name": "食費",
+           *           "description": "レストラン・カフェ等"
+           *         },
+           *         {
+           *           "id": 3,
+           *           "category_name": "電車・バス",
+           *           "category_code": null,
+           *           "group_id": 2,
+           *           "group_name": "交通費",
+           *           "description": null
+           *         }
+           *       ]
+           *     }
+           */
+          "application/json": components["schemas"]["ExpenseCategoryListResponse"];
         };
-        responses: {
-            /** @description 作成成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RecurringExpense"];
-                };
-            };
-            /** @description 入力値不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
     };
-    listPendingRecurring: {
-        parameters: {
-            query: {
-                year_month: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PendingRecurringListResponse"];
-                };
-            };
-            /** @description 入力値不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  createExpenseCategory: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    updateRecurringExpense: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RecurringExpenseRequest"];
-            };
-        };
-        responses: {
-            /** @description 更新成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RecurringExpense"];
-                };
-            };
-            /** @description 入力値不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 存在しない */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
-        };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "category_name": "ドラッグストア",
+         *       "group_id": 3,
+         *       "description": "日用品の購入など"
+         *     }
+         */
+        "application/json": components["schemas"]["ExpenseCategoryRequest"];
+      };
     };
-    deleteRecurringExpense: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
+    responses: {
+      /** @description 作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description 削除成功 */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 存在しない */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
+        content: {
+          /**
+           * @example {
+           *       "id": 10,
+           *       "category_name": "ドラッグストア",
+           *       "category_code": null,
+           *       "group_id": 3,
+           *       "group_name": "日用品・消耗品",
+           *       "description": "日用品の購入など"
+           *     }
+           */
+          "application/json": components["schemas"]["ExpenseCategory"];
         };
+      };
+      /** @description リクエスト不正（必須項目欠落・group_idが存在しないなど） */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "category_nameは必須です"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 同一大分類内で生活区分名が重複している */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "CONFLICT",
+           *       "message": "同名の生活区分が既に存在します"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
     };
-    listSavingsGoals: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SavingsGoalListResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  updateExpenseCategory: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /**
+         * @description 生活区分ID
+         * @example 10
+         */
+        id: number;
+      };
+      cookie?: never;
     };
-    createSavingsGoal: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SavingsGoalRequest"];
-            };
-        };
-        responses: {
-            /** @description 作成成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SavingsGoal"];
-                };
-            };
-            /** @description 入力値不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "category_name": "ドラッグストア・薬局",
+         *       "group_id": 3,
+         *       "description": "日用品の購入など"
+         *     }
+         */
+        "application/json": components["schemas"]["ExpenseCategoryRequest"];
+      };
     };
-    updateSavingsGoal: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SavingsGoalRequest"];
-            };
+        content: {
+          /**
+           * @example {
+           *       "id": 10,
+           *       "category_name": "ドラッグストア・薬局",
+           *       "category_code": null,
+           *       "group_id": 3,
+           *       "group_name": "日用品・消耗品",
+           *       "description": "日用品の購入など"
+           *     }
+           */
+          "application/json": components["schemas"]["ExpenseCategory"];
         };
-        responses: {
-            /** @description 更新成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SavingsGoal"];
-                };
-            };
-            /** @description 入力値不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 存在しない */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
+      };
+      /** @description リクエスト不正（必須項目欠落・group_idが存在しないなど） */
+      400: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "category_nameは必須です"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 指定した生活区分が存在しない（論理削除済み・他ユーザーのリソースを含む） */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "NOT_FOUND",
+           *       "message": "生活区分が見つかりません"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 変更後の生活区分名が同一大分類内で重複している */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "CONFLICT",
+           *       "message": "同名の生活区分が既に存在します"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
     };
-    deleteSavingsGoal: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 削除成功 */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 存在しない */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  deleteExpenseCategory: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /**
+         * @description 生活区分ID
+         * @example 10
+         */
+        id: number;
+      };
+      cookie?: never;
     };
-    postMonthlySavings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description 削除成功（ボディなし） */
+      204: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": {
-                    amount: number;
-                    year_month: string;
-                };
-            };
+        content?: never;
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 指定した生活区分が存在しない（論理削除済み・他ユーザーのリソースを含む） */
+      404: {
+        headers: {
+          [name: string]: unknown;
         };
-        responses: {
-            /** @description 積立成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SavingsGoal"];
-                };
-            };
-            /** @description 入力値不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 存在しない */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
+        content: {
+          /**
+           * @example {
+           *       "code": "NOT_FOUND",
+           *       "message": "生活区分が見つかりません"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
         };
+      };
+      500: components["responses"]["InternalServerError"];
     };
-    listIncomeRecords: {
-        parameters: {
-            query: {
-                year_month: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncomeRecordListResponse"];
-                };
-            };
-            /** @description 入力値不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  getStatementTypes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    createIncomeRecord: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IncomeRecordRequest"];
-            };
+        content: {
+          /**
+           * @example {
+           *       "statement_types": [
+           *         {
+           *           "id": 1,
+           *           "type_code": "food",
+           *           "statement_type_name": "食費"
+           *         },
+           *         {
+           *           "id": 2,
+           *           "type_code": "other",
+           *           "statement_type_name": "その他"
+           *         }
+           *       ]
+           *     }
+           */
+          "application/json": {
+            statement_types: components["schemas"]["StatementTypeSummary"][];
+          };
         };
-        responses: {
-            /** @description 作成成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncomeRecord"];
-                };
-            };
-            /** @description 入力値不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
     };
-    updateIncomeRecord: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IncomeRecordRequest"];
-            };
-        };
-        responses: {
-            /** @description 更新成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncomeRecord"];
-                };
-            };
-            /** @description 入力値不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 存在しない */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  getBudgets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    deleteIncomeRecord: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description 削除成功 */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description 存在しない */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            500: components["responses"]["InternalServerError"];
+        content: {
+          /**
+           * @example {
+           *       "monthly_budget": 150000,
+           *       "goal_text": "夏までに旅行費を貯める",
+           *       "goal_amount": 300000
+           *     }
+           */
+          "application/json": components["schemas"]["BudgetResponse"];
         };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
     };
-    getBaseIncome: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseIncomeSetting"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+  };
+  updateBudgets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    updateBaseIncome: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BaseIncomeSetting"];
-            };
-        };
-        responses: {
-            /** @description 更新成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseIncomeSetting"];
-                };
-            };
-            /** @description 入力値不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
-        };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "monthly_budget": 120000,
+         *       "goal_text": "夏までに旅行費を貯める",
+         *       "goal_amount": 300000
+         *     }
+         */
+        "application/json": components["schemas"]["BudgetRequest"];
+      };
     };
-    getBudgetSummary: {
-        parameters: {
-            query: {
-                year_month: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description 取得成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BudgetSummaryResponse"];
-                };
-            };
-            /** @description 入力値不正 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            500: components["responses"]["InternalServerError"];
+        content: {
+          /**
+           * @example {
+           *       "monthly_budget": 120000,
+           *       "goal_text": "夏までに旅行費を貯める",
+           *       "goal_amount": 300000
+           *     }
+           */
+          "application/json": components["schemas"]["BudgetResponse"];
         };
+      };
+      /** @description リクエスト不正（monthly_budgetが0以下など） */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "monthly_budgetは1以上の整数である必要があります"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
     };
+  };
+  getJournalEntries: {
+    parameters: {
+      query: {
+        /**
+         * @description 対象年月（YYYY-MM）
+         * @example 2025-05
+         */
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "year_month": "2025-05",
+           *       "entries": [
+           *         {
+           *           "date": "2025-05-05",
+           *           "journal_entries": [
+           *             {
+           *               "id": 43,
+           *               "transaction_date": "2025-05-05",
+           *               "item": "ランチ",
+           *               "amount": 1200,
+           *               "category_id": 2,
+           *               "category_name": "外食",
+           *               "group_id": 1,
+           *               "group_name": "食費",
+           *               "is_excluded": false,
+           *               "note": null,
+           *               "created_at": "2025-05-05T13:00:00Z"
+           *             },
+           *             {
+           *               "id": 42,
+           *               "transaction_date": "2025-05-05",
+           *               "item": "コンビニ",
+           *               "amount": 650,
+           *               "category_id": 1,
+           *               "category_name": "スーパー",
+           *               "group_id": 1,
+           *               "group_name": "食費",
+           *               "is_excluded": false,
+           *               "note": "昼飯",
+           *               "created_at": "2025-05-05T12:34:56Z"
+           *             }
+           *           ]
+           *         },
+           *         {
+           *           "date": "2025-05-03",
+           *           "journal_entries": [
+           *             {
+           *               "id": 41,
+           *               "transaction_date": "2025-05-03",
+           *               "item": "電車代",
+           *               "amount": 480,
+           *               "category_id": 5,
+           *               "category_name": "電車・バス",
+           *               "group_id": 2,
+           *               "group_name": "交通費",
+           *               "is_excluded": false,
+           *               "note": null,
+           *               "created_at": "2025-05-03T09:10:00Z"
+           *             }
+           *           ]
+           *         }
+           *       ]
+           *     }
+           */
+          "application/json": components["schemas"]["JournalEntryListResponse"];
+        };
+      };
+      /** @description year_monthの形式不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "year_monthはYYYY-MM形式で指定してください"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  createJournalEntry: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "transaction_date": "2025-05-05",
+         *       "item": "コンビニ",
+         *       "amount": 650,
+         *       "category_id": 1,
+         *       "is_excluded": true,
+         *       "note": "昼飯"
+         *     }
+         */
+        "application/json": components["schemas"]["JournalEntryRequest"];
+      };
+    };
+    responses: {
+      /** @description 登録成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "id": 42,
+           *       "transaction_date": "2025-05-05",
+           *       "item": "コンビニ",
+           *       "amount": 650,
+           *       "category_id": 1,
+           *       "category_name": "スーパー",
+           *       "group_id": 1,
+           *       "group_name": "食費",
+           *       "is_excluded": true,
+           *       "note": "昼飯",
+           *       "created_at": "2025-05-05T12:34:56Z"
+           *     }
+           */
+          "application/json": components["schemas"]["JournalEntryResponse"];
+        };
+      };
+      /** @description リクエスト不正（必須項目欠落・amountが0以下など） */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "amountは正の整数である必要があります"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  updateJournalEntry: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /**
+         * @description 仕訳ID
+         * @example 42
+         */
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "transaction_date": "2025-05-05",
+         *       "item": "コンビニ（修正）",
+         *       "amount": 700,
+         *       "category_id": 1,
+         *       "is_excluded": false,
+         *       "note": "昼飯のついでに買い物"
+         *     }
+         */
+        "application/json": components["schemas"]["JournalEntryRequest"];
+      };
+    };
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "id": 42,
+           *       "transaction_date": "2025-05-05",
+           *       "item": "コンビニ（修正）",
+           *       "amount": 700,
+           *       "category_id": 1,
+           *       "category_name": "スーパー",
+           *       "group_id": 1,
+           *       "group_name": "食費",
+           *       "is_excluded": false,
+           *       "note": "昼飯のついでに買い物",
+           *       "created_at": "2025-05-05T12:34:56Z"
+           *     }
+           */
+          "application/json": components["schemas"]["JournalEntryResponse"];
+        };
+      };
+      /** @description リクエスト不正（必須項目欠落・amountが0以下など） */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "amountは正の整数である必要があります"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 指定した仕訳が存在しない（論理削除済み・他ユーザーのリソースを含む） */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "NOT_FOUND",
+           *       "message": "仕訳が見つかりません"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  deleteJournalEntry: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /**
+         * @description 仕訳ID
+         * @example 42
+         */
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 削除成功（ボディなし） */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 指定した仕訳が存在しない（他ユーザーのリソースを含む） */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "NOT_FOUND",
+           *       "message": "仕訳が見つかりません"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  getMonthlyReviews: {
+    parameters: {
+      query: {
+        /**
+         * @description 対象年月（YYYY-MM）
+         * @example 2025-04
+         */
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "year_month": "2025-04",
+           *       "notes": [
+           *         {
+           *           "category_id": 1,
+           *           "note": "スーパーで買いすぎた。特売につられがち"
+           *         },
+           *         {
+           *           "category_id": 3,
+           *           "note": "今月は外食少なめで頑張れた"
+           *         }
+           *       ]
+           *     }
+           */
+          "application/json": components["schemas"]["MonthlyReviewResponse"];
+        };
+      };
+      /** @description year_monthの形式不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "year_monthはYYYY-MM形式で指定してください"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  putMonthlyReviews: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "year_month": "2025-04",
+         *       "notes": [
+         *         {
+         *           "category_id": 1,
+         *           "note": "スーパーで買いすぎた。特売につられがち"
+         *         },
+         *         {
+         *           "category_id": 3,
+         *           "note": "今月は外食少なめで頑張れた"
+         *         },
+         *         {
+         *           "category_id": 5,
+         *           "note": ""
+         *         }
+         *       ]
+         *     }
+         */
+        "application/json": {
+          /**
+           * @description 対象年月（YYYY-MM）
+           * @example 2025-04
+           */
+          year_month: string;
+          /**
+           * @description 生活区分ごとのメモ一覧。空配列で全件削除。
+           *     `note` が空文字のエントリはサーバー側で除外する。
+           */
+          notes: components["schemas"]["MonthlyReviewNote"][];
+        };
+      };
+    };
+    responses: {
+      /** @description 保存成功（空文字エントリは除外して返す） */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "year_month": "2025-04",
+           *       "notes": [
+           *         {
+           *           "category_id": 1,
+           *           "note": "スーパーで買いすぎた。特売につられがち"
+           *         },
+           *         {
+           *           "category_id": 3,
+           *           "note": "今月は外食少なめで頑張れた"
+           *         }
+           *       ]
+           *     }
+           */
+          "application/json": components["schemas"]["MonthlyReviewResponse"];
+        };
+      };
+      /** @description リクエスト不正（year_month形式不正・必須項目欠落など） */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "year_monthはYYYY-MM形式で指定してください"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  getDailyNotes: {
+    parameters: {
+      query: {
+        /**
+         * @description 対象年月（YYYY-MM）
+         * @example 2025-05
+         */
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "year_month": "2025-05",
+           *       "notes": [
+           *         {
+           *           "date": "2025-05-05",
+           *           "note": "ディズニー行ったから出費多め"
+           *         },
+           *         {
+           *           "date": "2025-05-03",
+           *           "note": "飲み会"
+           *         }
+           *       ]
+           *     }
+           */
+          "application/json": components["schemas"]["DailyNoteListResponse"];
+        };
+      };
+      /** @description year_monthの形式不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "year_monthはYYYY-MM形式で指定してください"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  putDailyNote: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /**
+         * @description 対象日付（YYYY-MM-DD）
+         * @example 2025-05-05
+         */
+        date: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "note": "ディズニー行ったから出費多め"
+         *     }
+         */
+        "application/json": {
+          /**
+           * @description コメントテキスト。空文字で削除扱い（レコードを物理削除し、nullを返す）
+           * @example ディズニー行ったから出費多め
+           */
+          note: string;
+        };
+      };
+    };
+    responses: {
+      /** @description 保存成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DailyNote"];
+        };
+      };
+      /** @description リクエスト不正（dateの形式不正・必須項目欠落など） */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "code": "BAD_REQUEST",
+           *       "message": "dateはYYYY-MM-DD形式で指定してください"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  listRecurringExpenses: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RecurringExpenseListResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  createRecurringExpense: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RecurringExpenseRequest"];
+      };
+    };
+    responses: {
+      /** @description 作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RecurringExpense"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  listPendingRecurring: {
+    parameters: {
+      query: {
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PendingRecurringListResponse"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  updateRecurringExpense: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RecurringExpenseRequest"];
+      };
+    };
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RecurringExpense"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  deleteRecurringExpense: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 削除成功 */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  listSavingsGoals: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SavingsGoalListResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  createSavingsGoal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SavingsGoalRequest"];
+      };
+    };
+    responses: {
+      /** @description 作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SavingsGoal"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  updateSavingsGoal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SavingsGoalRequest"];
+      };
+    };
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SavingsGoal"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  deleteSavingsGoal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 削除成功 */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  postMonthlySavings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amount: number;
+          year_month: string;
+        };
+      };
+    };
+    responses: {
+      /** @description 積立成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SavingsGoal"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  listIncomeRecords: {
+    parameters: {
+      query: {
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncomeRecordListResponse"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  createIncomeRecord: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["IncomeRecordRequest"];
+      };
+    };
+    responses: {
+      /** @description 作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncomeRecord"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  updateIncomeRecord: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["IncomeRecordRequest"];
+      };
+    };
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncomeRecord"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  deleteIncomeRecord: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 削除成功 */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  getBaseIncome: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BaseIncomeSetting"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  updateBaseIncome: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BaseIncomeSetting"];
+      };
+    };
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BaseIncomeSetting"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  getBudgetSummary: {
+    parameters: {
+      query: {
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BudgetSummaryResponse"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
 }

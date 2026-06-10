@@ -437,9 +437,10 @@ function MobileTabBar({ active, onChange, onPlusClick, addTone = "coral" }: Mobi
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: addTone === "sage"
-                    ? `0 6px 0 ${T.sageDeep}, 0 12px 20px -8px rgba(123,196,164,0.5)`
-                    : `0 6px 0 ${T.coralDeep}, 0 12px 20px -8px rgba(242,107,63,0.5)`,
+                  boxShadow:
+                    addTone === "sage"
+                      ? `0 6px 0 ${T.sageDeep}, 0 12px 20px -8px rgba(123,196,164,0.5)`
+                      : `0 6px 0 ${T.coralDeep}, 0 12px 20px -8px rgba(242,107,63,0.5)`,
                 }}
               >
                 ＋
@@ -788,12 +789,16 @@ export default function App() {
 
         {active_tab === "review" && <ReviewScreen />}
 
-        {active_tab === "budget" && is_mobile && (() => {
-          if (budget_sub === "income")    return <MobileIncome    onBack={() => setBudgetSub("hub")} />;
-          if (budget_sub === "recurring") return <MobileRecurring onBack={() => setBudgetSub("hub")} />;
-          if (budget_sub === "savings")   return <MobileSavings   onBack={() => setBudgetSub("hub")} />;
-          return <MobileBudget onNavigate={(s) => setBudgetSub(s)} />;
-        })()}
+        {active_tab === "budget" &&
+          is_mobile &&
+          (() => {
+            if (budget_sub === "income") return <MobileIncome onBack={() => setBudgetSub("hub")} />;
+            if (budget_sub === "recurring")
+              return <MobileRecurring onBack={() => setBudgetSub("hub")} />;
+            if (budget_sub === "savings")
+              return <MobileSavings onBack={() => setBudgetSub("hub")} />;
+            return <MobileBudget onNavigate={(s) => setBudgetSub(s)} />;
+          })()}
         {active_tab === "budget" && !is_mobile && <BudgetSettings />}
 
         {active_tab === "master" && <MasterManagement />}
