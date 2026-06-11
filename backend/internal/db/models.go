@@ -37,6 +37,12 @@ type AccountTransaction struct {
 	Version         int32       `json:"version"`
 }
 
+type BaseIncomeSetting struct {
+	UserID    int32     `json:"user_id"`
+	Amount    int32     `json:"amount"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type Budget struct {
 	ID            int32     `json:"id"`
 	UserID        int32     `json:"user_id"`
@@ -83,18 +89,32 @@ type ExpenseCategory struct {
 	Version      int32      `json:"version"`
 }
 
-type JournalEntry struct {
+type IncomeRecord struct {
 	ID              int32       `json:"id"`
-	TransactionDate pgtype.Date `json:"transaction_date"`
-	Item            *string     `json:"item"`
-	Amount          int32       `json:"amount"`
-	IsExcluded      bool        `json:"is_excluded"`
-	CategoryID      int32       `json:"category_id"`
 	UserID          int32       `json:"user_id"`
-	Note            *string     `json:"note"`
+	TransactionDate pgtype.Date `json:"transaction_date"`
+	Amount          int32       `json:"amount"`
+	Name            string      `json:"name"`
+	IncomeType      string      `json:"income_type"`
+	Emoji           string      `json:"emoji"`
+	Note            string      `json:"note"`
 	CreatedAt       time.Time   `json:"created_at"`
 	UpdatedAt       time.Time   `json:"updated_at"`
-	Version         int32       `json:"version"`
+}
+
+type JournalEntry struct {
+	ID                 int32       `json:"id"`
+	TransactionDate    pgtype.Date `json:"transaction_date"`
+	Item               *string     `json:"item"`
+	Amount             int32       `json:"amount"`
+	IsExcluded         bool        `json:"is_excluded"`
+	CategoryID         int32       `json:"category_id"`
+	UserID             int32       `json:"user_id"`
+	Note               *string     `json:"note"`
+	CreatedAt          time.Time   `json:"created_at"`
+	UpdatedAt          time.Time   `json:"updated_at"`
+	Version            int32       `json:"version"`
+	RecurringExpenseID *int32      `json:"recurring_expense_id"`
 }
 
 type MonthlyReview struct {
@@ -104,6 +124,34 @@ type MonthlyReview struct {
 	Notes     []byte    `json:"notes"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type RecurringExpense struct {
+	ID         int32     `json:"id"`
+	UserID     int32     `json:"user_id"`
+	Name       string    `json:"name"`
+	Emoji      string    `json:"emoji"`
+	BillingDay int16     `json:"billing_day"`
+	Amount     *int32    `json:"amount"`
+	Type       string    `json:"type"`
+	CategoryID int32     `json:"category_id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type SavingsGoal struct {
+	ID                int32     `json:"id"`
+	UserID            int32     `json:"user_id"`
+	Name              string    `json:"name"`
+	Emoji             string    `json:"emoji"`
+	MonthlyAmount     int32     `json:"monthly_amount"`
+	TargetAmount      int32     `json:"target_amount"`
+	AccumulatedAmount int32     `json:"accumulated_amount"`
+	Deadline          *string   `json:"deadline"`
+	LastPostedMonth   *string   `json:"last_posted_month"`
+	Memo              string    `json:"memo"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type StatementType struct {

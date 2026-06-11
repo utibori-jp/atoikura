@@ -11,11 +11,16 @@ import { UserInfo } from "./components/UserInfo";
 import { MobileHome } from "./components/mobile/MobileHome";
 import { MobileJournal } from "./components/mobile/MobileJournal";
 import { MobileEntryForm } from "./components/mobile/MobileEntryForm";
+import { MobileBudget } from "./components/mobile/MobileBudget";
+import { MobileRecurring } from "./components/mobile/MobileRecurring";
+import { MobileSavings } from "./components/mobile/MobileSavings";
+import { MobileIncome } from "./components/mobile/MobileIncome";
 import { api, AuthError, token_store } from "./api/client";
 import type { components } from "./api/types";
 import { T } from "./theme";
 
 type Tab = "home" | "list" | "budget" | "master" | "review" | "account";
+type BudgetSubScreen = "hub" | "income" | "recurring" | "savings";
 type UserProfile = components["schemas"]["UserResponse"];
 type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
 
@@ -74,7 +79,7 @@ const MOBILE_TAB_ITEMS: { id: Tab | "add"; label: string; emoji: string }[] = [
   { id: "review", label: "振り返り", emoji: "📖" },
   { id: "add", label: "", emoji: "＋" },
   { id: "list", label: "仕訳", emoji: "📝" },
-  { id: "budget", label: "目標", emoji: "🎯" },
+  { id: "budget", label: "予算", emoji: "💰" },
 ];
 
 function currentMonthJST(): string {
@@ -383,9 +388,10 @@ interface MobileTabBarProps {
   active: Tab;
   onChange: (tab: Tab) => void;
   onPlusClick: () => void;
+  addTone?: "coral" | "sage";
 }
 
-function MobileTabBar({ active, onChange, onPlusClick }: MobileTabBarProps) {
+function MobileTabBar({ active, onChange, onPlusClick, addTone = "coral" }: MobileTabBarProps) {
   return (
     <div
       style={{
@@ -422,7 +428,7 @@ function MobileTabBar({ active, onChange, onPlusClick }: MobileTabBarProps) {
                   width: 58,
                   height: 58,
                   borderRadius: 20,
-                  background: T.coral,
+                  background: addTone === "sage" ? T.sage : T.coral,
                   color: "#fff",
                   fontSize: 30,
                   fontWeight: 300,
@@ -431,7 +437,10 @@ function MobileTabBar({ active, onChange, onPlusClick }: MobileTabBarProps) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: `0 6px 0 ${T.coralDeep}, 0 12px 20px -8px rgba(242,107,63,0.5)`,
+                  boxShadow:
+                    addTone === "sage"
+                      ? `0 6px 0 ${T.sageDeep}, 0 12px 20px -8px rgba(123,196,164,0.5)`
+                      : `0 6px 0 ${T.coralDeep}, 0 12px 20px -8px rgba(242,107,63,0.5)`,
                 }}
               >
                 ＋
@@ -577,6 +586,7 @@ export default function App() {
     token_store.load() ? { status: "checking" } : { status: "anonymous" }
   );
   const [active_tab, setActiveTab] = useState<Tab>("home");
+  const [budget_sub, setBudgetSub] = useState<BudgetSubScreen>("hub");
   const [refresh_token, setRefreshToken] = useState(0);
   const [list_year_month, setListYearMonth] = useState(currentMonthJST());
   const [show_entry_sheet, setShowEntrySheet] = useState(false);
@@ -779,7 +789,17 @@ export default function App() {
 
         {active_tab === "review" && <ReviewScreen />}
 
-        {active_tab === "budget" && <BudgetSettings />}
+        {active_tab === "budget" &&
+          is_mobile &&
+          (() => {
+            if (budget_sub === "income") return <MobileIncome onBack={() => setBudgetSub("hub")} />;
+            if (budget_sub === "recurring")
+              return <MobileRecurring onBack={() => setBudgetSub("hub")} />;
+            if (budget_sub === "savings")
+              return <MobileSavings onBack={() => setBudgetSub("hub")} />;
+            return <MobileBudget onNavigate={(s) => setBudgetSub(s)} />;
+          })()}
+        {active_tab === "budget" && !is_mobile && <BudgetSettings />}
 
         {active_tab === "master" && <MasterManagement />}
 
@@ -789,11 +809,15 @@ export default function App() {
       {is_mobile && (
         <MobileTabBar
           active={active_tab}
-          onChange={setActiveTab}
+          onChange={(tab) => {
+            if (tab !== "budget") setBudgetSub("hub");
+            setActiveTab(tab);
+          }}
           onPlusClick={() => {
             setEditEntry(null);
             setShowEntrySheet(true);
           }}
+          addTone={active_tab === "budget" && budget_sub === "income" ? "sage" : "coral"}
         />
       )}
 

@@ -645,6 +645,309 @@ components:
           minLength: 8
           description: 新しいパスワード（8文字以上）
 
+    RecurringExpense:
+      type: object
+      required: [id, name, emoji, billing_day, type, category_id, group_id, group_name, category_name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          maxLength: 50
+          example: "家賃"
+        emoji:
+          type: string
+          example: "🏠"
+        billing_day:
+          type: integer
+          minimum: 1
+          maximum: 31
+          description: 引落日（毎月何日か）
+          example: 25
+        amount:
+          type: [integer, "null"]
+          description: 金額（円）。nullの場合は毎月変動
+          example: 80000
+        type:
+          type: string
+          enum: [fixed, variable]
+          description: fixed=金額固定, variable=毎月要確認
+          example: "fixed"
+        category_id:
+          type: integer
+          example: 15
+        group_id:
+          type: integer
+          example: 7
+        group_name:
+          type: string
+          example: "固定費"
+        category_name:
+          type: string
+          example: "家賃"
+
+    RecurringExpenseRequest:
+      type: object
+      required: [name, emoji, billing_day, type, category_id]
+      properties:
+        name:
+          type: string
+          maxLength: 50
+          example: "家賃"
+        emoji:
+          type: string
+          example: "🏠"
+        billing_day:
+          type: integer
+          minimum: 1
+          maximum: 31
+          example: 25
+        amount:
+          type: [integer, "null"]
+          example: 80000
+        type:
+          type: string
+          enum: [fixed, variable]
+          example: "fixed"
+        category_id:
+          type: integer
+          example: 15
+
+    RecurringExpenseListResponse:
+      type: object
+      required: [recurring_expenses]
+      properties:
+        recurring_expenses:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecurringExpense'
+
+    PendingRecurring:
+      type: object
+      required: [id, name, emoji, billing_day, last_amount, group_name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: "電気代"
+        emoji:
+          type: string
+          example: "💡"
+        billing_day:
+          type: integer
+          example: 10
+        last_amount:
+          type: integer
+          description: 前回記録した金額（円）
+          example: 7480
+        group_name:
+          type: string
+          example: "固定費"
+
+    PendingRecurringListResponse:
+      type: object
+      required: [pending]
+      properties:
+        pending:
+          type: array
+          items:
+            $ref: '#/components/schemas/PendingRecurring'
+
+    SavingsGoal:
+      type: object
+      required: [id, name, emoji, monthly_amount, target_amount, accumulated_amount, memo, is_posted_this_month]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          maxLength: 50
+          example: "旅行積立"
+        emoji:
+          type: string
+          example: "✈️"
+        monthly_amount:
+          type: integer
+          description: 毎月の積立額（円）
+          example: 20000
+        target_amount:
+          type: integer
+          description: 目標金額（円）
+          example: 250000
+        accumulated_amount:
+          type: integer
+          description: 現在の積立済み金額（円）
+          example: 170000
+        deadline:
+          type: [string, "null"]
+          description: 目標期限（YYYY/MM形式）。未設定はnull
+          example: "2027/03"
+        memo:
+          type: string
+          example: "北海道旅行：新幹線とホテル代"
+        is_posted_this_month:
+          type: boolean
+          description: 今月分の積立が済んでいるか
+          example: true
+
+    SavingsGoalRequest:
+      type: object
+      required: [name, emoji, monthly_amount, target_amount]
+      properties:
+        name:
+          type: string
+          maxLength: 50
+          example: "旅行積立"
+        emoji:
+          type: string
+          example: "✈️"
+        monthly_amount:
+          type: integer
+          minimum: 0
+          example: 20000
+        target_amount:
+          type: integer
+          minimum: 0
+          example: 250000
+        deadline:
+          type: [string, "null"]
+          example: "2027/03"
+        memo:
+          type: string
+          example: "北海道旅行：新幹線とホテル代"
+
+    SavingsGoalListResponse:
+      type: object
+      required: [savings_goals]
+      properties:
+        savings_goals:
+          type: array
+          items:
+            $ref: '#/components/schemas/SavingsGoal'
+
+    IncomeRecord:
+      type: object
+      required: [id, transaction_date, amount, name, income_type, emoji, note]
+      properties:
+        id:
+          type: integer
+        transaction_date:
+          type: string
+          format: date
+          example: "2026-05-25"
+        amount:
+          type: integer
+          example: 280000
+        name:
+          type: string
+          maxLength: 50
+          example: "6月給与"
+        income_type:
+          type: string
+          enum: [salary, side, bonus, oneoff]
+          example: "salary"
+        emoji:
+          type: string
+          example: "🏢"
+        note:
+          type: string
+          example: ""
+
+    IncomeRecordRequest:
+      type: object
+      required: [transaction_date, amount, name, income_type, emoji]
+      properties:
+        transaction_date:
+          type: string
+          format: date
+          example: "2026-05-25"
+        amount:
+          type: integer
+          minimum: 1
+          example: 280000
+        name:
+          type: string
+          maxLength: 50
+          example: "6月給与"
+        income_type:
+          type: string
+          enum: [salary, side, bonus, oneoff]
+          example: "salary"
+        emoji:
+          type: string
+          example: "🏢"
+        note:
+          type: string
+          example: ""
+
+    IncomeRecordListResponse:
+      type: object
+      required: [income_records]
+      properties:
+        income_records:
+          type: array
+          items:
+            $ref: '#/components/schemas/IncomeRecord'
+
+    BaseIncomeSetting:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: integer
+          description: 基準収入（毎月の見込み額、円）
+          example: 280000
+
+    BudgetHistoryItem:
+      type: object
+      required: [year_month, budget, actual]
+      properties:
+        year_month:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+          example: "2026-03"
+        budget:
+          type: integer
+          example: 142000
+        actual:
+          type: integer
+          description: 実際の支出合計（対象外除く）
+          example: 131200
+
+    BudgetSummaryResponse:
+      type: object
+      required: [income_total, recurring_total, savings_total, variable_budget, daily_budget, days_remaining, history]
+      properties:
+        income_total:
+          type: integer
+          description: 今月の収入合計（円）
+          example: 323200
+        recurring_total:
+          type: integer
+          description: 定期支出合計（円）
+          example: 96000
+        savings_total:
+          type: integer
+          description: 貯金合計（円）
+          example: 45000
+        variable_budget:
+          type: integer
+          description: 変動費予算 = 収入 − 定期支出 − 貯金（円）
+          example: 182200
+        daily_budget:
+          type: integer
+          description: 1日あたりの予算（円）
+          example: 6073
+        days_remaining:
+          type: integer
+          description: 今月の残り日数
+          example: 12
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetHistoryItem'
+
 paths:
   /auth/signup:
     post:
@@ -1999,6 +2302,496 @@ paths:
               example:
                 code: BAD_REQUEST
                 message: "dateはYYYY-MM-DD形式で指定してください"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /recurring-expenses:
+    get:
+      summary: 定期支出一覧
+      operationId: listRecurringExpenses
+      tags: [recurring-expenses]
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringExpenseListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: 定期支出追加
+      operationId: createRecurringExpense
+      tags: [recurring-expenses]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringExpenseRequest'
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringExpense'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /recurring-expenses/pending:
+    get:
+      summary: 確認待ち定期支出一覧（variable型で今月未記録）
+      operationId: listPendingRecurring
+      tags: [recurring-expenses]
+      parameters:
+        - name: year_month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PendingRecurringListResponse'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /recurring-expenses/{id}:
+    put:
+      summary: 定期支出更新
+      operationId: updateRecurringExpense
+      tags: [recurring-expenses]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringExpenseRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringExpense'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: 定期支出削除
+      operationId: deleteRecurringExpense
+      tags: [recurring-expenses]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: 削除成功
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /savings-goals:
+    get:
+      summary: 貯金目標一覧
+      operationId: listSavingsGoals
+      tags: [savings-goals]
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavingsGoalListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: 貯金目標追加
+      operationId: createSavingsGoal
+      tags: [savings-goals]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavingsGoalRequest'
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavingsGoal'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /savings-goals/{id}:
+    put:
+      summary: 貯金目標更新
+      operationId: updateSavingsGoal
+      tags: [savings-goals]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavingsGoalRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavingsGoal'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: 貯金目標削除
+      operationId: deleteSavingsGoal
+      tags: [savings-goals]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: 削除成功
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /savings-goals/{id}/post-monthly:
+    post:
+      summary: 今月分の積立を記録（accumulated_amountに加算）
+      operationId: postMonthlySavings
+      tags: [savings-goals]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, year_month]
+              properties:
+                amount:
+                  type: integer
+                  minimum: 1
+                year_month:
+                  type: string
+                  pattern: '^\d{4}-\d{2}$'
+      responses:
+        '200':
+          description: 積立成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavingsGoal'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /income-records:
+    get:
+      summary: 収入記録一覧
+      operationId: listIncomeRecords
+      tags: [income-records]
+      parameters:
+        - name: year_month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncomeRecordListResponse'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: 収入記録追加
+      operationId: createIncomeRecord
+      tags: [income-records]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncomeRecordRequest'
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncomeRecord'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /income-records/{id}:
+    put:
+      summary: 収入記録更新
+      operationId: updateIncomeRecord
+      tags: [income-records]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncomeRecordRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncomeRecord'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: 収入記録削除
+      operationId: deleteIncomeRecord
+      tags: [income-records]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: 削除成功
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /base-income:
+    get:
+      summary: 基準収入設定取得
+      operationId: getBaseIncome
+      tags: [income-records]
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseIncomeSetting'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      summary: 基準収入設定更新
+      operationId: updateBaseIncome
+      tags: [income-records]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseIncomeSetting'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseIncomeSetting'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /budget-summary:
+    get:
+      summary: 予算サマリー取得
+      operationId: getBudgetSummary
+      tags: [budget-summary]
+      parameters:
+        - name: year_month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetSummaryResponse'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
