@@ -28,6 +28,22 @@ Read additional documents based on the work area:
 - **Verify Before Declaring Completion**: Execute all items in the "Verification Checklist" of each prompt before finishing a task.
 - **Incremental Commits**: Commit in logical units. 1 Step = 1 PR.
 
+### Firewall (devcontainer)
+
+- **NEVER re-run `/usr/local/bin/init-firewall.sh`** while the container is running. It flushes all iptables rules, which immediately kills the Claude Code API connection.
+- The firewall is initialized automatically via `postStartCommand` before Claude Code starts. It is always already active.
+- If a specific domain is blocked, add only that domain's IPs to the existing ipset — do NOT re-run the whole script:
+  ```bash
+  sudo ipset add --exist allowed-domains $(dig +short A <domain> | head -1)
+  ```
+- If you encounter a network error installing packages, stop and ask the user to add the domain to `.devcontainer/init-firewall.sh` and rebuild the container.
+
+### Headroom MCP (devcontainer)
+
+- Headroom is **pre-installed in the Docker image** (`headroom-ai[mcp,proxy]`) and the MCP is registered at build time via `headroom mcp install`. No installation steps are needed after container start.
+- Do NOT run `uv tool install headroom-ai` or `headroom mcp install` — they are already done.
+- If `headroom --help` fails, the image is stale. Ask the user to rebuild the container (`Dev Containers: Rebuild Container`).
+
 ---
 
 ## Conventions
