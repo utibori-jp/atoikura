@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
@@ -59,8 +60,14 @@ func ListSavingsGoalsHandler(repo savingsGoalRepo) http.HandlerFunc {
 			return
 		}
 
-		// Use query param year_month if provided, otherwise default to empty string
 		year_month := r.URL.Query().Get("year_month")
+		if year_month == "" {
+			loc, err := time.LoadLocation("Asia/Tokyo")
+			if err != nil {
+				loc = time.FixedZone("JST", 9*60*60)
+			}
+			year_month = time.Now().In(loc).Format("2006-01")
+		}
 
 		items := make([]savingsGoalJSON, len(goals))
 		for i, g := range goals {
