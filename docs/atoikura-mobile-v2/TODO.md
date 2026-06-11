@@ -324,13 +324,58 @@ const fab_tone = active_tab === "budget" && budget_sub === "income" ? "sage" : "
 
 ## Swap checklist (when backend is ready)
 
-When each backend PR merges, do the following to wire up the real API:
+> **Status: All frontend screens already use `api` from `client.ts` (real API client). The swaps below are complete.**
 
-| Backend PR | Frontend change |
-|---|---|
-| B-1: 定期支出 API | In `MobileRecurring.tsx`, replace `mobileApi.listRecurringExpenses()` / `listPendingRecurring()` with `api.listRecurringExpenses()` etc. |
-| B-2: 貯金目標 API | In `MobileSavings.tsx`, replace `mobileApi.listSavingsGoals()` |
-| B-3: 収入記録 API | In `MobileIncome.tsx`, replace `mobileApi.listIncomes()` / `getBaseIncome()` |
-| B-4: 予算ハブ + `is_recurring` | In `MobileBudget.tsx`, replace `mobileApi.getBudgetSummary()`; `is_recurring` field on journal entries will appear automatically |
+~~When each backend PR merges, do the following to wire up the real API:~~
+
+| Backend PR | Frontend change | Status |
+|---|---|---|
+| B-1: 定期支出 API | `MobileRecurring.tsx` uses `api.listRecurringExpenses()` / `listPendingRecurring()` | ✅ Done |
+| B-2: 貯金目標 API | `MobileSavings.tsx` uses `api.listSavingsGoals()` | ✅ Done |
+| B-3: 収入記録 API | `MobileIncome.tsx` uses `api.listIncomeRecords()` / `getBaseIncome()` | ✅ Done |
+| B-4: 予算ハブ + `is_recurring` | `MobileBudget.tsx` uses `api.getBudgetSummary()`; `is_recurring` will appear when B-4 lands | ✅ Hub done / `is_recurring` pending |
 
 After all swaps, delete `src/api/mobile-mock.ts` and `src/api/mobile-types.ts` (types move into generated `types.ts`).
+
+---
+
+## Backend API remaining work
+
+### B-4-a: Add `is_recurring` to `JournalEntryResponse` ← **do first**
+
+The migration `000017_add_recurring_to_journal_entries.sql` already added `recurring_expense_id` to the
+`journal_entries` table, but it is not yet exposed in the API response. The 🔁 badge in `MobileJournal.tsx`
+depends on this field.
+
+**Files to change:**
+
+1. `backend/queries/journal_entries.sql`
+   — Add `je.recurring_expense_id` to the `ListJournalEntriesByMonth` SELECT list
+
+2. `backend/internal/db/journal_entries.sql.go` *(sqlc-generated — edit manually or re-run sqlc)*
+   — Add `RecurringExpenseID *int32` to `ListJournalEntriesByMonthRow`
+   — Add the field to the `rows.Scan(...)` call
+
+3. `backend/internal/repository/journal_entries.go`
+   — Add `RecurringExpenseID *int32` to `JournalEntryView`
+   — Map the field in `ListJournalEntriesByMonth`
+
+4. `backend/internal/handler/journal_entries.go`
+   — Add `IsRecurring bool` to `journalEntryJSON`
+   — Set `IsRecurring: e.RecurringExpenseID != nil` in `viewToJournalEntryJSON`
+
+5. `docs/atoikura-api.yaml`
+   — Add optional `is_recurring` boolean field to `JournalEntryResponse` schema
+
+### B-4-b: Auto-post recurring expenses (job scheduler) — Issue #25
+
+Implement the month-start job that creates `journal_entries` from `recurring_expenses` records:
+- Fixed-type: post immediately with confirmed amount
+- Variable-type: create pending entry for user confirmation
+- Use `robfig/cron` scheduler, organized under `internal/job/`
+
+### B-5: Cleanup mock files
+
+Once the above is complete, delete:
+- `frontend/src/api/mobile-mock.ts`
+- `frontend/src/api/mobile-types.ts`
