@@ -174,7 +174,6 @@ export function JournalEntryForm({ onSuccess }: Props) {
       });
       setSelectedGroupId(category_groups.length > 0 ? String(category_groups[0].id) : "");
       setSelectedCategoryId("");
-      setTransactionDate(today_jst());
       setAmount("");
       setItem("");
       setIsExcluded(false);
