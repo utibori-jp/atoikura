@@ -774,17 +774,13 @@ export default function App() {
             />
           ))}
 
-        {active_tab === "review" &&
-          (is_mobile ? (
-            <ReviewScreen />
-          ) : (
-            <WebReview />
-          ))}
+        {active_tab === "review" && (is_mobile ? <ReviewScreen /> : <WebReview />)}
 
         {active_tab === "budget" &&
           (() => {
             if (is_mobile) {
-              if (budget_sub === "income") return <MobileIncome onBack={() => setBudgetSub("hub")} />;
+              if (budget_sub === "income")
+                return <MobileIncome onBack={() => setBudgetSub("hub")} />;
               if (budget_sub === "recurring")
                 return <MobileRecurring onBack={() => setBudgetSub("hub")} />;
               if (budget_sub === "savings")
@@ -792,7 +788,8 @@ export default function App() {
               return <MobileBudget onNavigate={(s) => setBudgetSub(s)} />;
             }
             if (budget_sub === "income") return <WebIncome onBack={() => setBudgetSub("hub")} />;
-            if (budget_sub === "recurring") return <WebRecurring onBack={() => setBudgetSub("hub")} />;
+            if (budget_sub === "recurring")
+              return <WebRecurring onBack={() => setBudgetSub("hub")} />;
             if (budget_sub === "savings") return <WebSavings onBack={() => setBudgetSub("hub")} />;
             return <WebBudget onNavigate={(s) => setBudgetSub(s)} />;
           })()}

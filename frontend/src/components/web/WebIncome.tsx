@@ -24,8 +24,8 @@ function monthLabel(ym: string): string {
 
 const INCOME_TYPES: Record<string, { label: string; bg: string; fg: string }> = {
   salary: { label: "給与", bg: "#DEF1E6", fg: "#4FA481" },
-  side:   { label: "副業", bg: "#E5EEF7", fg: "#3F6B91" },
-  bonus:  { label: "ボーナス", bg: "#FFF1CC", fg: "#F0A92E" },
+  side: { label: "副業", bg: "#E5EEF7", fg: "#3F6B91" },
+  bonus: { label: "ボーナス", bg: "#FFF1CC", fg: "#F0A92E" },
   oneoff: { label: "一時収入", bg: "#FFE8DD", fg: "#F26B3F" },
 };
 
@@ -57,15 +57,16 @@ export function WebIncome({ onBack }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      api.listIncomeRecords(active_ym),
-      api.getBaseIncome(),
-    ]).then(([income_res, base_res]) => {
-      if (cancelled) return;
-      setRecords(income_res.income_records);
-      setBaseIncome(base_res);
-    }).catch(() => {});
-    return () => { cancelled = true; };
+    Promise.all([api.listIncomeRecords(active_ym), api.getBaseIncome()])
+      .then(([income_res, base_res]) => {
+        if (cancelled) return;
+        setRecords(income_res.income_records);
+        setBaseIncome(base_res);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [active_ym]);
 
   const income_total = records.reduce((s, r) => s + r.amount, 0);
@@ -96,22 +97,51 @@ export function WebIncome({ onBack }: Props) {
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.inkSoft, fontWeight: 600, marginBottom: 6 }}>
-            <span onClick={onBack} style={{ cursor: "pointer", color: T.coral }}>予算</span>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: T.inkSoft,
+              fontWeight: 600,
+              marginBottom: 6,
+            }}
+          >
+            <span onClick={onBack} style={{ cursor: "pointer", color: T.coral }}>
+              予算
+            </span>
             <span style={{ opacity: 0.4 }}>›</span>
             <span style={{ color: T.ink }}>収入記録</span>
           </div>
-          <div style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 30, fontWeight: 900, letterSpacing: "-0.01em" }}>
+          <div
+            style={{
+              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+              fontSize: 30,
+              fontWeight: 900,
+              letterSpacing: "-0.01em",
+            }}
+          >
             収入記録
           </div>
-          <div style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>基準と余剰を分けて管理します</div>
+          <div style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>
+            基準と余剰を分けて管理します
+          </div>
         </div>
-        <button style={{
-          border: "none", background: T.sage, color: "#fff",
-          padding: "12px 24px", borderRadius: 999,
-          fontFamily: "inherit", fontWeight: 700, fontSize: 14,
-          cursor: "pointer", boxShadow: `0 4px 0 ${T.sageDeep}`,
-        }}>
+        <button
+          style={{
+            border: "none",
+            background: T.sage,
+            color: "#fff",
+            padding: "12px 24px",
+            borderRadius: 999,
+            fontFamily: "inherit",
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: "pointer",
+            boxShadow: `0 4px 0 ${T.sageDeep}`,
+          }}
+        >
           ＋ 収入を記録
         </button>
       </div>
@@ -119,8 +149,22 @@ export function WebIncome({ onBack }: Props) {
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
         {/* Left: summary */}
         <div style={{ flex: "0 0 380px" }}>
-          <div style={{ background: T.card, borderRadius: 28, padding: 24, boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div
+            style={{
+              background: T.card,
+              borderRadius: 28,
+              padding: 24,
+              boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 14,
+              }}
+            >
               <span style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600 }}>
                 {monthLabel(active_ym)}の収入合計
               </span>
@@ -132,7 +176,15 @@ export function WebIncome({ onBack }: Props) {
             <div style={{ height: 1, background: T.hair, marginBottom: 16 }} />
 
             <div>
-              <div style={{ fontSize: 11, color: T.inkSoft, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: T.inkSoft,
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
                 基準収入
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 6 }}>
@@ -145,37 +197,78 @@ export function WebIncome({ onBack }: Props) {
                       placeholder="金額を入力"
                       autoFocus
                       style={{
-                        flex: 1, padding: "8px 12px",
+                        flex: 1,
+                        padding: "8px 12px",
                         border: `1.5px solid ${T.coral}`,
-                        borderRadius: 10, fontFamily: "'DM Sans', sans-serif",
-                        fontSize: 18, fontWeight: 700, outline: "none",
+                        borderRadius: 10,
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontSize: 18,
+                        fontWeight: 700,
+                        outline: "none",
                       }}
                     />
-                    <button onClick={handle_base_save}
-                      style={{ border: "none", background: T.coral, color: "#fff", padding: "8px 14px", borderRadius: 10, fontFamily: "inherit", fontWeight: 700, cursor: "pointer" }}>
+                    <button
+                      onClick={handle_base_save}
+                      style={{
+                        border: "none",
+                        background: T.coral,
+                        color: "#fff",
+                        padding: "8px 14px",
+                        borderRadius: 10,
+                        fontFamily: "inherit",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
                       保存
                     </button>
-                    <button onClick={() => setEditingBase(false)}
-                      style={{ border: "none", background: "transparent", color: T.inkSoft, fontFamily: "inherit", cursor: "pointer" }}>
+                    <button
+                      onClick={() => setEditingBase(false)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: T.inkSoft,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                      }}
+                    >
                       ✕
                     </button>
                   </div>
                 ) : (
-                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 800, fontSize: 32, letterSpacing: "-0.02em", color: T.ink }}>
+                  <span
+                    style={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontWeight: 800,
+                      fontSize: 32,
+                      letterSpacing: "-0.02em",
+                      color: T.ink,
+                    }}
+                  >
                     {yen(base_amount)}
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 3 }}>毎月の見込み・予算の元</div>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 3 }}>
+                毎月の見込み・予算の元
+              </div>
               {!editing_base && (
                 <button
-                  onClick={() => { setEditingBase(true); setBaseDraft(String(base_amount)); }}
+                  onClick={() => {
+                    setEditingBase(true);
+                    setBaseDraft(String(base_amount));
+                  }}
                   style={{
-                    marginTop: 10, padding: "7px 14px",
+                    marginTop: 10,
+                    padding: "7px 14px",
                     border: `1px solid ${T.hair}`,
-                    background: T.bgSoft, color: T.inkSoft,
-                    borderRadius: 999, fontFamily: "inherit",
-                    fontSize: 12, fontWeight: 700, cursor: "pointer",
+                    background: T.bgSoft,
+                    color: T.inkSoft,
+                    borderRadius: 999,
+                    fontFamily: "inherit",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
                   }}
                 >
                   ✎ 基準収入を編集
@@ -187,29 +280,72 @@ export function WebIncome({ onBack }: Props) {
 
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 11, color: T.inkSoft, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: T.inkSoft,
+                    fontWeight: 700,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                  }}
+                >
                   余剰金額
                 </span>
-                <span style={{
-                  padding: "2px 7px", borderRadius: 999,
-                  background: T.bgSoft, border: `1px solid ${T.hair}`,
-                  fontSize: 9, fontWeight: 700, color: T.inkSoft,
-                }}>未振分</span>
+                <span
+                  style={{
+                    padding: "2px 7px",
+                    borderRadius: 999,
+                    background: T.bgSoft,
+                    border: `1px solid ${T.hair}`,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: T.inkSoft,
+                  }}
+                >
+                  未振分
+                </span>
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 6 }}>
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 800, fontSize: 14, color: T.sageDeep }}>+</span>
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 800, fontSize: 32, color: T.sageDeep, letterSpacing: "-0.02em" }}>
+                <span
+                  style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 800,
+                    fontSize: 14,
+                    color: T.sageDeep,
+                  }}
+                >
+                  +
+                </span>
+                <span
+                  style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 800,
+                    fontSize: 32,
+                    color: T.sageDeep,
+                    letterSpacing: "-0.02em",
+                  }}
+                >
                   {yen(Math.max(0, surplus))}
                 </span>
               </div>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 3 }}>基準を超えた今月の上振れ</div>
-              <button style={{
-                marginTop: 10, padding: "9px 16px",
-                border: "none", borderRadius: 999,
-                background: T.mustard, color: T.ink,
-                fontFamily: "inherit", fontSize: 12, fontWeight: 800,
-                cursor: "pointer", boxShadow: "0 3px 0 #F0A92E",
-              }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 3 }}>
+                基準を超えた今月の上振れ
+              </div>
+              <button
+                style={{
+                  marginTop: 10,
+                  padding: "9px 16px",
+                  border: "none",
+                  borderRadius: 999,
+                  background: T.mustard,
+                  color: T.ink,
+                  fontFamily: "inherit",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  boxShadow: "0 3px 0 #F0A92E",
+                }}
+              >
                 振り分ける →
               </button>
             </div>
@@ -229,8 +365,12 @@ export function WebIncome({ onBack }: Props) {
                     border: `1.5px solid ${active ? T.coral : T.hair}`,
                     background: active ? T.coral : "#fff",
                     color: active ? "#fff" : T.ink,
-                    padding: "10px 16px", borderRadius: 999,
-                    fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    padding: "10px 16px",
+                    borderRadius: 999,
+                    fontFamily: "inherit",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
                   }}
                 >
                   {monthLabel(m)}
@@ -250,27 +390,58 @@ export function WebIncome({ onBack }: Props) {
               const { day, month } = dateSquareParts(date);
 
               return (
-                <div key={date} style={{
-                  background: T.card, borderRadius: 24, padding: "20px 24px",
-                  boxShadow: "0 8px 24px -16px rgba(80,40,10,0.12)",
-                }}>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 14,
-                    paddingBottom: 12, borderBottom: `1.5px solid ${T.hair}`,
-                  }}>
-                    <div style={{
-                      width: 50, height: 50, borderRadius: 16,
-                      background: T.bgSoft,
-                      display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center",
-                      border: `1.5px solid ${T.hair}`,
-                    }}>
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 20, lineHeight: 1 }}>
+                <div
+                  key={date}
+                  style={{
+                    background: T.card,
+                    borderRadius: 24,
+                    padding: "20px 24px",
+                    boxShadow: "0 8px 24px -16px rgba(80,40,10,0.12)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 14,
+                      paddingBottom: 12,
+                      borderBottom: `1.5px solid ${T.hair}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 50,
+                        height: 50,
+                        borderRadius: 16,
+                        background: T.bgSoft,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: `1.5px solid ${T.hair}`,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontWeight: 700,
+                          fontSize: 20,
+                          lineHeight: 1,
+                        }}
+                      >
                         {day}
                       </div>
                       <div style={{ fontSize: 10, color: T.inkSoft, marginTop: 1 }}>{month}月</div>
                     </div>
-                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 18, color: T.sageDeep, marginLeft: "auto" }}>
+                    <div
+                      style={{
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontWeight: 700,
+                        fontSize: 18,
+                        color: T.sageDeep,
+                        marginLeft: "auto",
+                      }}
+                    >
                       +{yen(day_total)}
                     </div>
                   </div>
@@ -279,41 +450,106 @@ export function WebIncome({ onBack }: Props) {
                       const type_info = INCOME_TYPES[e.income_type] ?? INCOME_TYPES.oneoff;
                       const is_base = e.income_type === "salary";
                       return (
-                        <div key={e.id} style={{
-                          display: "flex", alignItems: "center", gap: 14,
-                          padding: "12px 4px",
-                          borderBottom: i < items.length - 1 ? `1px solid ${T.hair}` : "none",
-                        }}>
-                          <div style={{
-                            width: 38, height: 38, borderRadius: 12,
-                            background: "#DEF1E6",
-                            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-                          }}>{e.emoji}</div>
+                        <div
+                          key={e.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 14,
+                            padding: "12px 4px",
+                            borderBottom: i < items.length - 1 ? `1px solid ${T.hair}` : "none",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: 12,
+                              background: "#DEF1E6",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 18,
+                            }}
+                          >
+                            {e.emoji}
+                          </div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                            <div
+                              style={{
+                                fontWeight: 600,
+                                fontSize: 14,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                              }}
+                            >
                               {e.name}
-                              <span style={{ padding: "2px 8px", borderRadius: 6, background: type_info.bg, color: type_info.fg, fontSize: 11, fontWeight: 700 }}>
+                              <span
+                                style={{
+                                  padding: "2px 8px",
+                                  borderRadius: 6,
+                                  background: type_info.bg,
+                                  color: type_info.fg,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                }}
+                              >
                                 {type_info.label}
                               </span>
                               {is_base && (
-                                <span style={{ padding: "2px 7px", borderRadius: 6, background: "rgba(42,37,32,0.08)", color: T.inkSoft, fontSize: 10, fontWeight: 700 }}>
+                                <span
+                                  style={{
+                                    padding: "2px 7px",
+                                    borderRadius: 6,
+                                    background: "rgba(42,37,32,0.08)",
+                                    color: T.inkSoft,
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                  }}
+                                >
                                   基準
                                 </span>
                               )}
                             </div>
                             {e.note && (
-                              <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 2 }}>{e.note}</div>
+                              <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 2 }}>
+                                {e.note}
+                              </div>
                             )}
                           </div>
-                          <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 16, color: T.sageDeep }}>
+                          <div
+                            style={{
+                              fontFamily: "'DM Sans', sans-serif",
+                              fontWeight: 700,
+                              fontSize: 16,
+                              color: T.sageDeep,
+                            }}
+                          >
                             +{yen(e.amount)}
                           </div>
                           <div style={{ display: "flex", gap: 6, opacity: 0.45 }}>
-                            <span style={{ padding: "4px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer" }}>✎</span>
+                            <span
+                              style={{
+                                padding: "4px 8px",
+                                borderRadius: 8,
+                                fontSize: 12,
+                                cursor: "pointer",
+                              }}
+                            >
+                              ✎
+                            </span>
                             <span
                               onClick={() => handle_delete(e.id)}
-                              style={{ padding: "4px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer" }}
-                            >🗑</span>
+                              style={{
+                                padding: "4px 8px",
+                                borderRadius: 8,
+                                fontSize: 12,
+                                cursor: "pointer",
+                              }}
+                            >
+                              🗑
+                            </span>
                           </div>
                         </div>
                       );
