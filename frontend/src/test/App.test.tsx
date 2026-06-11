@@ -1,0 +1,137 @@
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import App from "../App";
+
+// recharts ResponsiveContainer uses ResizeObserver, which jsdom doesn't provide
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+beforeAll(() => {
+  global.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+});
+
+function mockMatchMedia(matches: boolean) {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }),
+  });
+}
+
+const TOKEN_KEY = "atoikura.jwt_token";
+
+describe("App — mobile layout (≤ 1023 px)", () => {
+  beforeEach(() => {
+    mockMatchMedia(true);
+    sessionStorage.setItem(TOKEN_KEY, "test-token");
+  });
+
+  afterEach(() => {
+    sessionStorage.removeItem(TOKEN_KEY);
+  });
+
+  it("renders bottom tab bar instead of top nav", async () => {
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+
+    // Bottom tab bar items
+    expect(screen.getByRole("button", { name: /ホーム/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /振り返り/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /仕訳/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /予算/ })).toBeInTheDocument();
+
+    // Desktop <nav> element must not be present
+    expect(document.querySelector("nav")).not.toBeInTheDocument();
+  });
+
+  it("opens EntrySheet when FAB is clicked", async () => {
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "＋" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "✕" })).toBeInTheDocument();
+    });
+  });
+
+  it("closes EntrySheet when ✕ is clicked", async () => {
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "＋" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "✕" })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "✕" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "✕" })).not.toBeInTheDocument()
+    );
+  });
+
+  it("shows month navigation when journal tab is active", async () => {
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /仕訳/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "‹" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "›" })).toBeInTheDocument();
+    });
+  });
+
+  it("navigates to account view when avatar is clicked", async () => {
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+
+    // Avatar button shows the initial of the user's display name
+    fireEvent.click(screen.getByTitle("アカウント"));
+
+    await waitFor(() => {
+      // UserInfo renders a ログアウト button unique to the account view
+      expect(screen.getByRole("button", { name: /ログアウト/ })).toBeInTheDocument();
+    });
+  });
+});
+
+describe("App — desktop layout (≥ 1024 px)", () => {
+  beforeEach(() => {
+    mockMatchMedia(false);
+    sessionStorage.setItem(TOKEN_KEY, "test-token");
+  });
+
+  afterEach(() => {
+    sessionStorage.removeItem(TOKEN_KEY);
+  });
+
+  it("renders top navigation bar with a <nav> element", async () => {
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+
+    expect(document.querySelector("nav")).toBeInTheDocument();
+  });
+
+  it("includes マスタ tab that is absent from the mobile tab bar", async () => {
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+
+    expect(screen.getByRole("button", { name: /マスタ/ })).toBeInTheDocument();
+  });
+});

@@ -98,7 +98,8 @@ SELECT
   cg.group_name,
   je.is_excluded,
   je.note,
-  je.created_at
+  je.created_at,
+  je.recurring_expense_id
 FROM journal_entries je
 JOIN expense_categories ec ON je.category_id = ec.id
 JOIN category_groups cg ON ec.group_id = cg.id
@@ -114,17 +115,18 @@ type ListJournalEntriesByMonthParams struct {
 }
 
 type ListJournalEntriesByMonthRow struct {
-	ID              int32       `json:"id"`
-	TransactionDate pgtype.Date `json:"transaction_date"`
-	Item            *string     `json:"item"`
-	Amount          int32       `json:"amount"`
-	CategoryID      int32       `json:"category_id"`
-	CategoryName    string      `json:"category_name"`
-	GroupID         int32       `json:"group_id"`
-	GroupName       string      `json:"group_name"`
-	IsExcluded      bool        `json:"is_excluded"`
-	Note            *string     `json:"note"`
-	CreatedAt       time.Time   `json:"created_at"`
+	ID                 int32       `json:"id"`
+	TransactionDate    pgtype.Date `json:"transaction_date"`
+	Item               *string     `json:"item"`
+	Amount             int32       `json:"amount"`
+	CategoryID         int32       `json:"category_id"`
+	CategoryName       string      `json:"category_name"`
+	GroupID            int32       `json:"group_id"`
+	GroupName          string      `json:"group_name"`
+	IsExcluded         bool        `json:"is_excluded"`
+	Note               *string     `json:"note"`
+	CreatedAt          time.Time   `json:"created_at"`
+	RecurringExpenseID *int32      `json:"recurring_expense_id"`
 }
 
 // Joins category and group info for the response.
@@ -150,6 +152,7 @@ func (q *Queries) ListJournalEntriesByMonth(ctx context.Context, arg ListJournal
 			&i.IsExcluded,
 			&i.Note,
 			&i.CreatedAt,
+			&i.RecurringExpenseID,
 		); err != nil {
 			return nil, err
 		}

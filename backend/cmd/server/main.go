@@ -64,9 +64,9 @@ func run(parent_ctx context.Context) error {
 
 	h := handler.ChainMiddleware(mux,
 		handler.LogRequest,
+		handler.AllowCORS,
 		handler.RequireBearerAuth(jwt_secret),
 		handler.RecoverPanic,
-		handler.AllowCORS,
 	)
 
 	http_server := &http.Server{
@@ -126,4 +126,21 @@ func registerRoutes(mux *http.ServeMux, repo *repository.Repository, jwt_secret 
 	mux.Handle("PUT /notes/monthly-reviews", handler.UpdateMonthlyReviewsHandler(repo))
 	mux.Handle("GET /notes/daily", handler.GetDailyNotesHandler(repo))
 	mux.Handle("PUT /notes/daily/{date}", handler.UpdateDailyNoteHandler(repo))
+	mux.Handle("GET /recurring-expenses", handler.ListRecurringExpensesHandler(repo))
+	mux.Handle("POST /recurring-expenses", handler.CreateRecurringExpenseHandler(repo))
+	mux.Handle("GET /recurring-expenses/pending", handler.ListPendingRecurringHandler(repo))
+	mux.Handle("PUT /recurring-expenses/{id}", handler.UpdateRecurringExpenseHandler(repo))
+	mux.Handle("DELETE /recurring-expenses/{id}", handler.DeleteRecurringExpenseHandler(repo))
+	mux.Handle("GET /savings-goals", handler.ListSavingsGoalsHandler(repo))
+	mux.Handle("POST /savings-goals", handler.CreateSavingsGoalHandler(repo))
+	mux.Handle("PUT /savings-goals/{id}", handler.UpdateSavingsGoalHandler(repo))
+	mux.Handle("DELETE /savings-goals/{id}", handler.DeleteSavingsGoalHandler(repo))
+	mux.Handle("POST /savings-goals/{id}/post-monthly", handler.PostMonthlySavingsHandler(repo))
+	mux.Handle("GET /income-records", handler.ListIncomeRecordsHandler(repo))
+	mux.Handle("POST /income-records", handler.CreateIncomeRecordHandler(repo))
+	mux.Handle("PUT /income-records/{id}", handler.UpdateIncomeRecordHandler(repo))
+	mux.Handle("DELETE /income-records/{id}", handler.DeleteIncomeRecordHandler(repo))
+	mux.Handle("GET /base-income", handler.GetBaseIncomeHandler(repo))
+	mux.Handle("PUT /base-income", handler.UpdateBaseIncomeHandler(repo))
+	mux.Handle("GET /budget-summary", handler.GetBudgetSummaryHandler(repo))
 }

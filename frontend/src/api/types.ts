@@ -525,6 +525,183 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/recurring-expenses": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 定期支出一覧 */
+    get: operations["listRecurringExpenses"];
+    put?: never;
+    /** 定期支出追加 */
+    post: operations["createRecurringExpense"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/recurring-expenses/pending": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 確認待ち定期支出一覧（variable型で今月未記録） */
+    get: operations["listPendingRecurring"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/recurring-expenses/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** 定期支出更新 */
+    put: operations["updateRecurringExpense"];
+    post?: never;
+    /** 定期支出削除 */
+    delete: operations["deleteRecurringExpense"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/savings-goals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 貯金目標一覧 */
+    get: operations["listSavingsGoals"];
+    put?: never;
+    /** 貯金目標追加 */
+    post: operations["createSavingsGoal"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/savings-goals/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** 貯金目標更新 */
+    put: operations["updateSavingsGoal"];
+    post?: never;
+    /** 貯金目標削除 */
+    delete: operations["deleteSavingsGoal"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/savings-goals/{id}/post-monthly": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 今月分の積立を記録（accumulated_amountに加算） */
+    post: operations["postMonthlySavings"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/income-records": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 収入記録一覧 */
+    get: operations["listIncomeRecords"];
+    put?: never;
+    /** 収入記録追加 */
+    post: operations["createIncomeRecord"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/income-records/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** 収入記録更新 */
+    put: operations["updateIncomeRecord"];
+    post?: never;
+    /** 収入記録削除 */
+    delete: operations["deleteIncomeRecord"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/base-income": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 基準収入設定取得 */
+    get: operations["getBaseIncome"];
+    /** 基準収入設定更新 */
+    put: operations["updateBaseIncome"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/budget-summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 予算サマリー取得 */
+    get: operations["getBudgetSummary"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1014,6 +1191,222 @@ export interface components {
        * @description 新しいパスワード（8文字以上）
        */
       new_password: string;
+    };
+    RecurringExpense: {
+      id: number;
+      /** @example 家賃 */
+      name: string;
+      /** @example 🏠 */
+      emoji: string;
+      /**
+       * @description 引落日（毎月何日か）
+       * @example 25
+       */
+      billing_day: number;
+      /**
+       * @description 金額（円）。nullの場合は毎月変動
+       * @example 80000
+       */
+      amount?: number | null;
+      /**
+       * @description fixed=金額固定, variable=毎月要確認
+       * @example fixed
+       * @enum {string}
+       */
+      type: "fixed" | "variable";
+      /** @example 15 */
+      category_id: number;
+      /** @example 7 */
+      group_id: number;
+      /** @example 固定費 */
+      group_name: string;
+      /** @example 家賃 */
+      category_name: string;
+    };
+    RecurringExpenseRequest: {
+      /** @example 家賃 */
+      name: string;
+      /** @example 🏠 */
+      emoji: string;
+      /** @example 25 */
+      billing_day: number;
+      /** @example 80000 */
+      amount?: number | null;
+      /**
+       * @example fixed
+       * @enum {string}
+       */
+      type: "fixed" | "variable";
+      /** @example 15 */
+      category_id: number;
+    };
+    RecurringExpenseListResponse: {
+      recurring_expenses: components["schemas"]["RecurringExpense"][];
+    };
+    PendingRecurring: {
+      id: number;
+      /** @example 電気代 */
+      name: string;
+      /** @example 💡 */
+      emoji: string;
+      /** @example 10 */
+      billing_day: number;
+      /**
+       * @description 前回記録した金額（円）
+       * @example 7480
+       */
+      last_amount: number;
+      /** @example 固定費 */
+      group_name: string;
+    };
+    PendingRecurringListResponse: {
+      pending: components["schemas"]["PendingRecurring"][];
+    };
+    SavingsGoal: {
+      id: number;
+      /** @example 旅行積立 */
+      name: string;
+      /** @example ✈️ */
+      emoji: string;
+      /**
+       * @description 毎月の積立額（円）
+       * @example 20000
+       */
+      monthly_amount: number;
+      /**
+       * @description 目標金額（円）
+       * @example 250000
+       */
+      target_amount: number;
+      /**
+       * @description 現在の積立済み金額（円）
+       * @example 170000
+       */
+      accumulated_amount: number;
+      /**
+       * @description 目標期限（YYYY/MM形式）。未設定はnull
+       * @example 2027/03
+       */
+      deadline?: string | null;
+      /** @example 北海道旅行：新幹線とホテル代 */
+      memo: string;
+      /**
+       * @description 今月分の積立が済んでいるか
+       * @example true
+       */
+      is_posted_this_month: boolean;
+    };
+    SavingsGoalRequest: {
+      /** @example 旅行積立 */
+      name: string;
+      /** @example ✈️ */
+      emoji: string;
+      /** @example 20000 */
+      monthly_amount: number;
+      /** @example 250000 */
+      target_amount: number;
+      /** @example 2027/03 */
+      deadline?: string | null;
+      /** @example 北海道旅行：新幹線とホテル代 */
+      memo?: string;
+    };
+    SavingsGoalListResponse: {
+      savings_goals: components["schemas"]["SavingsGoal"][];
+    };
+    IncomeRecord: {
+      id: number;
+      /**
+       * Format: date
+       * @example 2026-05-25
+       */
+      transaction_date: string;
+      /** @example 280000 */
+      amount: number;
+      /** @example 6月給与 */
+      name: string;
+      /**
+       * @example salary
+       * @enum {string}
+       */
+      income_type: "salary" | "side" | "bonus" | "oneoff";
+      /** @example 🏢 */
+      emoji: string;
+      /** @example  */
+      note: string;
+    };
+    IncomeRecordRequest: {
+      /**
+       * Format: date
+       * @example 2026-05-25
+       */
+      transaction_date: string;
+      /** @example 280000 */
+      amount: number;
+      /** @example 6月給与 */
+      name: string;
+      /**
+       * @example salary
+       * @enum {string}
+       */
+      income_type: "salary" | "side" | "bonus" | "oneoff";
+      /** @example 🏢 */
+      emoji: string;
+      /** @example  */
+      note?: string;
+    };
+    IncomeRecordListResponse: {
+      income_records: components["schemas"]["IncomeRecord"][];
+    };
+    BaseIncomeSetting: {
+      /**
+       * @description 基準収入（毎月の見込み額、円）
+       * @example 280000
+       */
+      amount: number;
+    };
+    BudgetHistoryItem: {
+      /** @example 2026-03 */
+      year_month: string;
+      /** @example 142000 */
+      budget: number;
+      /**
+       * @description 実際の支出合計（対象外除く）
+       * @example 131200
+       */
+      actual: number;
+    };
+    BudgetSummaryResponse: {
+      /**
+       * @description 今月の収入合計（円）
+       * @example 323200
+       */
+      income_total: number;
+      /**
+       * @description 定期支出合計（円）
+       * @example 96000
+       */
+      recurring_total: number;
+      /**
+       * @description 貯金合計（円）
+       * @example 45000
+       */
+      savings_total: number;
+      /**
+       * @description 変動費予算 = 収入 − 定期支出 − 貯金（円）
+       * @example 182200
+       */
+      variable_budget: number;
+      /**
+       * @description 1日あたりの予算（円）
+       * @example 6073
+       */
+      daily_budget: number;
+      /**
+       * @description 今月の残り日数
+       * @example 12
+       */
+      days_remaining: number;
+      history: components["schemas"]["BudgetHistoryItem"][];
     };
   };
   responses: {
@@ -2561,6 +2954,591 @@ export interface operations {
            *       "message": "dateはYYYY-MM-DD形式で指定してください"
            *     }
            */
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  listRecurringExpenses: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RecurringExpenseListResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  createRecurringExpense: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RecurringExpenseRequest"];
+      };
+    };
+    responses: {
+      /** @description 作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RecurringExpense"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  listPendingRecurring: {
+    parameters: {
+      query: {
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PendingRecurringListResponse"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  updateRecurringExpense: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RecurringExpenseRequest"];
+      };
+    };
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RecurringExpense"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  deleteRecurringExpense: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 削除成功 */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  listSavingsGoals: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SavingsGoalListResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  createSavingsGoal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SavingsGoalRequest"];
+      };
+    };
+    responses: {
+      /** @description 作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SavingsGoal"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  updateSavingsGoal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SavingsGoalRequest"];
+      };
+    };
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SavingsGoal"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  deleteSavingsGoal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 削除成功 */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  postMonthlySavings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amount: number;
+          year_month: string;
+        };
+      };
+    };
+    responses: {
+      /** @description 積立成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SavingsGoal"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  listIncomeRecords: {
+    parameters: {
+      query: {
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncomeRecordListResponse"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  createIncomeRecord: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["IncomeRecordRequest"];
+      };
+    };
+    responses: {
+      /** @description 作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncomeRecord"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  updateIncomeRecord: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["IncomeRecordRequest"];
+      };
+    };
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncomeRecord"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  deleteIncomeRecord: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 削除成功 */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  getBaseIncome: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BaseIncomeSetting"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  updateBaseIncome: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BaseIncomeSetting"];
+      };
+    };
+    responses: {
+      /** @description 更新成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BaseIncomeSetting"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  getBudgetSummary: {
+    parameters: {
+      query: {
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BudgetSummaryResponse"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
           "application/json": components["schemas"]["ErrorResponse"];
         };
       };

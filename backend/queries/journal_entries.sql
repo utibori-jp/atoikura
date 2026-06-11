@@ -38,7 +38,8 @@ SELECT
   cg.group_name,
   je.is_excluded,
   je.note,
-  je.created_at
+  je.created_at,
+  je.recurring_expense_id
 FROM journal_entries je
 JOIN expense_categories ec ON je.category_id = ec.id
 JOIN category_groups cg ON ec.group_id = cg.id

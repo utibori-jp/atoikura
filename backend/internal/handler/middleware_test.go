@@ -70,8 +70,8 @@ func TestRequireBearerAuth(t *testing.T) {
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
-			name:       "Bearer with wrong secret",
-			path:       "/budgets",
+			name: "Bearer with wrong secret",
+			path: "/budgets",
 			authHeader: func() string {
 				tok, _ := IssueJWT(1, []byte("wrong-secret"))
 				return "Bearer " + tok

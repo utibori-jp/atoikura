@@ -132,7 +132,12 @@ export function JournalEntryForm({ onSuccess }: Props) {
   const [error_message, setErrorMessage] = useState("");
 
   useEffect(() => {
-    api.listCategoryGroups().then((res) => setCategoryGroups(res.category_groups));
+    api.listCategoryGroups().then((res) => {
+      setCategoryGroups(res.category_groups);
+      if (res.category_groups.length > 0) {
+        setSelectedGroupId(String(res.category_groups[0].id));
+      }
+    });
     api.listExpenseCategories().then((res) => setAllExpenseCategories(res.expense_categories));
   }, []);
 
@@ -167,7 +172,7 @@ export function JournalEntryForm({ onSuccess }: Props) {
         item: item || null,
         note: note || null,
       });
-      setSelectedGroupId("");
+      setSelectedGroupId(category_groups.length > 0 ? String(category_groups[0].id) : "");
       setSelectedCategoryId("");
       setAmount("");
       setItem("");
@@ -197,7 +202,7 @@ export function JournalEntryForm({ onSuccess }: Props) {
         <p style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>サクッと入力してすぐ反映</p>
       </div>
 
-      <div style={{ display: "flex", gap: 14, marginBottom: 16 }}>
+      <div className="form-top-row" style={{ display: "flex", gap: 14, marginBottom: 16 }}>
         <Field label="日付" flex="0 0 160px">
           <input
             type="date"

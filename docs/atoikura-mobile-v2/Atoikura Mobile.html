@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>Atoikura — Mobile v2 (PWA)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=DM+Sans:wght@400;500;700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --font-jp: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", system-ui, sans-serif;
+    --font-jp-display: "Zen Maru Gothic", "M PLUS Rounded 1c", system-ui, sans-serif;
+    --font-num: "DM Sans", system-ui, sans-serif;
+  }
+  html, body { margin: 0; padding: 0; background: #efeae2; font-family: var(--font-jp); }
+  * { box-sizing: border-box; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Review-only scaffold (canvas, tweaks panel, phone bezel) — not part of the product -->
+<script type="text/babel" src="_scaffold/design-canvas.jsx"></script>
+<script type="text/babel" src="_scaffold/tweaks-panel.jsx"></script>
+<script type="text/babel" src="_scaffold/ios-frame.jsx"></script>
+
+<!-- Shared data, utilities, and shared chrome -->
+<script type="text/babel" src="src/shared.jsx"></script>
+<script type="text/babel" src="src/mobile-home.jsx"></script>
+
+<!-- Screens (original) -->
+<script type="text/babel" src="src/mobile-others.jsx"></script>
+
+<!-- Screens (v2 additions — Issues #25 / #27 / #28 / #29) -->
+<script type="text/babel" src="src/mobile-recurring.jsx"></script>
+<script type="text/babel" src="src/mobile-savings.jsx"></script>
+<script type="text/babel" src="src/mobile-income.jsx"></script>
+<script type="text/babel" src="src/mobile-goals-v2.jsx"></script>
+
+<!-- App assembly (v2) -->
+<script type="text/babel" src="src/mobile-app-v2.jsx"></script>
+</body>
+</html>
