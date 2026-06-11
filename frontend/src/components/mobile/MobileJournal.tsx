@@ -3,7 +3,6 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "./groupEmoji";
-import type { JournalEntryResponseWithRecurring } from "../../api/mobile-types";
 
 type DailyJournalEntries = components["schemas"]["DailyJournalEntries"];
 type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
@@ -310,7 +309,7 @@ export function MobileJournal({ year_month, refresh_token, onEditEntry }: Props)
                           >
                             {e.item ?? e.category_name}
                           </span>
-                          {(e as JournalEntryResponseWithRecurring).is_recurring && (
+                          {e.is_recurring && (
                             <span
                               style={{
                                 flexShrink: 0,
