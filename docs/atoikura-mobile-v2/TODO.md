@@ -367,15 +367,19 @@ depends on this field.
 5. `docs/atoikura-api.yaml`
    — Add optional `is_recurring` boolean field to `JournalEntryResponse` schema
 
-### B-4-b: Auto-post recurring expenses (job scheduler) — Issue #25
+### B-4-b: Auto-post recurring expenses (job scheduler) — Issue #25 ✅ Done
 
-Implement the month-start job that creates `journal_entries` from `recurring_expenses` records:
-- Fixed-type: post immediately with confirmed amount
-- Variable-type: create pending entry for user confirmation
-- Use `robfig/cron` scheduler, organized under `internal/job/`
+Implemented daily scheduler in `backend/internal/job/recurring_poster.go`.
+- Wakes at 08:00 JST each day (stdlib `time.Timer` loop; `robfig/cron` unavailable offline)
+- Queries all `fixed` recurring expenses whose `billing_day` = today and not yet posted this month
+- Inserts `journal_entries` with `recurring_expense_id` set
+- Started from `cmd/server/main.go` via `poster.Start()` / `defer poster.Stop()`
 
-### B-5: Cleanup mock files
+Variable-type expenses remain as "pending" items; users confirm amount via the existing `MobileRecurring` UI (no auto-insert for variable type by design).
 
-Once the above is complete, delete:
-- `frontend/src/api/mobile-mock.ts`
-- `frontend/src/api/mobile-types.ts`
+### B-5: Cleanup mock files ✅ Done
+
+- Regenerated `frontend/src/api/types.ts` via `npm run gen:api` (adds `is_recurring?: boolean` to `JournalEntryResponse`)
+- Removed cast to `JournalEntryResponseWithRecurring` in `MobileJournal.tsx` — now uses `e.is_recurring` directly
+- Deleted `frontend/src/api/mobile-mock.ts`
+- Deleted `frontend/src/api/mobile-types.ts`
