@@ -106,9 +106,13 @@ export function WebReview() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    Promise.all([api.getMonthlyBreakdown(year_month), api.getMonthlyReviews(year_month)])
-      .then(([breakdown_res, reviews_res]) => {
+    void (async () => {
+      setLoading(true);
+      try {
+        const [breakdown_res, reviews_res] = await Promise.all([
+          api.getMonthlyBreakdown(year_month),
+          api.getMonthlyReviews(year_month),
+        ]);
         if (cancelled) return;
         const memo_map: Record<number, string> = {};
         for (const n of reviews_res.notes) {
@@ -118,9 +122,9 @@ export function WebReview() {
         setMemos(memo_map);
         setSavedMemos(memo_map);
         setSaveMsg("");
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
+      } catch { /* ignore fetch errors */ }
+      finally { if (!cancelled) setLoading(false); }
+    })();
     return () => { cancelled = true; };
   }, [year_month]);
 

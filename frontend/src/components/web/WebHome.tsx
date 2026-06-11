@@ -296,11 +296,13 @@ function EntryForm({ onSuccess }: EntryFormProps) {
   );
 
   useEffect(() => {
-    setSelectedCategoryId((cur) => {
-      const still_valid = filtered_categories.some((c) => String(c.id) === cur);
-      return still_valid ? cur : "";
-    });
-  }, [selected_group_id, all_categories]);
+    void Promise.resolve().then(() =>
+      setSelectedCategoryId((cur) => {
+        const still_valid = filtered_categories.some((c) => String(c.id) === cur);
+        return still_valid ? cur : "";
+      })
+    );
+  }, [selected_group_id, all_categories]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handle_submit = useCallback(
     async (e?: React.FormEvent) => {

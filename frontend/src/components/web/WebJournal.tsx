@@ -38,7 +38,7 @@ function DailyNoteField({
   const save_timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setValue(initial_note);
+    void Promise.resolve().then(() => setValue(initial_note));
   }, [initial_note]);
 
   const handle_change = (new_val: string) => {
@@ -93,22 +93,25 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
 
   useEffect(() => {
     let cancelled = false;
-    setEntries(null);
-    setErrorMsg("");
-    Promise.all([
-      api.listJournalEntries(year_month),
-      api.getDailyNotes(year_month),
-    ]).then(([entries_res, notes_res]) => {
-      if (cancelled) return;
-      setEntries(entries_res.entries);
-      const notes_map: Record<string, string> = {};
-      for (const n of notes_res.notes) {
-        if (n.note != null) notes_map[n.date] = n.note;
+    void (async () => {
+      setEntries(null);
+      setErrorMsg("");
+      try {
+        const [entries_res, notes_res] = await Promise.all([
+          api.listJournalEntries(year_month),
+          api.getDailyNotes(year_month),
+        ]);
+        if (cancelled) return;
+        setEntries(entries_res.entries);
+        const notes_map: Record<string, string> = {};
+        for (const n of notes_res.notes) {
+          if (n.note != null) notes_map[n.date] = n.note;
+        }
+        setDailyNotes(notes_map);
+      } catch (err: unknown) {
+        if (!cancelled) setErrorMsg(err instanceof Error ? err.message : "読み込みに失敗しました");
       }
-      setDailyNotes(notes_map);
-    }).catch((err: unknown) => {
-      if (!cancelled) setErrorMsg(err instanceof Error ? err.message : "読み込みに失敗しました");
-    });
+    })();
     return () => { cancelled = true; };
   }, [year_month, refresh_token]);
 

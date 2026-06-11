@@ -41,17 +41,21 @@ export function WebMaster() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    Promise.all([
-      api.listCategoryGroups(),
-      api.listExpenseCategories(),
-      api.listStatementTypes(),
-    ]).then(([g_res, c_res, s_res]) => {
-      if (cancelled) return;
-      setGroups(g_res.category_groups);
-      setCategories(c_res.expense_categories);
-      setStatementTypes(s_res.statement_types);
-    }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });
+    void (async () => {
+      setLoading(true);
+      try {
+        const [g_res, c_res, s_res] = await Promise.all([
+          api.listCategoryGroups(),
+          api.listExpenseCategories(),
+          api.listStatementTypes(),
+        ]);
+        if (cancelled) return;
+        setGroups(g_res.category_groups);
+        setCategories(c_res.expense_categories);
+        setStatementTypes(s_res.statement_types);
+      } catch { /* ignore fetch errors */ }
+      finally { if (!cancelled) setLoading(false); }
+    })();
     return () => { cancelled = true; };
   }, []);
 
