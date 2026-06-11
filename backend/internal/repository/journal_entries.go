@@ -13,17 +13,18 @@ import (
 )
 
 type JournalEntryView struct {
-	ID              int32     `json:"id"`
-	TransactionDate string    `json:"transaction_date"`
-	Item            *string   `json:"item"`
-	Amount          int32     `json:"amount"`
-	CategoryID      int32     `json:"category_id"`
-	CategoryName    string    `json:"category_name"`
-	GroupID         int32     `json:"group_id"`
-	GroupName       string    `json:"group_name"`
-	IsExcluded      bool      `json:"is_excluded"`
-	Note            *string   `json:"note"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID                 int32     `json:"id"`
+	TransactionDate    string    `json:"transaction_date"`
+	Item               *string   `json:"item"`
+	Amount             int32     `json:"amount"`
+	CategoryID         int32     `json:"category_id"`
+	CategoryName       string    `json:"category_name"`
+	GroupID            int32     `json:"group_id"`
+	GroupName          string    `json:"group_name"`
+	IsExcluded         bool      `json:"is_excluded"`
+	Note               *string   `json:"note"`
+	CreatedAt          time.Time `json:"created_at"`
+	RecurringExpenseID *int32    `json:"recurring_expense_id"`
 }
 
 type CreateJournalEntryParams struct {
@@ -160,17 +161,18 @@ func (r *Repository) ListJournalEntriesByMonth(ctx context.Context, user_id int6
 	result := make([]JournalEntryView, len(rows))
 	for i, row := range rows {
 		result[i] = JournalEntryView{
-			ID:              row.ID,
-			TransactionDate: row.TransactionDate.Time.Format("2006-01-02"),
-			Item:            row.Item,
-			Amount:          row.Amount,
-			CategoryID:      row.CategoryID,
-			CategoryName:    row.CategoryName,
-			GroupID:         row.GroupID,
-			GroupName:       row.GroupName,
-			IsExcluded:      row.IsExcluded,
-			Note:            row.Note,
-			CreatedAt:       row.CreatedAt,
+			ID:                 row.ID,
+			TransactionDate:    row.TransactionDate.Time.Format("2006-01-02"),
+			Item:               row.Item,
+			Amount:             row.Amount,
+			CategoryID:         row.CategoryID,
+			CategoryName:       row.CategoryName,
+			GroupID:            row.GroupID,
+			GroupName:          row.GroupName,
+			IsExcluded:         row.IsExcluded,
+			Note:               row.Note,
+			CreatedAt:          row.CreatedAt,
+			RecurringExpenseID: row.RecurringExpenseID,
 		}
 	}
 	return result, nil

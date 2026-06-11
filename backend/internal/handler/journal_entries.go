@@ -30,6 +30,7 @@ type journalEntryJSON struct {
 	IsExcluded      bool    `json:"is_excluded"`
 	Note            *string `json:"note"`
 	CreatedAt       string  `json:"created_at"`
+	IsRecurring     bool    `json:"is_recurring"`
 }
 
 func viewToJournalEntryJSON(e repository.JournalEntryView) journalEntryJSON {
@@ -45,6 +46,7 @@ func viewToJournalEntryJSON(e repository.JournalEntryView) journalEntryJSON {
 		IsExcluded:      e.IsExcluded,
 		Note:            e.Note,
 		CreatedAt:       toJST(e.CreatedAt),
+		IsRecurring:     e.RecurringExpenseID != nil,
 	}
 }
 
