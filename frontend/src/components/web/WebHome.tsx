@@ -66,7 +66,7 @@ function DonutChart({ size, spent_pct, remaining, remaining_pct, days_left }: Do
   const cx = size / 2;
   const cy = size / 2;
   const circ = 2 * Math.PI * r;
-  const spent_arc = circ * spent_pct / 100;
+  const spent_arc = (circ * spent_pct) / 100;
 
   return (
     <div style={{ position: "relative", width: size, height: size }}>
@@ -80,31 +80,51 @@ function DonutChart({ size, spent_pct, remaining, remaining_pct, days_left }: Do
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="#FFE8DD" strokeWidth="26" />
         {spent_pct > 0 && (
           <circle
-            cx={cx} cy={cy} r={r} fill="none"
-            stroke="url(#webDonutGrad)" strokeWidth="26"
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke="url(#webDonutGrad)"
+            strokeWidth="26"
             strokeDasharray={`${spent_arc} ${circ}`}
             strokeLinecap="round"
             style={{ transform: "rotate(-90deg)", transformOrigin: `${cx}px ${cy}px` }}
           />
         )}
       </svg>
-      <div style={{
-        position: "absolute", inset: 0,
-        display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-      }}>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-          <span style={{
-            fontFamily: "'DM Sans', sans-serif",
-            fontWeight: 700, fontSize: 38,
-            letterSpacing: "-0.03em", color: T.ink, lineHeight: 1,
-          }}>
+          <span
+            style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontWeight: 700,
+              fontSize: 38,
+              letterSpacing: "-0.03em",
+              color: T.ink,
+              lineHeight: 1,
+            }}
+          >
             {yenSlim(remaining)}
           </span>
-          <span style={{
-            fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
-            fontWeight: 700, fontSize: 17, color: T.ink,
-          }}>円</span>
+          <span
+            style={{
+              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+              fontWeight: 700,
+              fontSize: 17,
+              color: T.ink,
+            }}
+          >
+            円
+          </span>
         </div>
         <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 6 }}>
           残り <strong style={{ color: T.coralDeep }}>{remaining_pct}%</strong> · あと{days_left}日
@@ -124,8 +144,19 @@ interface AreaChartProps {
   spent_so_far: number;
 }
 
-function AreaChart({ width, height, days, monthly_budget, today_day, days_in_month, spent_so_far }: AreaChartProps) {
-  const padL = 56, padR = 28, padT = 24, padB = 40;
+function AreaChart({
+  width,
+  height,
+  days,
+  monthly_budget,
+  today_day,
+  days_in_month,
+  spent_so_far,
+}: AreaChartProps) {
+  const padL = 56,
+    padR = 28,
+    padT = 24,
+    padB = 40;
   const w = width - padL - padR;
   const h = height - padT - padB;
   const maxY = Math.max(monthly_budget * 1.05, 1);
@@ -170,53 +201,126 @@ function AreaChart({ width, height, days, monthly_budget, today_day, days_in_mon
 
       {y_ticks.map((t) => (
         <g key={t}>
-          <line x1={padL} x2={width - padR} y1={yAt(t)} y2={yAt(t)}
-            stroke={T.hair} strokeDasharray="2 4" />
-          <text x={padL - 10} y={yAt(t) + 4} textAnchor="end"
-            fontFamily="DM Sans" fontSize="11" fill={T.inkSoft}>
+          <line
+            x1={padL}
+            x2={width - padR}
+            y1={yAt(t)}
+            y2={yAt(t)}
+            stroke={T.hair}
+            strokeDasharray="2 4"
+          />
+          <text
+            x={padL - 10}
+            y={yAt(t) + 4}
+            textAnchor="end"
+            fontFamily="DM Sans"
+            fontSize="11"
+            fill={T.inkSoft}
+          >
             {t === 0 ? "0" : `${t / 1000}k`}
           </text>
         </g>
       ))}
 
       <line
-        x1={xAt(1)} y1={yAt(0)} x2={xAt(days_in_month)} y2={yAt(monthly_budget)}
-        stroke={T.sage} strokeWidth="2" strokeDasharray="6 6" strokeLinecap="round" opacity="0.7"
+        x1={xAt(1)}
+        y1={yAt(0)}
+        x2={xAt(days_in_month)}
+        y2={yAt(monthly_budget)}
+        stroke={T.sage}
+        strokeWidth="2"
+        strokeDasharray="6 6"
+        strokeLinecap="round"
+        opacity="0.7"
       />
 
       {total_fill && <path d={total_fill} fill="url(#webAreaFill)" />}
       {total_path && (
-        <path d={total_path} fill="none" stroke={T.coral} strokeWidth="3.5"
-          strokeLinejoin="round" strokeLinecap="round" />
+        <path
+          d={total_path}
+          fill="none"
+          stroke={T.coral}
+          strokeWidth="3.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
       )}
       {food_path && (
-        <path d={food_path} fill="none" stroke={T.mustard} strokeWidth="2.5"
-          strokeLinejoin="round" strokeLinecap="round" />
+        <path
+          d={food_path}
+          fill="none"
+          stroke={T.mustard}
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
       )}
       {other_path && (
-        <path d={other_path} fill="none" stroke={T.sky} strokeWidth="2.5"
-          strokeLinejoin="round" strokeLinecap="round" />
+        <path
+          d={other_path}
+          fill="none"
+          stroke={T.sky}
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
       )}
       {fc_path && (
-        <path d={fc_path} fill="none" stroke={T.coralDeep} strokeWidth="2.5"
-          strokeDasharray="2 6" strokeLinecap="round" opacity="0.65" />
+        <path
+          d={fc_path}
+          fill="none"
+          stroke={T.coralDeep}
+          strokeWidth="2.5"
+          strokeDasharray="2 6"
+          strokeLinecap="round"
+          opacity="0.65"
+        />
       )}
 
-      <line x1={today_x} y1={padT} x2={today_x} y2={padT + h}
-        stroke={T.ink} strokeWidth="1" opacity="0.15" />
+      <line
+        x1={today_x}
+        y1={padT}
+        x2={today_x}
+        y2={padT + h}
+        stroke={T.ink}
+        strokeWidth="1"
+        opacity="0.15"
+      />
       <circle cx={today_x} cy={today_y} r="7" fill="#fff" stroke={T.coral} strokeWidth="3" />
 
       {spent_so_far > 0 && (
-        <g transform={`translate(${Math.min(today_x + 12, width - padR - 120)}, ${Math.max(today_y - 44, padT)})`}>
+        <g
+          transform={`translate(${Math.min(today_x + 12, width - padR - 120)}, ${Math.max(today_y - 44, padT)})`}
+        >
           <rect width="116" height="38" rx="12" fill={T.ink} />
-          <text x="14" y="16" fill="#fff" fontFamily="M PLUS Rounded 1c" fontSize="10" opacity="0.6">今日</text>
-          <text x="14" y="30" fill="#fff" fontFamily="DM Sans" fontWeight="700" fontSize="14">{yen(spent_so_far)}</text>
+          <text
+            x="14"
+            y="16"
+            fill="#fff"
+            fontFamily="M PLUS Rounded 1c"
+            fontSize="10"
+            opacity="0.6"
+          >
+            今日
+          </text>
+          <text x="14" y="30" fill="#fff" fontFamily="DM Sans" fontWeight="700" fontSize="14">
+            {yen(spent_so_far)}
+          </text>
         </g>
       )}
 
       {x_ticks.map((d) => (
-        <text key={d} x={xAt(d)} y={padT + h + 18} textAnchor="middle"
-          fontFamily="DM Sans" fontSize="11" fill={T.inkSoft}>{d}</text>
+        <text
+          key={d}
+          x={xAt(d)}
+          y={padT + h + 18}
+          textAnchor="middle"
+          fontFamily="DM Sans"
+          fontSize="11"
+          fill={T.inkSoft}
+        >
+          {d}
+        </text>
       ))}
     </svg>
   );
@@ -233,11 +337,27 @@ function LegendDot({ color, label, dashed }: LegendDotProps) {
     <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.inkSoft }}>
       {dashed ? (
         <svg width="20" height="6">
-          <line x1="0" y1="3" x2="20" y2="3" stroke={color} strokeWidth="2.5"
-            strokeDasharray="4 4" strokeLinecap="round" />
+          <line
+            x1="0"
+            y1="3"
+            x2="20"
+            y2="3"
+            stroke={color}
+            strokeWidth="2.5"
+            strokeDasharray="4 4"
+            strokeLinecap="round"
+          />
         </svg>
       ) : (
-        <span style={{ width: 14, height: 14, borderRadius: 7, background: color, display: "inline-block" }} />
+        <span
+          style={{
+            width: 14,
+            height: 14,
+            borderRadius: 7,
+            background: color,
+            display: "inline-block",
+          }}
+        />
       )}
       <span>{label}</span>
     </div>
@@ -256,8 +376,18 @@ function StatPill({ tone, label, value, sub }: StatPillProps) {
   const fg = { coral: T.coralDeep, mustard: "#A3791F", sage: T.sageDeep }[tone];
   return (
     <div style={{ background: bg, borderRadius: 24, padding: "18px 22px", flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 12, color: fg, fontWeight: 700, letterSpacing: "0.04em" }}>{label}</div>
-      <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 26, color: T.ink, marginTop: 4 }}>
+      <div style={{ fontSize: 12, color: fg, fontWeight: 700, letterSpacing: "0.04em" }}>
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: "'DM Sans', sans-serif",
+          fontWeight: 700,
+          fontSize: 26,
+          color: T.ink,
+          marginTop: 4,
+        }}
+      >
         {value}
       </div>
       <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 2 }}>{sub}</div>
@@ -366,16 +496,36 @@ function EntryForm({ onSuccess }: EntryFormProps) {
   };
 
   return (
-    <form onSubmit={handle_submit} style={{
-      background: T.card, borderRadius: 32, padding: 28,
-      boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+    <form
+      onSubmit={handle_submit}
+      style={{
+        background: T.card,
+        borderRadius: 32,
+        padding: 28,
+        boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 18,
+        }}
+      >
         <div>
-          <div style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 18, fontWeight: 700 }}>
+          <div
+            style={{
+              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+              fontSize: 18,
+              fontWeight: 700,
+            }}
+          >
             支出を記録
           </div>
-          <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 2 }}>サクッと入力してすぐ反映</div>
+          <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 2 }}>
+            サクッと入力してすぐ反映
+          </div>
         </div>
         <div style={{ fontSize: 12, color: T.inkSoft }}>⌘ + Enter で保存</div>
       </div>
@@ -392,14 +542,28 @@ function EntryForm({ onSuccess }: EntryFormProps) {
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 6, flex: 0.6 }}>
           <span style={{ fontSize: 12, color: T.inkSoft, fontWeight: 500 }}>金額</span>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "12px 14px",
-            border: `1.5px solid ${amount_str ? T.coral : T.hair}`,
-            borderRadius: 16, background: "#fff",
-            transition: "border-color 0.15s",
-          }}>
-            <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 20, color: T.coralDeep }}>¥</span>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "12px 14px",
+              border: `1.5px solid ${amount_str ? T.coral : T.hair}`,
+              borderRadius: 16,
+              background: "#fff",
+              transition: "border-color 0.15s",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 700,
+                fontSize: 20,
+                color: T.coralDeep,
+              }}
+            >
+              ¥
+            </span>
             <input
               type="number"
               min="1"
@@ -407,9 +571,15 @@ function EntryForm({ onSuccess }: EntryFormProps) {
               value={amount_str}
               onChange={(e) => setAmountStr(e.target.value)}
               style={{
-                border: "none", outline: "none", background: "transparent",
-                fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 20,
-                color: T.ink, width: "100%", padding: 0,
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 700,
+                fontSize: 20,
+                color: T.ink,
+                width: "100%",
+                padding: 0,
               }}
             />
           </div>
@@ -427,7 +597,9 @@ function EntryForm({ onSuccess }: EntryFormProps) {
       </div>
 
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 500, marginBottom: 8 }}>大分類</div>
+        <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 500, marginBottom: 8 }}>
+          大分類
+        </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {groups.map((g) => {
             const active = String(g.id) === selected_group_id;
@@ -440,9 +612,13 @@ function EntryForm({ onSuccess }: EntryFormProps) {
                   border: `1.5px solid ${active ? T.coral : T.hair}`,
                   background: active ? T.coral : "#fff",
                   color: active ? "#fff" : T.ink,
-                  padding: "10px 16px", borderRadius: 999,
-                  fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", whiteSpace: "nowrap",
+                  padding: "10px 16px",
+                  borderRadius: 999,
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
                   transition: "background 0.15s, color 0.15s",
                 }}
               >
@@ -455,7 +631,9 @@ function EntryForm({ onSuccess }: EntryFormProps) {
       </div>
 
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 500, marginBottom: 8 }}>生活区分</div>
+        <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 500, marginBottom: 8 }}>
+          生活区分
+        </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {filtered_categories.map((c) => {
             const active = String(c.id) === selected_category_id;
@@ -468,9 +646,13 @@ function EntryForm({ onSuccess }: EntryFormProps) {
                   border: `1.5px solid ${active ? T.mustard : T.hair}`,
                   background: active ? T.mustard : "#fff",
                   color: active ? T.ink : T.ink,
-                  padding: "10px 16px", borderRadius: 999,
-                  fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", whiteSpace: "nowrap",
+                  padding: "10px 16px",
+                  borderRadius: 999,
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
                   transition: "background 0.15s",
                 }}
               >
@@ -485,26 +667,52 @@ function EntryForm({ onSuccess }: EntryFormProps) {
         <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 12 }}>{error_msg}</div>
       )}
 
-      <div style={{ display: "flex", gap: 14, alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: T.inkSoft, cursor: "pointer" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 14,
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginTop: 18,
+        }}
+      >
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            fontSize: 13,
+            color: T.inkSoft,
+            cursor: "pointer",
+          }}
+        >
           <span
             onClick={() => setIsExcluded(!is_excluded)}
             style={{
-              width: 36, height: 22, borderRadius: 999,
+              width: 36,
+              height: 22,
+              borderRadius: 999,
               background: is_excluded ? T.coral : T.hair,
-              position: "relative", display: "inline-block",
-              transition: "background 0.2s", cursor: "pointer", flexShrink: 0,
+              position: "relative",
+              display: "inline-block",
+              transition: "background 0.2s",
+              cursor: "pointer",
+              flexShrink: 0,
             }}
           >
-            <span style={{
-              position: "absolute",
-              left: is_excluded ? 16 : 2,
-              top: 2,
-              width: 18, height: 18, borderRadius: 999,
-              background: "#fff",
-              boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
-              transition: "left 0.2s",
-            }} />
+            <span
+              style={{
+                position: "absolute",
+                left: is_excluded ? 16 : 2,
+                top: 2,
+                width: 18,
+                height: 18,
+                borderRadius: 999,
+                background: "#fff",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                transition: "left 0.2s",
+              }}
+            />
           </span>
           集計から除外する <span style={{ fontSize: 11 }}>（記念日など）</span>
         </label>
@@ -520,8 +728,12 @@ function EntryForm({ onSuccess }: EntryFormProps) {
               setSelectedCategoryId("");
             }}
             style={{
-              border: "none", background: "transparent",
-              color: T.inkSoft, fontFamily: "inherit", fontSize: 13, cursor: "pointer",
+              border: "none",
+              background: "transparent",
+              color: T.inkSoft,
+              fontFamily: "inherit",
+              fontSize: 13,
+              cursor: "pointer",
             }}
           >
             キャンセル
@@ -530,9 +742,14 @@ function EntryForm({ onSuccess }: EntryFormProps) {
             type="submit"
             disabled={submitting}
             style={{
-              border: "none", background: T.coral, color: "#fff",
-              padding: "12px 28px", borderRadius: 999,
-              fontFamily: "inherit", fontWeight: 700, fontSize: 15,
+              border: "none",
+              background: T.coral,
+              color: "#fff",
+              padding: "12px 28px",
+              borderRadius: 999,
+              fontFamily: "inherit",
+              fontWeight: 700,
+              fontSize: 15,
               cursor: submitting ? "default" : "pointer",
               boxShadow: `0 6px 0 ${T.coralDeep}`,
               opacity: submitting ? 0.7 : 1,
@@ -560,10 +777,15 @@ export function WebHome({ refresh_token, onSuccess }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    api.getDailyCumulative(ym).then((res) => {
-      if (!cancelled) setCumulative(res);
-    }).catch(() => {});
-    return () => { cancelled = true; };
+    api
+      .getDailyCumulative(ym)
+      .then((res) => {
+        if (!cancelled) setCumulative(res);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [ym, refresh_token]);
 
   const monthly_budget = cumulative?.monthly_budget ?? 0;
@@ -587,19 +809,48 @@ export function WebHome({ refresh_token, onSuccess }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div style={{ display: "flex", gap: 24, alignItems: "stretch" }}>
-        <div style={{
-          flex: "0 0 360px", background: T.card, borderRadius: 28,
-          padding: "24px 28px 28px",
-          boxShadow: "0 4px 20px -12px rgba(80,40,10,0.14)",
-          display: "flex", flexDirection: "column", alignItems: "center",
-        }}>
-          <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 2 }}>
+        <div
+          style={{
+            flex: "0 0 360px",
+            background: T.card,
+            borderRadius: 28,
+            padding: "24px 28px 28px",
+            boxShadow: "0 4px 20px -12px rgba(80,40,10,0.14)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              marginBottom: 2,
+            }}
+          >
             <div style={{ fontSize: 12, color: T.inkSoft }}>{formatDateJP(today)}</div>
-            <div style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 14, fontWeight: 700, color: T.inkSoft }}>
+            <div
+              style={{
+                fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                fontSize: 14,
+                fontWeight: 700,
+                color: T.inkSoft,
+              }}
+            >
               おかえりなさい！
             </div>
           </div>
-          <div style={{ fontSize: 13, color: T.inkSoft, fontWeight: 500, marginTop: 10, marginBottom: 8 }}>
+          <div
+            style={{
+              fontSize: 13,
+              color: T.inkSoft,
+              fontWeight: 500,
+              marginTop: 10,
+              marginBottom: 8,
+            }}
+          >
             今月あといくら使える？
           </div>
           <DonutChart
@@ -611,14 +862,27 @@ export function WebHome({ refresh_token, onSuccess }: Props) {
           />
         </div>
 
-        <div style={{
-          flex: 1, background: T.card, borderRadius: 32, padding: 28,
-          boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
-          overflow: "hidden",
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div
+          style={{
+            flex: 1,
+            background: T.card,
+            borderRadius: 32,
+            padding: 28,
+            boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}
+          >
             <div>
-              <div style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 18, fontWeight: 700 }}>
+              <div
+                style={{
+                  fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                  fontSize: 18,
+                  fontWeight: 700,
+                }}
+              >
                 変動費の累積
               </div>
               <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>

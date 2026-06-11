@@ -46,8 +46,11 @@ function DailyNoteField({
     if (save_timer.current) clearTimeout(save_timer.current);
     save_timer.current = setTimeout(() => {
       setSaving(true);
-      api.updateDailyNote(date, new_val)
-        .then(() => { onSave(date, new_val); })
+      api
+        .updateDailyNote(date, new_val)
+        .then(() => {
+          onSave(date, new_val);
+        })
         .catch(() => {})
         .finally(() => setSaving(false));
     }, 800);
@@ -76,7 +79,16 @@ function DailyNoteField({
         }}
       />
       {saving && (
-        <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: T.inkSoft }}>
+        <span
+          style={{
+            position: "absolute",
+            right: 10,
+            top: "50%",
+            transform: "translateY(-50%)",
+            fontSize: 11,
+            color: T.inkSoft,
+          }}
+        >
           保存中…
         </span>
       )}
@@ -112,7 +124,9 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
         if (!cancelled) setErrorMsg(err instanceof Error ? err.message : "読み込みに失敗しました");
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [year_month, refresh_token]);
 
   const handle_delete = async (id: number) => {
@@ -120,11 +134,12 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
     setDeletingId(id);
     try {
       await api.deleteJournalEntry(id);
-      setEntries((prev) => prev
-        ? prev
-          .map((d) => ({ ...d, journal_entries: d.journal_entries.filter((e) => e.id !== id) }))
-          .filter((d) => d.journal_entries.length > 0)
-        : prev
+      setEntries((prev) =>
+        prev
+          ? prev
+              .map((d) => ({ ...d, journal_entries: d.journal_entries.filter((e) => e.id !== id) }))
+              .filter((d) => d.journal_entries.length > 0)
+          : prev
       );
       onRefresh();
     } catch {
@@ -135,14 +150,15 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
   };
 
   const filtered_days = entries
-    ? entries.filter((d) =>
-        search_query === "" ||
-        d.journal_entries.some(
-          (e) =>
-            (e.item ?? "").includes(search_query) ||
-            (e.category_name ?? "").includes(search_query) ||
-            (e.group_name ?? "").includes(search_query)
-        )
+    ? entries.filter(
+        (d) =>
+          search_query === "" ||
+          d.journal_entries.some(
+            (e) =>
+              (e.item ?? "").includes(search_query) ||
+              (e.category_name ?? "").includes(search_query) ||
+              (e.group_name ?? "").includes(search_query)
+          )
       )
     : null;
 
@@ -150,20 +166,36 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
         <div>
-          <div style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 30, fontWeight: 900, letterSpacing: "-0.01em" }}>
+          <div
+            style={{
+              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+              fontSize: 30,
+              fontWeight: 900,
+              letterSpacing: "-0.01em",
+            }}
+          >
             仕訳一覧
           </div>
-          <div style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>日ごとの記録をふりかえり、コメントを残せます</div>
+          <div style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>
+            日ごとの記録をふりかえり、コメントを残せます
+          </div>
         </div>
       </div>
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "flex-end" }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8,
-          padding: "10px 14px", borderRadius: 999,
-          background: "#fff", border: `1.5px solid ${T.hair}`,
-          fontSize: 13, color: T.inkSoft,
-        }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 14px",
+            borderRadius: 999,
+            background: "#fff",
+            border: `1.5px solid ${T.hair}`,
+            fontSize: 13,
+            color: T.inkSoft,
+          }}
+        >
           <span>🔍</span>
           <input
             type="text"
@@ -171,19 +203,24 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
             value={search_query}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
-              border: "none", outline: "none", background: "transparent",
-              fontFamily: "inherit", fontSize: 13, color: T.ink, width: 120,
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              fontFamily: "inherit",
+              fontSize: 13,
+              color: T.ink,
+              width: 120,
             }}
           />
         </div>
       </div>
 
-      {error_msg && (
-        <div style={{ color: T.coralDeep, fontSize: 13 }}>{error_msg}</div>
-      )}
+      {error_msg && <div style={{ color: T.coralDeep, fontSize: 13 }}>{error_msg}</div>}
 
       {filtered_days === null ? (
-        <div style={{ padding: 32, textAlign: "center", color: T.inkSoft, fontSize: 14 }}>読み込み中…</div>
+        <div style={{ padding: 32, textAlign: "center", color: T.inkSoft, fontSize: 14 }}>
+          読み込み中…
+        </div>
       ) : filtered_days.length === 0 ? (
         <div style={{ padding: 32, textAlign: "center", color: T.inkSoft, fontSize: 14 }}>
           {search_query ? "該当する記録が見つかりません" : "この月の仕訳はありません"}
@@ -198,32 +235,69 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
             const note = daily_notes[day.date] ?? "";
 
             return (
-              <div key={day.date} style={{
-                background: T.card, borderRadius: 28, padding: 24,
-                boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
-              }}>
-                <div style={{
-                  display: "flex", alignItems: "flex-start", gap: 18,
-                  paddingBottom: 14, borderBottom: `1.5px solid ${T.hair}`,
-                }}>
-                  <div style={{
-                    width: 60, height: 60, borderRadius: 20,
-                    background: T.bgSoft,
-                    display: "flex", flexDirection: "column",
-                    alignItems: "center", justifyContent: "center",
-                    border: `1.5px solid ${T.hair}`, flexShrink: 0,
-                  }}>
-                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 22, lineHeight: 1 }}>
+              <div
+                key={day.date}
+                style={{
+                  background: T.card,
+                  borderRadius: 28,
+                  padding: 24,
+                  boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 18,
+                    paddingBottom: 14,
+                    borderBottom: `1.5px solid ${T.hair}`,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: 20,
+                      background: T.bgSoft,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: `1.5px solid ${T.hair}`,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontWeight: 700,
+                        fontSize: 22,
+                        lineHeight: 1,
+                      }}
+                    >
                       {d_num}
                     </div>
                     <div style={{ fontSize: 10, color: T.inkSoft, marginTop: 2 }}>{m_num}月</div>
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontWeight: 700, fontSize: 16 }}>
+                      <div
+                        style={{
+                          fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                          fontWeight: 700,
+                          fontSize: 16,
+                        }}
+                      >
                         {weekday}曜日
                       </div>
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 18, marginLeft: "auto" }}>
+                      <div
+                        style={{
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontWeight: 700,
+                          fontSize: 18,
+                          marginLeft: "auto",
+                        }}
+                      >
                         {yen(day_total)}
                       </div>
                     </div>
@@ -249,30 +323,82 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
                     const entry = e as JournalEntryResponseWithRecurring;
                     const emoji = emojiForGroup(e.group_name ?? "");
                     return (
-                      <div key={e.id} style={{
-                        display: "flex", alignItems: "center", gap: 14,
-                        padding: "12px 6px", borderBottom: `1px solid ${T.hair}`,
-                      }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: 12,
-                          background: e.is_excluded ? "#F4E9DC" : "#FFE8DD",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 18, flexShrink: 0,
-                        }}>
+                      <div
+                        key={e.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 14,
+                          padding: "12px 6px",
+                          borderBottom: `1px solid ${T.hair}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 12,
+                            background: e.is_excluded ? "#F4E9DC" : "#FFE8DD",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 18,
+                            flexShrink: 0,
+                          }}
+                        >
                           {emoji}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              fontSize: 14,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <span
+                              style={{
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                maxWidth: 220,
+                              }}
+                            >
                               {e.item ?? e.category_name}
                             </span>
                             {entry.is_recurring && (
-                              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "#E5EEF7", color: "#3F6B91", display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: "2px 8px",
+                                  borderRadius: 6,
+                                  background: "#E5EEF7",
+                                  color: "#3F6B91",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 3,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
                                 🔁 定期
                               </span>
                             )}
                             {e.is_excluded && (
-                              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: T.excluded, color: "#fff", whiteSpace: "nowrap" }}>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: "2px 8px",
+                                  borderRadius: 6,
+                                  background: T.excluded,
+                                  color: "#fff",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
                                 対象外
                               </span>
                             )}
@@ -282,26 +408,48 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
                             {e.note && ` — ${e.note}`}
                           </div>
                         </div>
-                        <div style={{
-                          fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 16,
-                          color: e.is_excluded ? T.inkSoft : T.ink,
-                          textDecoration: e.is_excluded ? "line-through" : "none",
-                          flexShrink: 0,
-                        }}>
+                        <div
+                          style={{
+                            fontFamily: "'DM Sans', sans-serif",
+                            fontWeight: 700,
+                            fontSize: 16,
+                            color: e.is_excluded ? T.inkSoft : T.ink,
+                            textDecoration: e.is_excluded ? "line-through" : "none",
+                            flexShrink: 0,
+                          }}
+                        >
                           {yen(e.amount)}
                         </div>
                         <div style={{ display: "flex", gap: 6, opacity: 0.5, flexShrink: 0 }}>
                           <button
                             type="button"
                             onClick={() => onEditEntry(e)}
-                            style={{ padding: "4px 8px", borderRadius: 8, fontSize: 12, border: "none", background: "transparent", cursor: "pointer" }}
-                          >✎</button>
+                            style={{
+                              padding: "4px 8px",
+                              borderRadius: 8,
+                              fontSize: 12,
+                              border: "none",
+                              background: "transparent",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✎
+                          </button>
                           <button
                             type="button"
                             disabled={deleting_id === e.id}
                             onClick={() => handle_delete(e.id)}
-                            style={{ padding: "4px 8px", borderRadius: 8, fontSize: 12, border: "none", background: "transparent", cursor: "pointer" }}
-                          >🗑</button>
+                            style={{
+                              padding: "4px 8px",
+                              borderRadius: 8,
+                              fontSize: 12,
+                              border: "none",
+                              background: "transparent",
+                              cursor: "pointer",
+                            }}
+                          >
+                            🗑
+                          </button>
                         </div>
                       </div>
                     );

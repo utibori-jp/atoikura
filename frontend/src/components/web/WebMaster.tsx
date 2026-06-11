@@ -53,10 +53,15 @@ export function WebMaster() {
         setGroups(g_res.category_groups);
         setCategories(c_res.expense_categories);
         setStatementTypes(s_res.statement_types);
-      } catch { /* ignore fetch errors */ }
-      finally { if (!cancelled) setLoading(false); }
+      } catch {
+        /* ignore fetch errors */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const refresh = async () => {
@@ -71,8 +76,14 @@ export function WebMaster() {
   const handle_group_submit = async () => {
     if (!group_form) return;
     setErrorMsg("");
-    if (!group_form.name.trim()) { setErrorMsg("名前を入力してください"); return; }
-    if (!group_form.statement_type_id) { setErrorMsg("変動費種別を選択してください"); return; }
+    if (!group_form.name.trim()) {
+      setErrorMsg("名前を入力してください");
+      return;
+    }
+    if (!group_form.statement_type_id) {
+      setErrorMsg("変動費種別を選択してください");
+      return;
+    }
     setSubmitting(true);
     try {
       const body = {
@@ -107,9 +118,18 @@ export function WebMaster() {
   const handle_cat_submit = async () => {
     if (!cat_form) return;
     setErrorMsg("");
-    if (!cat_form.name.trim()) { setErrorMsg("名前を入力してください"); return; }
-    if (!cat_form.group_id) { setErrorMsg("大分類を選択してください"); return; }
-    if (!cat_form.category_code.trim()) { setErrorMsg("コードを入力してください"); return; }
+    if (!cat_form.name.trim()) {
+      setErrorMsg("名前を入力してください");
+      return;
+    }
+    if (!cat_form.group_id) {
+      setErrorMsg("大分類を選択してください");
+      return;
+    }
+    if (!cat_form.category_code.trim()) {
+      setErrorMsg("コードを入力してください");
+      return;
+    }
     setSubmitting(true);
     try {
       const body = {
@@ -142,10 +162,16 @@ export function WebMaster() {
   };
 
   const input_style: React.CSSProperties = {
-    width: "100%", padding: "10px 12px",
-    border: `1.5px solid ${T.hair}`, borderRadius: 12,
-    fontFamily: "inherit", fontSize: 14, color: T.ink,
-    background: T.bgSoft, outline: "none", boxSizing: "border-box",
+    width: "100%",
+    padding: "10px 12px",
+    border: `1.5px solid ${T.hair}`,
+    borderRadius: 12,
+    fontFamily: "inherit",
+    fontSize: 14,
+    color: T.ink,
+    background: T.bgSoft,
+    outline: "none",
+    boxSizing: "border-box",
   };
 
   const categories_by_group = groups.map((g) => ({
@@ -156,14 +182,28 @@ export function WebMaster() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div>
-        <div style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 30, fontWeight: 900, letterSpacing: "-0.01em" }}>
+        <div
+          style={{
+            fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+            fontSize: 30,
+            fontWeight: 900,
+            letterSpacing: "-0.01em",
+          }}
+        >
           マスタ管理
         </div>
-        <div style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>自分らしいカテゴリで管理しよう</div>
+        <div style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>
+          自分らしいカテゴリで管理しよう
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>
-        {([{ id: "groups", label: "大分類" }, { id: "categories", label: "生活区分" }] as const).map((tab) => {
+        {(
+          [
+            { id: "groups", label: "大分類" },
+            { id: "categories", label: "生活区分" },
+          ] as const
+        ).map((tab) => {
           const active = active_tab === tab.id;
           return (
             <button
@@ -173,8 +213,12 @@ export function WebMaster() {
                 border: `1.5px solid ${active ? T.coral : T.hair}`,
                 background: active ? T.coral : "#fff",
                 color: active ? "#fff" : T.ink,
-                padding: "10px 16px", borderRadius: 999,
-                fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                padding: "10px 16px",
+                borderRadius: 999,
+                fontFamily: "inherit",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
               }}
             >
               {tab.label}
@@ -184,70 +228,144 @@ export function WebMaster() {
       </div>
 
       {loading ? (
-        <div style={{ padding: 32, textAlign: "center", color: T.inkSoft, fontSize: 14 }}>読み込み中…</div>
+        <div style={{ padding: 32, textAlign: "center", color: T.inkSoft, fontSize: 14 }}>
+          読み込み中…
+        </div>
       ) : active_tab === "groups" ? (
-        <div style={{ background: T.card, borderRadius: 32, padding: 28, boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-            <div style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 18, fontWeight: 700 }}>
+        <div
+          style={{
+            background: T.card,
+            borderRadius: 32,
+            padding: 28,
+            boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 18,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                fontSize: 18,
+                fontWeight: 700,
+              }}
+            >
               大分類（{groups.length}件）
             </div>
             <button
-              onClick={() => { setGroupForm({ id: null, name: "", emoji: "", statement_type_id: "" }); setErrorMsg(""); }}
-              style={{
-                border: "none", background: T.coral, color: "#fff",
-                padding: "10px 18px", borderRadius: 999,
-                fontFamily: "inherit", fontWeight: 700, fontSize: 13,
-                cursor: "pointer", boxShadow: `0 4px 0 ${T.coralDeep}`,
+              onClick={() => {
+                setGroupForm({ id: null, name: "", emoji: "", statement_type_id: "" });
+                setErrorMsg("");
               }}
-            >＋ 大分類を追加</button>
+              style={{
+                border: "none",
+                background: T.coral,
+                color: "#fff",
+                padding: "10px 18px",
+                borderRadius: 999,
+                fontFamily: "inherit",
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+                boxShadow: `0 4px 0 ${T.coralDeep}`,
+              }}
+            >
+              ＋ 大分類を追加
+            </button>
           </div>
 
           {group_form && (
-            <div style={{
-              marginBottom: 18, padding: "18px 20px", borderRadius: 20,
-              background: T.bgSoft, border: `1.5px solid ${T.hair}`,
-            }}>
+            <div
+              style={{
+                marginBottom: 18,
+                padding: "18px 20px",
+                borderRadius: 20,
+                background: T.bgSoft,
+                border: `1.5px solid ${T.hair}`,
+              }}
+            >
               <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
                 {group_form.id ? "大分類を編集" : "大分類を追加"}
               </div>
               <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                 <div style={{ flex: "0 0 80px" }}>
                   <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>絵文字</div>
-                  <input type="text" value={group_form.emoji}
-                    onChange={(e) => setGroupForm((f) => f && ({ ...f, emoji: e.target.value }))}
+                  <input
+                    type="text"
+                    value={group_form.emoji}
+                    onChange={(e) => setGroupForm((f) => f && { ...f, emoji: e.target.value })}
                     placeholder="🍙"
                     style={{ ...input_style, textAlign: "center", fontSize: 20 }}
                   />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>名前</div>
-                  <input type="text" value={group_form.name}
-                    onChange={(e) => setGroupForm((f) => f && ({ ...f, name: e.target.value }))}
+                  <input
+                    type="text"
+                    value={group_form.name}
+                    onChange={(e) => setGroupForm((f) => f && { ...f, name: e.target.value })}
                     placeholder="食費"
                     style={input_style}
                   />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>変動費種別</div>
-                  <select value={group_form.statement_type_id}
-                    onChange={(e) => setGroupForm((f) => f && ({ ...f, statement_type_id: e.target.value }))}
+                  <select
+                    value={group_form.statement_type_id}
+                    onChange={(e) =>
+                      setGroupForm((f) => f && { ...f, statement_type_id: e.target.value })
+                    }
                     style={input_style}
                   >
                     <option value="">選択…</option>
                     {statement_types.map((s) => (
-                      <option key={s.id} value={s.id}>{s.statement_type_name}</option>
+                      <option key={s.id} value={s.id}>
+                        {s.statement_type_name}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
-              {error_msg && <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>{error_msg}</div>}
+              {error_msg && (
+                <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>
+                  {error_msg}
+                </div>
+              )}
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={handle_group_submit} disabled={submitting}
-                  style={{ border: "none", background: T.coral, color: "#fff", padding: "9px 20px", borderRadius: 999, fontFamily: "inherit", fontWeight: 700, cursor: "pointer", boxShadow: `0 3px 0 ${T.coralDeep}` }}>
+                <button
+                  onClick={handle_group_submit}
+                  disabled={submitting}
+                  style={{
+                    border: "none",
+                    background: T.coral,
+                    color: "#fff",
+                    padding: "9px 20px",
+                    borderRadius: 999,
+                    fontFamily: "inherit",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    boxShadow: `0 3px 0 ${T.coralDeep}`,
+                  }}
+                >
                   {submitting ? "保存中…" : "保存"}
                 </button>
-                <button onClick={() => setGroupForm(null)}
-                  style={{ border: `1px solid ${T.hair}`, background: "#fff", color: T.inkSoft, padding: "9px 20px", borderRadius: 999, fontFamily: "inherit", cursor: "pointer" }}>
+                <button
+                  onClick={() => setGroupForm(null)}
+                  style={{
+                    border: `1px solid ${T.hair}`,
+                    background: "#fff",
+                    color: T.inkSoft,
+                    padding: "9px 20px",
+                    borderRadius: 999,
+                    fontFamily: "inherit",
+                    cursor: "pointer",
+                  }}
+                >
                   キャンセル
                 </button>
               </div>
@@ -265,23 +383,49 @@ export function WebMaster() {
               const type_c = type_colors[type_name] ?? { bg: "#E5EEF7", fg: "#3F6B91" };
               const cat_count = categories.filter((c) => c.group_id === g.id).length;
               return (
-                <div key={g.id} style={{
-                  padding: "16px 18px", borderRadius: 20,
-                  background: T.bgSoft, border: `1.5px solid ${T.hair}`,
-                  display: "flex", alignItems: "center", gap: 14,
-                }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: 14,
-                    background: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 22, boxShadow: "0 2px 0 #F2E4D2",
-                  }}>
+                <div
+                  key={g.id}
+                  style={{
+                    padding: "16px 18px",
+                    borderRadius: 20,
+                    background: T.bgSoft,
+                    border: `1.5px solid ${T.hair}`,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      background: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 22,
+                      boxShadow: "0 2px 0 #F2E4D2",
+                    }}
+                  >
                     {emojiForGroup(g.group_name)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{g.group_name}</div>
-                    <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 2 }}>{cat_count} 区分</div>
+                    <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 2 }}>
+                      {cat_count} 区分
+                    </div>
                   </div>
-                  <div style={{ padding: "4px 10px", borderRadius: 999, background: type_c.bg, color: type_c.fg, fontSize: 11, fontWeight: 700 }}>
+                  <div
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: 999,
+                      background: type_c.bg,
+                      color: type_c.fg,
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
                     {type_name}
                   </div>
                   <div style={{ display: "flex", gap: 4, color: T.inkSoft }}>
@@ -295,12 +439,30 @@ export function WebMaster() {
                         });
                         setErrorMsg("");
                       }}
-                      style={{ padding: "4px 6px", fontSize: 13, border: "none", background: "transparent", cursor: "pointer", color: T.inkSoft }}
-                    >✎</button>
+                      style={{
+                        padding: "4px 6px",
+                        fontSize: 13,
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        color: T.inkSoft,
+                      }}
+                    >
+                      ✎
+                    </button>
                     <button
                       onClick={() => handle_group_delete(g.id)}
-                      style={{ padding: "4px 6px", fontSize: 13, border: "none", background: "transparent", cursor: "pointer", color: T.inkSoft }}
-                    >🗑</button>
+                      style={{
+                        padding: "4px 6px",
+                        fontSize: 13,
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        color: T.inkSoft,
+                      }}
+                    >
+                      🗑
+                    </button>
                   </div>
                 </div>
               );
@@ -308,68 +470,140 @@ export function WebMaster() {
           </div>
         </div>
       ) : (
-        <div style={{ background: T.card, borderRadius: 32, padding: 28, boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-            <div style={{ fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif", fontSize: 16, fontWeight: 700 }}>
+        <div
+          style={{
+            background: T.card,
+            borderRadius: 32,
+            padding: 28,
+            boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 18,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                fontSize: 16,
+                fontWeight: 700,
+              }}
+            >
               生活区分（大分類ごと）
             </div>
             <button
-              onClick={() => { setCatForm({ id: null, name: "", category_code: "", group_id: "" }); setErrorMsg(""); }}
-              style={{
-                border: "none", background: T.coral, color: "#fff",
-                padding: "10px 18px", borderRadius: 999,
-                fontFamily: "inherit", fontWeight: 700, fontSize: 13,
-                cursor: "pointer", boxShadow: `0 4px 0 ${T.coralDeep}`,
+              onClick={() => {
+                setCatForm({ id: null, name: "", category_code: "", group_id: "" });
+                setErrorMsg("");
               }}
-            >＋ 生活区分を追加</button>
+              style={{
+                border: "none",
+                background: T.coral,
+                color: "#fff",
+                padding: "10px 18px",
+                borderRadius: 999,
+                fontFamily: "inherit",
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+                boxShadow: `0 4px 0 ${T.coralDeep}`,
+              }}
+            >
+              ＋ 生活区分を追加
+            </button>
           </div>
 
           {cat_form && (
-            <div style={{
-              marginBottom: 18, padding: "18px 20px", borderRadius: 20,
-              background: T.bgSoft, border: `1.5px solid ${T.hair}`,
-            }}>
+            <div
+              style={{
+                marginBottom: 18,
+                padding: "18px 20px",
+                borderRadius: 20,
+                background: T.bgSoft,
+                border: `1.5px solid ${T.hair}`,
+              }}
+            >
               <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
                 {cat_form.id ? "生活区分を編集" : "生活区分を追加"}
               </div>
               <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>名前</div>
-                  <input type="text" value={cat_form.name}
-                    onChange={(e) => setCatForm((f) => f && ({ ...f, name: e.target.value }))}
+                  <input
+                    type="text"
+                    value={cat_form.name}
+                    onChange={(e) => setCatForm((f) => f && { ...f, name: e.target.value })}
                     placeholder="外食"
                     style={input_style}
                   />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>コード</div>
-                  <input type="text" value={cat_form.category_code}
-                    onChange={(e) => setCatForm((f) => f && ({ ...f, category_code: e.target.value }))}
+                  <input
+                    type="text"
+                    value={cat_form.category_code}
+                    onChange={(e) =>
+                      setCatForm((f) => f && { ...f, category_code: e.target.value })
+                    }
                     placeholder="eating_out"
                     style={input_style}
                   />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>大分類</div>
-                  <select value={cat_form.group_id}
-                    onChange={(e) => setCatForm((f) => f && ({ ...f, group_id: e.target.value }))}
+                  <select
+                    value={cat_form.group_id}
+                    onChange={(e) => setCatForm((f) => f && { ...f, group_id: e.target.value })}
                     style={input_style}
                   >
                     <option value="">選択…</option>
                     {groups.map((g) => (
-                      <option key={g.id} value={g.id}>{g.group_name}</option>
+                      <option key={g.id} value={g.id}>
+                        {g.group_name}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
-              {error_msg && <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>{error_msg}</div>}
+              {error_msg && (
+                <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>
+                  {error_msg}
+                </div>
+              )}
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={handle_cat_submit} disabled={submitting}
-                  style={{ border: "none", background: T.coral, color: "#fff", padding: "9px 20px", borderRadius: 999, fontFamily: "inherit", fontWeight: 700, cursor: "pointer", boxShadow: `0 3px 0 ${T.coralDeep}` }}>
+                <button
+                  onClick={handle_cat_submit}
+                  disabled={submitting}
+                  style={{
+                    border: "none",
+                    background: T.coral,
+                    color: "#fff",
+                    padding: "9px 20px",
+                    borderRadius: 999,
+                    fontFamily: "inherit",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    boxShadow: `0 3px 0 ${T.coralDeep}`,
+                  }}
+                >
                   {submitting ? "保存中…" : "保存"}
                 </button>
-                <button onClick={() => setCatForm(null)}
-                  style={{ border: `1px solid ${T.hair}`, background: "#fff", color: T.inkSoft, padding: "9px 20px", borderRadius: 999, fontFamily: "inherit", cursor: "pointer" }}>
+                <button
+                  onClick={() => setCatForm(null)}
+                  style={{
+                    border: `1px solid ${T.hair}`,
+                    background: "#fff",
+                    color: T.inkSoft,
+                    padding: "9px 20px",
+                    borderRadius: 999,
+                    fontFamily: "inherit",
+                    cursor: "pointer",
+                  }}
+                >
                   キャンセル
                 </button>
               </div>
@@ -385,32 +619,75 @@ export function WebMaster() {
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingLeft: 28 }}>
                   {cats.map((c) => (
-                    <div key={c.id} style={{
-                      padding: "8px 14px", borderRadius: 999,
-                      background: T.bgSoft, border: `1.5px solid ${T.hair}`,
-                      fontSize: 13, fontWeight: 500,
-                      display: "flex", alignItems: "center", gap: 8,
-                    }}>
+                    <div
+                      key={c.id}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 999,
+                        background: T.bgSoft,
+                        border: `1.5px solid ${T.hair}`,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
                       {c.category_name}
                       <button
-                        onClick={() => { setCatForm({ id: c.id, name: c.category_name, category_code: c.category_code ?? "", group_id: String(c.group_id) }); setErrorMsg(""); }}
-                        style={{ color: T.inkSoft, fontSize: 11, border: "none", background: "transparent", cursor: "pointer", padding: 0 }}
-                      >✎</button>
+                        onClick={() => {
+                          setCatForm({
+                            id: c.id,
+                            name: c.category_name,
+                            category_code: c.category_code ?? "",
+                            group_id: String(c.group_id),
+                          });
+                          setErrorMsg("");
+                        }}
+                        style={{
+                          color: T.inkSoft,
+                          fontSize: 11,
+                          border: "none",
+                          background: "transparent",
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      >
+                        ✎
+                      </button>
                       <button
                         onClick={() => handle_cat_delete(c.id)}
-                        style={{ color: T.inkSoft, fontSize: 11, border: "none", background: "transparent", cursor: "pointer", padding: 0 }}
-                      >🗑</button>
+                        style={{
+                          color: T.inkSoft,
+                          fontSize: 11,
+                          border: "none",
+                          background: "transparent",
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      >
+                        🗑
+                      </button>
                     </div>
                   ))}
                   <button
-                    onClick={() => { setCatForm({ id: null, name: "", category_code: "", group_id: String(g.id) }); setErrorMsg(""); }}
+                    onClick={() => {
+                      setCatForm({ id: null, name: "", category_code: "", group_id: String(g.id) });
+                      setErrorMsg("");
+                    }}
                     style={{
-                      padding: "8px 14px", borderRadius: 999,
-                      background: "transparent", border: `1.5px dashed ${T.coral}`,
-                      color: T.coralDeep, fontSize: 13, fontWeight: 700,
+                      padding: "8px 14px",
+                      borderRadius: 999,
+                      background: "transparent",
+                      border: `1.5px dashed ${T.coral}`,
+                      color: T.coralDeep,
+                      fontSize: 13,
+                      fontWeight: 700,
                       cursor: "pointer",
                     }}
-                  >＋ 追加</button>
+                  >
+                    ＋ 追加
+                  </button>
                 </div>
               </div>
             ))}
