@@ -26,7 +26,7 @@
     "8001": { "label": "adminer" }
   },
 
-  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && npm install --prefix /workspace/atoikura",
   "waitFor": "postStartCommand",
 
   "customizations": {
