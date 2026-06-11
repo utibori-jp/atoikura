@@ -314,6 +314,13 @@ components:
           format: date-time
           description: 登録日時（RFC3339）
           example: "2025-05-05T12:34:56Z"
+        is_recurring:
+          type: boolean
+          description: |
+            定期支出から自動計上された仕訳かどうか。
+            recurring_expense_id が設定されている場合に true。
+            フロントエンドは 🔁 定期バッジの表示に使用する。
+          example: false
 
     CategoryGroupRequest:
       type: object
@@ -2450,6 +2457,15 @@ paths:
       summary: 貯金目標一覧
       operationId: listSavingsGoals
       tags: [savings-goals]
+      parameters:
+        - name: year_month
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+          description: 対象年月（YYYY-MM）。省略時は当月（JST）。is_posted_this_monthの判定に使用
+          example: "2026-06"
       responses:
         '200':
           description: 取得成功
