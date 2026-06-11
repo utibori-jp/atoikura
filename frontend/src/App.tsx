@@ -1,10 +1,4 @@
 import { useEffect, useState } from "react";
-import { JournalEntryForm } from "./components/JournalEntryForm";
-import { JournalEntryList } from "./components/JournalEntryList";
-import { BudgetSettings } from "./components/BudgetSettings";
-import { HomeGraph } from "./components/HomeGraph";
-import { SummaryCards } from "./components/SummaryCards";
-import { MasterManagement } from "./components/MasterManagement";
 import { ReviewScreen } from "./components/ReviewScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { UserInfo } from "./components/UserInfo";
@@ -15,6 +9,14 @@ import { MobileBudget } from "./components/mobile/MobileBudget";
 import { MobileRecurring } from "./components/mobile/MobileRecurring";
 import { MobileSavings } from "./components/mobile/MobileSavings";
 import { MobileIncome } from "./components/mobile/MobileIncome";
+import { WebHome } from "./components/web/WebHome";
+import { WebBudget } from "./components/web/WebBudget";
+import { WebRecurring } from "./components/web/WebRecurring";
+import { WebSavings } from "./components/web/WebSavings";
+import { WebIncome } from "./components/web/WebIncome";
+import { WebReview } from "./components/web/WebReview";
+import { WebJournal } from "./components/web/WebJournal";
+import { WebMaster } from "./components/web/WebMaster";
 import { api, AuthError, token_store } from "./api/client";
 import type { components } from "./api/types";
 import { T } from "./theme";
@@ -68,7 +70,7 @@ function LogoIcon() {
 
 const NAV_ITEMS: { id: Tab; label: string; emoji: string }[] = [
   { id: "home", label: "ホーム", emoji: "🌞" },
-  { id: "budget", label: "目標", emoji: "🎯" },
+  { id: "budget", label: "予算", emoji: "💰" },
   { id: "review", label: "振り返り", emoji: "📖" },
   { id: "list", label: "仕訳", emoji: "📝" },
   { id: "master", label: "マスタ", emoji: "🧰" },
@@ -744,33 +746,10 @@ export default function App() {
           (is_mobile ? (
             <MobileHome refresh_token={refresh_token} onShowList={() => setActiveTab("list")} />
           ) : (
-            <>
-              <SummaryCards />
-
-              <div
-                style={{
-                  background: T.card,
-                  borderRadius: 28,
-                  padding: 24,
-                  boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
-                  marginBottom: 20,
-                  overflowX: "hidden",
-                }}
-              >
-                <HomeGraph />
-              </div>
-
-              <div
-                style={{
-                  background: T.card,
-                  borderRadius: 28,
-                  padding: 28,
-                  boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
-                }}
-              >
-                <JournalEntryForm onSuccess={() => setRefreshToken((t) => t + 1)} />
-              </div>
-            </>
+            <WebHome
+              refresh_token={refresh_token}
+              onSuccess={() => setRefreshToken((t) => t + 1)}
+            />
           ))}
 
         {active_tab === "list" &&
@@ -784,24 +763,38 @@ export default function App() {
               }}
             />
           ) : (
-            <JournalEntryList year_month={list_year_month} refresh_token={refresh_token} />
+            <WebJournal
+              year_month={list_year_month}
+              refresh_token={refresh_token}
+              onEditEntry={(entry) => {
+                setEditEntry(entry);
+                setShowEntrySheet(true);
+              }}
+              onRefresh={() => setRefreshToken((t) => t + 1)}
+            />
           ))}
 
-        {active_tab === "review" && <ReviewScreen />}
+        {active_tab === "review" && (is_mobile ? <ReviewScreen /> : <WebReview />)}
 
         {active_tab === "budget" &&
-          is_mobile &&
           (() => {
-            if (budget_sub === "income") return <MobileIncome onBack={() => setBudgetSub("hub")} />;
+            if (is_mobile) {
+              if (budget_sub === "income")
+                return <MobileIncome onBack={() => setBudgetSub("hub")} />;
+              if (budget_sub === "recurring")
+                return <MobileRecurring onBack={() => setBudgetSub("hub")} />;
+              if (budget_sub === "savings")
+                return <MobileSavings onBack={() => setBudgetSub("hub")} />;
+              return <MobileBudget onNavigate={(s) => setBudgetSub(s)} />;
+            }
+            if (budget_sub === "income") return <WebIncome onBack={() => setBudgetSub("hub")} />;
             if (budget_sub === "recurring")
-              return <MobileRecurring onBack={() => setBudgetSub("hub")} />;
-            if (budget_sub === "savings")
-              return <MobileSavings onBack={() => setBudgetSub("hub")} />;
-            return <MobileBudget onNavigate={(s) => setBudgetSub(s)} />;
+              return <WebRecurring onBack={() => setBudgetSub("hub")} />;
+            if (budget_sub === "savings") return <WebSavings onBack={() => setBudgetSub("hub")} />;
+            return <WebBudget onNavigate={(s) => setBudgetSub(s)} />;
           })()}
-        {active_tab === "budget" && !is_mobile && <BudgetSettings />}
 
-        {active_tab === "master" && <MasterManagement />}
+        {active_tab === "master" && <WebMaster />}
 
         {active_tab === "account" && <UserInfo user={auth_state.user} onLogout={handleLogout} />}
       </main>
@@ -821,7 +814,7 @@ export default function App() {
         />
       )}
 
-      {is_mobile && show_entry_sheet && (
+      {show_entry_sheet && (
         <EntrySheet
           onClose={() => {
             setShowEntrySheet(false);
