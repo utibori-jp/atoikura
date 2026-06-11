@@ -90,12 +90,10 @@ ENV VISUAL=nano
 RUN go install "github.com/sqlc-dev/sqlc/cmd/sqlc@${SQLC_VERSION}" \
   && go clean -modcache
 
-# uv and headroom-ai for Headroom MCP server.
-# [mcp,proxy] both required: [mcp] alone is missing fastapi (from [proxy]).
+# uv for headroom-ai (installed at container-create time via postCreateCommand,
+# not here — pypi.org is unreachable during Docker Desktop image builds).
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/home/node/.local/bin:$PATH"
-RUN uv tool install "headroom-ai[mcp,proxy]" \
-  && headroom mcp install
 
 # Claude Code itself.
 RUN npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
