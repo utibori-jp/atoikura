@@ -26,8 +26,7 @@
     "8001": { "label": "adminer" }
   },
 
-  "postCreateCommand": "uv tool install \"headroom-ai[mcp,proxy]\" && headroom mcp install",
-  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && npm install --prefix /workspace/atoikura",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && npm install --prefix /workspace/atoikura && (headroom --version >/dev/null 2>&1 || (uv tool install \"headroom-ai[mcp,proxy]\" && headroom mcp install))",
   "waitFor": "postStartCommand",
 
   "customizations": {

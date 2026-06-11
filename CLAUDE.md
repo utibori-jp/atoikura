@@ -40,9 +40,10 @@ Read additional documents based on the work area:
 
 ### Headroom MCP (devcontainer)
 
-- Headroom is **pre-installed in the Docker image** (`headroom-ai[mcp,proxy]`) and the MCP is registered at build time via `headroom mcp install`. No installation steps are needed after container start.
-- Do NOT run `uv tool install headroom-ai` or `headroom mcp install` — they are already done.
-- If `headroom --help` fails, the image is stale. Ask the user to rebuild the container (`Dev Containers: Rebuild Container`).
+- Headroom is installed automatically by `postStartCommand` on the **first start after a rebuild** (runs `uv tool install headroom-ai[mcp,proxy] && headroom mcp install` only if not already present). This takes ~2 minutes on first run.
+- On subsequent starts the install is skipped (`headroom --version` check).
+- Do NOT manually run `uv tool install headroom-ai` or `headroom mcp install` — postStartCommand handles it.
+- If `headroom --help` fails after the container is fully started, ask the user to stop and restart the container to trigger postStartCommand again.
 
 ---
 
