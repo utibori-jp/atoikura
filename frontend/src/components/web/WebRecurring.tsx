@@ -52,16 +52,7 @@ export function WebRecurring({ onBack }: Props) {
     if (isNaN(amount) || amount < 1) return;
     setConfirmingId(id);
     try {
-      const target = recurring.find((r) => r.id === id);
-      if (!target) return;
-      await api.updateRecurringExpense(id, {
-        name: target.name,
-        emoji: target.emoji,
-        billing_day: target.billing_day,
-        amount,
-        type: "fixed",
-        category_id: target.category_id,
-      });
+      await api.confirmRecurringExpense(id, amount, ym);
       const [rec_res, pend_res] = await Promise.all([
         api.listRecurringExpenses(),
         api.listPendingRecurring(ym),
