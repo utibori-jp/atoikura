@@ -788,7 +788,7 @@ export function WebHome({ refresh_token, onSuccess }: Props) {
     };
   }, [ym, refresh_token]);
 
-  const monthly_budget = cumulative?.monthly_budget ?? 0;
+  const monthly_budget = cumulative?.variable_budget ?? 0;
   const last_actual = cumulative?.days
     ? [...cumulative.days].reverse().find((d) => d.is_actual)
     : null;

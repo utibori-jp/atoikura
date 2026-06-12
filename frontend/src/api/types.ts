@@ -323,41 +323,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/budgets": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * 予算・目標取得
-     * @description ログインユーザーの予算・目標設定を返す。
-     *     レコードが未作成の場合も200を返し、全フィールドをnullで返す。
-     *
-     *     **利用画面：**
-     *     - 目標設定画面：初期表示
-     */
-    get: operations["getBudgets"];
-    /**
-     * 予算・目標更新
-     * @description ログインユーザーの予算・目標設定を更新する。
-     *     レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
-     *     全フィールド任意。変更しないフィールドは現在値をそのまま送ること。
-     *     nullを送ると未設定状態に戻る。
-     *     `monthly_budget` に0以下の値を送った場合は400を返す。
-     *
-     *     **利用画面：**
-     *     - 目標設定画面：保存
-     */
-    put: operations["updateBudgets"];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/journal-entries": {
     parameters: {
       query?: never;
@@ -748,13 +713,13 @@ export interface components {
        */
       year_month: string;
       /**
-       * @description 月次変動費予算（円）
+       * @description 変動費予算 = 収入 − 定期支出 − 貯金（円）
        * @example 150000
        */
-      monthly_budget: number;
+      variable_budget: number;
       /**
        * @description 日割り予算（円）
-       *     monthly_budget ÷ 当月日数、小数切り捨て
+       *     variable_budget ÷ 当月日数、小数切り捨て
        * @example 4839
        */
       daily_budget: number;
@@ -1015,40 +980,6 @@ export interface components {
       year_month: string;
       /** @description 生活区分単位の集計リスト */
       breakdown: components["schemas"]["MonthlyBreakdownItem"][];
-    };
-    BudgetResponse: {
-      /**
-       * @description 月次変動費予算（円）。未設定時はnull
-       * @example 150000
-       */
-      monthly_budget?: number | null;
-      /**
-       * @description 貯金目標テキスト。未設定時はnull
-       * @example 夏までに旅行費を貯める
-       */
-      goal_text?: string | null;
-      /**
-       * @description 目標金額（円）。未設定時はnull
-       * @example 300000
-       */
-      goal_amount?: number | null;
-    };
-    BudgetRequest: {
-      /**
-       * @description 月次変動費予算（円）。nullで未設定に戻る。1以上の整数のみ許容
-       * @example 120000
-       */
-      monthly_budget?: number | null;
-      /**
-       * @description 貯金目標テキスト。nullで未設定に戻る
-       * @example 夏までに旅行費を貯める
-       */
-      goal_text?: string | null;
-      /**
-       * @description 目標金額（円）。nullで未設定に戻る
-       * @example 300000
-       */
-      goal_amount?: number | null;
     };
     MonthlyReviewNote: {
       /**
@@ -2325,90 +2256,6 @@ export interface operations {
           "application/json": {
             statement_types: components["schemas"]["StatementTypeSummary"][];
           };
-        };
-      };
-      401: components["responses"]["Unauthorized"];
-      500: components["responses"]["InternalServerError"];
-    };
-  };
-  getBudgets: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description 取得成功 */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          /**
-           * @example {
-           *       "monthly_budget": 150000,
-           *       "goal_text": "夏までに旅行費を貯める",
-           *       "goal_amount": 300000
-           *     }
-           */
-          "application/json": components["schemas"]["BudgetResponse"];
-        };
-      };
-      401: components["responses"]["Unauthorized"];
-      500: components["responses"]["InternalServerError"];
-    };
-  };
-  updateBudgets: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        /**
-         * @example {
-         *       "monthly_budget": 120000,
-         *       "goal_text": "夏までに旅行費を貯める",
-         *       "goal_amount": 300000
-         *     }
-         */
-        "application/json": components["schemas"]["BudgetRequest"];
-      };
-    };
-    responses: {
-      /** @description 更新成功 */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          /**
-           * @example {
-           *       "monthly_budget": 120000,
-           *       "goal_text": "夏までに旅行費を貯める",
-           *       "goal_amount": 300000
-           *     }
-           */
-          "application/json": components["schemas"]["BudgetResponse"];
-        };
-      };
-      /** @description リクエスト不正（monthly_budgetが0以下など） */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          /**
-           * @example {
-           *       "code": "BAD_REQUEST",
-           *       "message": "monthly_budgetは1以上の整数である必要があります"
-           *     }
-           */
-          "application/json": components["schemas"]["ErrorResponse"];
         };
       };
       401: components["responses"]["Unauthorized"];

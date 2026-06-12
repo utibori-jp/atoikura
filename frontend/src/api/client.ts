@@ -79,12 +79,6 @@ export const api = {
     request<components["schemas"]["JournalEntryListResponse"]>(
       `/journal-entries?year_month=${year_month}`
     ),
-  getBudgets: () => request<components["schemas"]["BudgetResponse"]>("/budgets"),
-  updateBudgets: (body: components["schemas"]["BudgetRequest"]) =>
-    request<components["schemas"]["BudgetResponse"]>("/budgets", {
-      method: "PUT",
-      body: JSON.stringify(body),
-    }),
   getDailyCumulative: (year_month?: string) => {
     const qs = year_month ? `?year_month=${year_month}` : "";
     return request<components["schemas"]["DailyCumulativeResponse"]>(

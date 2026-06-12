@@ -14,6 +14,7 @@ type fakeExpenseRepo struct {
 	listMonthlyBreakdown         func(context.Context, int64, time.Time) ([]repository.MonthlyBreakdownItem, error)
 	listDailyExpenseSumsForMonth func(context.Context, int64, time.Time) ([]repository.DailyExpenseSum, error)
 	getBudgetByUser              func(context.Context, int64) (*repository.BudgetResult, error)
+	getBudgetSummary             func(context.Context, int64, string) (*repository.BudgetSummaryResult, error)
 }
 
 func (f *fakeExpenseRepo) ListMonthlyBreakdown(ctx context.Context, user_id int64, first_day time.Time) ([]repository.MonthlyBreakdownItem, error) {
@@ -35,6 +36,13 @@ func (f *fakeExpenseRepo) GetBudgetByUser(ctx context.Context, user_id int64) (*
 		return f.getBudgetByUser(ctx, user_id)
 	}
 	return &repository.BudgetResult{MonthlyBudget: 150000}, nil
+}
+
+func (f *fakeExpenseRepo) GetBudgetSummary(ctx context.Context, user_id int64, year_month string) (*repository.BudgetSummaryResult, error) {
+	if f.getBudgetSummary != nil {
+		return f.getBudgetSummary(ctx, user_id, year_month)
+	}
+	return &repository.BudgetSummaryResult{VariableBudget: 150000, DailyBudget: 4839}, nil
 }
 
 func TestGetMonthlyBreakdownHandler(t *testing.T) {

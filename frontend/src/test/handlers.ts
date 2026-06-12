@@ -65,7 +65,7 @@ const defaultUser: components["schemas"]["UserResponse"] = {
 
 const defaultDailyCumulative: components["schemas"]["DailyCumulativeResponse"] = {
   year_month: "2026-06",
-  monthly_budget: 150000,
+  variable_budget: 150000,
   daily_budget: 5000,
   days: [
     {

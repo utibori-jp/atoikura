@@ -344,7 +344,7 @@ export function HomeGraph() {
         </ResponsiveContainer>
       )}
 
-      {data?.monthly_budget === 0 && (
+      {data?.variable_budget === 0 && (
         <p style={{ marginTop: 8, color: T.mustard, fontSize: 13 }}>予算を設定してください</p>
       )}
     </>

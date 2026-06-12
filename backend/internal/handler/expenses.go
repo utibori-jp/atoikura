@@ -14,6 +14,7 @@ type expenseRepo interface {
 	ListMonthlyBreakdown(ctx context.Context, user_id int64, first_day time.Time) ([]repository.MonthlyBreakdownItem, error)
 	ListDailyExpenseSumsForMonth(ctx context.Context, user_id int64, first_day time.Time) ([]repository.DailyExpenseSum, error)
 	GetBudgetByUser(ctx context.Context, user_id int64) (*repository.BudgetResult, error)
+	GetBudgetSummary(ctx context.Context, user_id int64, year_month string) (*repository.BudgetSummaryResult, error)
 }
 
 type monthlyBreakdownItemJSON struct {
@@ -79,10 +80,10 @@ func GetMonthlyBreakdownHandler(repo expenseRepo) http.HandlerFunc {
 }
 
 type dailyCumulativeResponseJSON struct {
-	YearMonth     string               `json:"year_month"`
-	MonthlyBudget int32                `json:"monthly_budget"`
-	DailyBudget   int32                `json:"daily_budget"`
-	Days          []service.DailyEntry `json:"days"`
+	YearMonth      string               `json:"year_month"`
+	VariableBudget int32                `json:"variable_budget"`
+	DailyBudget    int32                `json:"daily_budget"`
+	Days           []service.DailyEntry `json:"days"`
 }
 
 func GetDailyCumulativeHandler(repo expenseRepo) http.HandlerFunc {
@@ -121,9 +122,9 @@ func GetDailyCumulativeHandler(repo expenseRepo) http.HandlerFunc {
 			return
 		}
 
-		budget, err := repo.GetBudgetByUser(r.Context(), user_id)
+		budget, err := repo.GetBudgetSummary(r.Context(), user_id, year_month)
 		if err != nil {
-			slog.Error("getting budget", "error", err)
+			slog.Error("getting budget summary", "error", err)
 			WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
 			return
 		}
@@ -141,16 +142,11 @@ func GetDailyCumulativeHandler(repo expenseRepo) http.HandlerFunc {
 
 		days := service.BuildDailyEntries(actual_sums, first_day, days_in_month, today_str, today_day_num, is_past_month)
 
-		var daily_budget int32
-		if budget.MonthlyBudget > 0 {
-			daily_budget = budget.MonthlyBudget / int32(days_in_month)
-		}
-
 		WriteJSON(w, http.StatusOK, dailyCumulativeResponseJSON{
-			YearMonth:     year_month,
-			MonthlyBudget: budget.MonthlyBudget,
-			DailyBudget:   daily_budget,
-			Days:          days,
+			YearMonth:      year_month,
+			VariableBudget: budget.VariableBudget,
+			DailyBudget:    budget.DailyBudget,
+			Days:           days,
 		})
 	}
 }

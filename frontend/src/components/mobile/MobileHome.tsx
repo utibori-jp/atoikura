@@ -328,7 +328,7 @@ export function MobileHome({ refresh_token, onShowList }: Props) {
   const days_total = daysInMonth(ym);
   const today_day = todayDayJST();
   const days_left = Math.max(0, days_total - today_day);
-  const monthly_budget = cumulative?.monthly_budget ?? 0;
+  const monthly_budget = cumulative?.variable_budget ?? 0;
   const last_actual = cumulative?.days
     ? [...cumulative.days].reverse().find((d) => d.is_actual)
     : null;
