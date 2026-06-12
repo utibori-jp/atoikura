@@ -33,6 +33,7 @@ jobs:
         with:
           context: ./backend
           push: true
+          provenance: false
           tags: |
             ${{ env.BACKEND_IMAGE }}:latest
             ${{ env.BACKEND_IMAGE }}:${{ github.ref_name }}
@@ -42,6 +43,7 @@ jobs:
         with:
           context: ./frontend
           push: true
+          provenance: false
           build-args: |
             VITE_API_URL=${{ vars.VITE_API_URL }}
           tags: |
