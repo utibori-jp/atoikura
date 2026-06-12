@@ -543,6 +543,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/recurring-expenses/{id}/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 確認待ち定期支出の金額を確定し仕訳を記録
+     * @description variable型の定期支出について、当月の金額を確定して journal_entries を recurring_expense_id 付きで作成する。これにより当該月の確認待ち状態が解消される。 type を変更せず、毎月の確認フローを維持する。
+     */
+    post: operations["confirmRecurringExpense"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/savings-goals": {
     parameters: {
       query?: never;
@@ -2972,6 +2992,66 @@ export interface operations {
       401: components["responses"]["Unauthorized"];
       /** @description 存在しない */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  confirmRecurringExpense: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @description 確定する金額（円） */
+          amount: number;
+          /** @description 対象年月（YYYY-MM）。仕訳の日付は billing_day をこの月に当てはめて決定する */
+          year_month: string;
+        };
+      };
+    };
+    responses: {
+      /** @description 仕訳作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["JournalEntryResponse"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 当月分は既に確定済み */
+      409: {
         headers: {
           [name: string]: unknown;
         };

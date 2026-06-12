@@ -134,6 +134,7 @@ func registerRoutes(mux *http.ServeMux, repo *repository.Repository, jwt_secret 
 	mux.Handle("GET /recurring-expenses/pending", handler.ListPendingRecurringHandler(repo))
 	mux.Handle("PUT /recurring-expenses/{id}", handler.UpdateRecurringExpenseHandler(repo))
 	mux.Handle("DELETE /recurring-expenses/{id}", handler.DeleteRecurringExpenseHandler(repo))
+	mux.Handle("POST /recurring-expenses/{id}/confirm", handler.ConfirmRecurringExpenseHandler(repo))
 	mux.Handle("GET /savings-goals", handler.ListSavingsGoalsHandler(repo))
 	mux.Handle("POST /savings-goals", handler.CreateSavingsGoalHandler(repo))
 	mux.Handle("PUT /savings-goals/{id}", handler.UpdateSavingsGoalHandler(repo))

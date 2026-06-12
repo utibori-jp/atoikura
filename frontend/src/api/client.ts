@@ -159,6 +159,11 @@ export const api = {
     request<components["schemas"]["PendingRecurringListResponse"]>(
       `/recurring-expenses/pending?year_month=${year_month}`
     ),
+  confirmRecurringExpense: (id: number, amount: number, year_month: string) =>
+    request<components["schemas"]["JournalEntryResponse"]>(`/recurring-expenses/${id}/confirm`, {
+      method: "POST",
+      body: JSON.stringify({ amount, year_month }),
+    }),
   listSavingsGoals: () =>
     request<components["schemas"]["SavingsGoalListResponse"]>("/savings-goals"),
   createSavingsGoal: (body: components["schemas"]["SavingsGoalRequest"]) =>

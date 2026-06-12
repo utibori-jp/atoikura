@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -184,6 +185,76 @@ func (r *Repository) UpdateRecurringExpense(ctx context.Context, user_id int64, 
 		GroupName:    group_name,
 		CategoryName: category_name,
 	}, nil
+}
+
+// ErrRecurringAlreadyConfirmed is returned when a recurring expense already has a
+// linked journal entry for the requested month.
+var ErrRecurringAlreadyConfirmed = errors.New("recurring expense already confirmed for month")
+
+// ConfirmRecurringExpense records the confirmed amount for a recurring expense in the
+// given month by creating a journal entry linked via recurring_expense_id. The journal
+// entry's transaction date is the recurring expense's billing day within year_month
+// (clamped to the last day of the month). It does not alter the recurring expense itself,
+// preserving the monthly confirmation flow.
+//
+// Returns nil, nil if the recurring expense does not exist for the user, and
+// ErrRecurringAlreadyConfirmed if a linked entry already exists for the month.
+func (r *Repository) ConfirmRecurringExpense(ctx context.Context, recurring_expense_id int64, user_id int64, amount int32, year_month string) (*JournalEntryView, error) {
+	recurring, err := r.queries.GetRecurringExpenseByID(ctx, db.GetRecurringExpenseByIDParams{
+		ID:     int32(recurring_expense_id),
+		UserID: int32(user_id),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("getting recurring expense for confirm: %w", err)
+	}
+
+	recurring_id := recurring.ID
+	already_confirmed, err := r.queries.ExistsRecurringJournalEntryForMonth(ctx, db.ExistsRecurringJournalEntryForMonthParams{
+		RecurringExpenseID: &recurring_id,
+		UserID:             int32(user_id),
+		Column3:            year_month,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("checking existing recurring confirmation: %w", err)
+	}
+	if already_confirmed {
+		return nil, ErrRecurringAlreadyConfirmed
+	}
+
+	transaction_date, err := billingDateForMonth(year_month, recurring.BillingDay)
+	if err != nil {
+		return nil, fmt.Errorf("resolving billing date: %w", err)
+	}
+
+	item := recurring.Name
+	return r.CreateJournalEntry(ctx, CreateJournalEntryParams{
+		TransactionDate:    transaction_date,
+		Item:               &item,
+		Amount:             amount,
+		CategoryID:         recurring.CategoryID,
+		UserID:             int32(user_id),
+		IsExcluded:         false,
+		RecurringExpenseID: &recurring_id,
+	})
+}
+
+// billingDateForMonth maps a billing day (1-31) onto year_month (YYYY-MM),
+// clamping to the last day of the month when the billing day exceeds it
+// (e.g. day 31 in a 30-day month becomes the 30th).
+func billingDateForMonth(year_month string, billing_day int16) (time.Time, error) {
+	first_of_month, err := time.Parse("2006-01-02", year_month+"-01")
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parsing year_month %q: %w", year_month, err)
+	}
+	last_of_month := first_of_month.AddDate(0, 1, -1).Day()
+	day := int(billing_day)
+	if day > last_of_month {
+		day = last_of_month
+	}
+	return time.Date(first_of_month.Year(), first_of_month.Month(), day, 0, 0, 0, 0, time.UTC), nil
 }
 
 // DeleteRecurringExpense deletes a recurring expense. Returns false if not found.

@@ -72,6 +72,29 @@ func (q *Queries) DeleteRecurringExpense(ctx context.Context, arg DeleteRecurrin
 	return err
 }
 
+const existsRecurringJournalEntryForMonth = `-- name: ExistsRecurringJournalEntryForMonth :one
+SELECT EXISTS (
+  SELECT 1 FROM journal_entries je
+  WHERE je.recurring_expense_id = $1
+    AND je.user_id = $2
+    AND TO_CHAR(je.transaction_date, 'YYYY-MM') = $3::text
+) AS exists
+`
+
+type ExistsRecurringJournalEntryForMonthParams struct {
+	RecurringExpenseID *int32 `json:"recurring_expense_id"`
+	UserID             int32  `json:"user_id"`
+	Column3            string `json:"column_3"`
+}
+
+// True when a journal entry already links this recurring expense in the given month.
+func (q *Queries) ExistsRecurringJournalEntryForMonth(ctx context.Context, arg ExistsRecurringJournalEntryForMonthParams) (bool, error) {
+	row := q.db.QueryRow(ctx, existsRecurringJournalEntryForMonth, arg.RecurringExpenseID, arg.UserID, arg.Column3)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getRecurringExpenseByID = `-- name: GetRecurringExpenseByID :one
 SELECT id, name, emoji, billing_day, amount, type, category_id
 FROM recurring_expenses WHERE id = $1 AND user_id = $2

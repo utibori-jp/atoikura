@@ -38,3 +38,12 @@ DELETE FROM recurring_expenses WHERE id = $1 AND user_id = $2;
 -- name: GetRecurringExpenseByID :one
 SELECT id, name, emoji, billing_day, amount, type, category_id
 FROM recurring_expenses WHERE id = $1 AND user_id = $2;
+
+-- name: ExistsRecurringJournalEntryForMonth :one
+-- True when a journal entry already links this recurring expense in the given month.
+SELECT EXISTS (
+  SELECT 1 FROM journal_entries je
+  WHERE je.recurring_expense_id = $1
+    AND je.user_id = $2
+    AND TO_CHAR(je.transaction_date, 'YYYY-MM') = $3::text
+) AS exists;
