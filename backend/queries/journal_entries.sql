@@ -1,11 +1,12 @@
 -- name: CreateJournalEntry :one
 INSERT INTO journal_entries (
-  transaction_date, item, amount, category_id, user_id, is_excluded, note
+  transaction_date, item, amount, category_id, user_id, is_excluded, note,
+  recurring_expense_id
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7
+  $1, $2, $3, $4, $5, $6, $7, $8
 )
 RETURNING id, transaction_date, item, amount, category_id, user_id,
-          is_excluded, note, created_at, updated_at;
+          is_excluded, note, created_at, updated_at, recurring_expense_id;
 
 -- name: UpdateJournalEntry :one
 UPDATE journal_entries

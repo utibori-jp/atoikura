@@ -14,35 +14,38 @@ import (
 
 const createJournalEntry = `-- name: CreateJournalEntry :one
 INSERT INTO journal_entries (
-  transaction_date, item, amount, category_id, user_id, is_excluded, note
+  transaction_date, item, amount, category_id, user_id, is_excluded, note,
+  recurring_expense_id
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7
+  $1, $2, $3, $4, $5, $6, $7, $8
 )
 RETURNING id, transaction_date, item, amount, category_id, user_id,
-          is_excluded, note, created_at, updated_at
+          is_excluded, note, created_at, updated_at, recurring_expense_id
 `
 
 type CreateJournalEntryParams struct {
-	TransactionDate pgtype.Date `json:"transaction_date"`
-	Item            *string     `json:"item"`
-	Amount          int32       `json:"amount"`
-	CategoryID      int32       `json:"category_id"`
-	UserID          int32       `json:"user_id"`
-	IsExcluded      bool        `json:"is_excluded"`
-	Note            *string     `json:"note"`
+	TransactionDate    pgtype.Date `json:"transaction_date"`
+	Item               *string     `json:"item"`
+	Amount             int32       `json:"amount"`
+	CategoryID         int32       `json:"category_id"`
+	UserID             int32       `json:"user_id"`
+	IsExcluded         bool        `json:"is_excluded"`
+	Note               *string     `json:"note"`
+	RecurringExpenseID *int32      `json:"recurring_expense_id"`
 }
 
 type CreateJournalEntryRow struct {
-	ID              int32       `json:"id"`
-	TransactionDate pgtype.Date `json:"transaction_date"`
-	Item            *string     `json:"item"`
-	Amount          int32       `json:"amount"`
-	CategoryID      int32       `json:"category_id"`
-	UserID          int32       `json:"user_id"`
-	IsExcluded      bool        `json:"is_excluded"`
-	Note            *string     `json:"note"`
-	CreatedAt       time.Time   `json:"created_at"`
-	UpdatedAt       time.Time   `json:"updated_at"`
+	ID                 int32       `json:"id"`
+	TransactionDate    pgtype.Date `json:"transaction_date"`
+	Item               *string     `json:"item"`
+	Amount             int32       `json:"amount"`
+	CategoryID         int32       `json:"category_id"`
+	UserID             int32       `json:"user_id"`
+	IsExcluded         bool        `json:"is_excluded"`
+	Note               *string     `json:"note"`
+	CreatedAt          time.Time   `json:"created_at"`
+	UpdatedAt          time.Time   `json:"updated_at"`
+	RecurringExpenseID *int32      `json:"recurring_expense_id"`
 }
 
 func (q *Queries) CreateJournalEntry(ctx context.Context, arg CreateJournalEntryParams) (CreateJournalEntryRow, error) {
@@ -54,6 +57,7 @@ func (q *Queries) CreateJournalEntry(ctx context.Context, arg CreateJournalEntry
 		arg.UserID,
 		arg.IsExcluded,
 		arg.Note,
+		arg.RecurringExpenseID,
 	)
 	var i CreateJournalEntryRow
 	err := row.Scan(
@@ -67,6 +71,7 @@ func (q *Queries) CreateJournalEntry(ctx context.Context, arg CreateJournalEntry
 		&i.Note,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RecurringExpenseID,
 	)
 	return i, err
 }
