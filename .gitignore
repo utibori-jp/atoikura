@@ -33,3 +33,4 @@ postgres_data/
 
 # Claude Code per-developer overrides
 .claude/settings.local.json
+**/.claude/settings.local.json
