@@ -926,6 +926,13 @@ export interface components {
        * @example 2025-05-05T12:34:56Z
        */
       created_at: string;
+      /**
+       * @description 定期支出から自動計上された仕訳かどうか。
+       *     recurring_expense_id が設定されている場合に true。
+       *     フロントエンドは 🔁 定期バッジの表示に使用する。
+       * @example false
+       */
+      is_recurring?: boolean;
     };
     CategoryGroupRequest: {
       /**
@@ -3130,7 +3137,13 @@ export interface operations {
   };
   listSavingsGoals: {
     parameters: {
-      query?: never;
+      query?: {
+        /**
+         * @description 対象年月（YYYY-MM）。省略時は当月（JST）。is_posted_this_monthの判定に使用
+         * @example 2026-06
+         */
+        year_month?: string;
+      };
       header?: never;
       path?: never;
       cookie?: never;

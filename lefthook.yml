@@ -14,3 +14,7 @@ pre-commit:
       root: "frontend/"
       glob: "src/**/*.{ts,tsx}"
       run: npx eslint {staged_files}
+    prettier:
+      root: "frontend/"
+      glob: "src/**/*.{ts,tsx,css}"
+      run: npx prettier --write {staged_files} && git add {staged_files}

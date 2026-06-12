@@ -26,7 +26,7 @@
     "8001": { "label": "adminer" }
   },
 
-  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && npm install --prefix /workspace/atoikura && (headroom --version >/dev/null 2>&1 || (uv tool install \"headroom-ai[mcp,proxy]\" && headroom mcp install))",
   "waitFor": "postStartCommand",
 
   "customizations": {
