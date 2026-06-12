@@ -90,6 +90,11 @@ ENV VISUAL=nano
 RUN go install "github.com/sqlc-dev/sqlc/cmd/sqlc@${SQLC_VERSION}" \
   && go clean -modcache
 
+# uv for headroom-ai (installed at container-create time via postCreateCommand,
+# not here — pypi.org is unreachable during Docker Desktop image builds).
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/node/.local/bin:$PATH"
+
 # Claude Code itself.
 RUN npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
 

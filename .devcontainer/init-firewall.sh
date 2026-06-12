@@ -65,7 +65,24 @@ while read -r cidr; do
     exit 1
   fi
   ipset add --exist allowed-domains "$cidr"
-done < <(echo "$gh_ranges" | jq -r '(.web + .api + .git)[]' | aggregate -q)
+done < <(echo "$gh_ranges" | jq -r '(.web + .api + .git + .actions)[]' | aggregate -q)
+
+# Fastly CDN: pypi.org and files.pythonhosted.org use Fastly; a single dig
+# only resolves a few IPs and misses the rest of the CDN range, causing
+# intermittent blocks. Use Fastly's published IP list instead.
+echo "Fetching Fastly IP ranges..."
+fastly_ranges=$(curl -s https://api.fastly.com/public-ip-list)
+if echo "$fastly_ranges" | jq -e '.addresses' >/dev/null 2>&1; then
+  while read -r cidr; do
+    ipset add --exist allowed-domains "$cidr"
+  done < <(echo "$fastly_ranges" | jq -r '.addresses[]')
+else
+  echo "WARNING: failed to fetch Fastly IP list, falling back to dig for pypi.org"
+  for domain in "pypi.org" "files.pythonhosted.org"; do
+    ips=$(dig +noall +answer A "$domain" | awk '$4 == "A" {print $5}')
+    while read -r ip; do ipset add --exist allowed-domains "$ip"; done <<< "$ips"
+  done
+fi
 
 # Other allowed domains. Add new ones with a one-line comment explaining why.
 for domain in \
@@ -82,6 +99,7 @@ for domain in \
     "go.dev" \
     "dl.google.com" \
     "objects.githubusercontent.com" \
+    "astral.sh" \
     ; do
   echo "Resolving $domain..."
   ips=$(dig +noall +answer A "$domain" | awk '$4 == "A" {print $5}')

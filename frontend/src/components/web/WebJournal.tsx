@@ -3,7 +3,6 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
-import type { JournalEntryResponseWithRecurring } from "../../api/mobile-types";
 
 type DailyJournalEntries = components["schemas"]["DailyJournalEntries"];
 type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
@@ -320,7 +319,7 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
 
                 <div style={{ display: "flex", flexDirection: "column", marginTop: 6 }}>
                   {day.journal_entries.map((e) => {
-                    const entry = e as JournalEntryResponseWithRecurring;
+                    const entry = e as components["schemas"]["JournalEntryResponse"];
                     const emoji = emojiForGroup(e.group_name ?? "");
                     return (
                       <div
