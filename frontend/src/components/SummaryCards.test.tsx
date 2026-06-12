@@ -12,7 +12,7 @@ function makeDailyCumulative(
 ): components["schemas"]["DailyCumulativeResponse"] {
   return {
     year_month: "2026-06",
-    monthly_budget: 150000,
+    variable_budget: 150000,
     daily_budget: 5000,
     days: [
       {
@@ -61,10 +61,10 @@ describe("SummaryCards", () => {
     expect(screen.getByText(/¥3,700/)).toBeInTheDocument();
   });
 
-  it("shows remaining budget as monthly_budget minus total_spend", async () => {
+  it("shows remaining budget as variable_budget minus total_spend", async () => {
     server.use(
       http.get(`${API_BASE}/expenses/daily-cumulative`, () =>
-        HttpResponse.json(makeDailyCumulative({ monthly_budget: 10000 }))
+        HttpResponse.json(makeDailyCumulative({ variable_budget: 10000 }))
       )
     );
 

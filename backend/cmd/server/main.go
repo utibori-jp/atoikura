@@ -123,8 +123,6 @@ func registerRoutes(mux *http.ServeMux, repo *repository.Repository, jwt_secret 
 	mux.Handle("GET /journal-entries", handler.ListJournalEntriesHandler(repo))
 	mux.Handle("PUT /journal-entries/{id}", handler.UpdateJournalEntryHandler(repo))
 	mux.Handle("DELETE /journal-entries/{id}", handler.DeleteJournalEntryHandler(repo))
-	mux.Handle("GET /budgets", handler.GetBudgetsHandler(repo))
-	mux.Handle("PUT /budgets", handler.UpdateBudgetsHandler(repo))
 	mux.Handle("GET /expenses/daily-cumulative", handler.GetDailyCumulativeHandler(repo))
 	mux.Handle("GET /expenses/monthly-breakdown", handler.GetMonthlyBreakdownHandler(repo))
 	mux.Handle("GET /notes/monthly-reviews", handler.GetMonthlyReviewsHandler(repo))

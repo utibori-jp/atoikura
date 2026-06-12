@@ -99,7 +99,7 @@ components:
       type: object
       required:
         - year_month
-        - monthly_budget
+        - variable_budget
         - daily_budget
         - days
       properties:
@@ -108,15 +108,15 @@ components:
           pattern: '^\d{4}-\d{2}$'
           description: 対象年月（YYYY-MM）
           example: "2025-05"
-        monthly_budget:
+        variable_budget:
           type: integer
-          description: 月次変動費予算（円）
+          description: 変動費予算 = 収入 − 定期支出 − 貯金（円）
           example: 150000
         daily_budget:
           type: integer
           description: |
             日割り予算（円）
-            monthly_budget ÷ 当月日数、小数切り捨て
+            variable_budget ÷ 当月日数、小数切り捨て
           example: 4839
         days:
           type: array
@@ -420,38 +420,6 @@ components:
           description: 生活区分単位の集計リスト
           items:
             $ref: '#/components/schemas/MonthlyBreakdownItem'
-
-    BudgetResponse:
-      type: object
-      properties:
-        monthly_budget:
-          type: [integer, "null"]
-          description: 月次変動費予算（円）。未設定時はnull
-          example: 150000
-        goal_text:
-          type: [string, "null"]
-          description: 貯金目標テキスト。未設定時はnull
-          example: "夏までに旅行費を貯める"
-        goal_amount:
-          type: [integer, "null"]
-          description: 目標金額（円）。未設定時はnull
-          example: 300000
-
-    BudgetRequest:
-      type: object
-      properties:
-        monthly_budget:
-          type: [integer, "null"]
-          description: 月次変動費予算（円）。nullで未設定に戻る。1以上の整数のみ許容
-          example: 120000
-        goal_text:
-          type: [string, "null"]
-          description: 貯金目標テキスト。nullで未設定に戻る
-          example: "夏までに旅行費を貯める"
-        goal_amount:
-          type: [integer, "null"]
-          description: 目標金額（円）。nullで未設定に戻る
-          example: 300000
 
     MonthlyReviewNote:
       type: object
@@ -1723,83 +1691,6 @@ paths:
                   - id: 2
                     type_code: "other"
                     statement_type_name: "その他"
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-  /budgets:
-    get:
-      summary: 予算・目標取得
-      description: |
-        ログインユーザーの予算・目標設定を返す。
-        レコードが未作成の場合も200を返し、全フィールドをnullで返す。
-
-        **利用画面：**
-        - 目標設定画面：初期表示
-      operationId: getBudgets
-      tags:
-        - budgets
-      responses:
-        '200':
-          description: 取得成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BudgetResponse'
-              example:
-                monthly_budget: 150000
-                goal_text: "夏までに旅行費を貯める"
-                goal_amount: 300000
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-    put:
-      summary: 予算・目標更新
-      description: |
-        ログインユーザーの予算・目標設定を更新する。
-        レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
-        全フィールド任意。変更しないフィールドは現在値をそのまま送ること。
-        nullを送ると未設定状態に戻る。
-        `monthly_budget` に0以下の値を送った場合は400を返す。
-
-        **利用画面：**
-        - 目標設定画面：保存
-      operationId: updateBudgets
-      tags:
-        - budgets
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BudgetRequest'
-            example:
-              monthly_budget: 120000
-              goal_text: "夏までに旅行費を貯める"
-              goal_amount: 300000
-      responses:
-        '200':
-          description: 更新成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BudgetResponse'
-              example:
-                monthly_budget: 120000
-                goal_text: "夏までに旅行費を貯める"
-                goal_amount: 300000
-        '400':
-          description: リクエスト不正（monthly_budgetが0以下など）
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                code: BAD_REQUEST
-                message: "monthly_budgetは1以上の整数である必要があります"
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
