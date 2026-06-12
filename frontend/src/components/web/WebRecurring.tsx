@@ -5,6 +5,7 @@ import { T } from "../../theme";
 
 type RecurringExpense = components["schemas"]["RecurringExpense"];
 type PendingRecurring = components["schemas"]["PendingRecurring"];
+type ExpenseCategory = components["schemas"]["ExpenseCategory"];
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 
@@ -18,21 +19,76 @@ interface Props {
 
 type FilterType = "fixed" | "variable" | "all";
 
+// Form state for create / edit. id=null means "create mode".
+interface RecurringFormState {
+  id: number | null;
+  name: string;
+  emoji: string;
+  billing_day: string;
+  amount: string;
+  type: "fixed" | "variable";
+  category_id: string;
+}
+
+function blank_recurring_form(): RecurringFormState {
+  return {
+    id: null,
+    name: "",
+    emoji: "",
+    billing_day: "",
+    amount: "",
+    type: "fixed",
+    category_id: "",
+  };
+}
+
+function recurring_to_form(r: RecurringExpense): RecurringFormState {
+  return {
+    id: r.id,
+    name: r.name,
+    emoji: r.emoji,
+    billing_day: String(r.billing_day),
+    amount: r.amount != null ? String(r.amount) : "",
+    type: r.type,
+    category_id: String(r.category_id),
+  };
+}
+
 export function WebRecurring({ onBack }: Props) {
   const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
   const [pending, setPending] = useState<PendingRecurring[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
   const [confirm_amounts, setConfirmAmounts] = useState<Record<number, string>>({});
   const [confirming_id, setConfirmingId] = useState<number | null>(null);
+  const [expense_categories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const ym = currentMonthJST();
+
+  // recurring_form=null means the form is hidden
+  const [recurring_form, setRecurringForm] = useState<RecurringFormState | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [form_error_msg, setFormErrorMsg] = useState("");
+
+  const refresh_lists = async () => {
+    const [rec_res, pend_res] = await Promise.all([
+      api.listRecurringExpenses(),
+      api.listPendingRecurring(ym),
+    ]);
+    setRecurring(rec_res.recurring_expenses);
+    setPending(pend_res.pending);
+  };
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.listRecurringExpenses(), api.listPendingRecurring(ym)])
-      .then(([rec_res, pend_res]) => {
+    Promise.all([
+      api.listRecurringExpenses(),
+      api.listPendingRecurring(ym),
+      api.listExpenseCategories(),
+    ])
+      .then(([rec_res, pend_res, cat_res]) => {
         if (cancelled) return;
         setRecurring(rec_res.recurring_expenses);
         setPending(pend_res.pending);
+        setExpenseCategories(cat_res.expense_categories);
       })
       .catch(() => {});
     return () => {
@@ -77,11 +133,94 @@ export function WebRecurring({ onBack }: Props) {
     setRecurring((prev) => prev.filter((r) => r.id !== id));
   };
 
+  const open_create_form = () => {
+    setRecurringForm(blank_recurring_form());
+    setFormErrorMsg("");
+  };
+
+  const open_edit_form = (r: RecurringExpense) => {
+    setRecurringForm(recurring_to_form(r));
+    setFormErrorMsg("");
+  };
+
+  const handle_recurring_submit = async () => {
+    if (!recurring_form) return;
+    setFormErrorMsg("");
+
+    if (!recurring_form.name.trim()) {
+      setFormErrorMsg("名前を入力してください");
+      return;
+    }
+    if (!recurring_form.emoji.trim()) {
+      setFormErrorMsg("絵文字を入力してください");
+      return;
+    }
+
+    const parsed_billing_day = parseInt(recurring_form.billing_day, 10);
+    if (isNaN(parsed_billing_day) || parsed_billing_day < 1 || parsed_billing_day > 31) {
+      setFormErrorMsg("引落日を1〜31で入力してください");
+      return;
+    }
+
+    const parsed_category_id = parseInt(recurring_form.category_id, 10);
+    if (isNaN(parsed_category_id)) {
+      setFormErrorMsg("カテゴリを選択してください");
+      return;
+    }
+
+    let parsed_amount: number | null = null;
+    if (recurring_form.amount.trim() !== "") {
+      parsed_amount = parseInt(recurring_form.amount, 10);
+      if (isNaN(parsed_amount) || parsed_amount < 0) {
+        setFormErrorMsg("金額を正しく入力してください");
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    try {
+      const request_body: components["schemas"]["RecurringExpenseRequest"] = {
+        name: recurring_form.name.trim(),
+        emoji: recurring_form.emoji.trim(),
+        billing_day: parsed_billing_day,
+        amount: parsed_amount,
+        type: recurring_form.type,
+        category_id: parsed_category_id,
+      };
+
+      if (recurring_form.id !== null) {
+        await api.updateRecurringExpense(recurring_form.id, request_body);
+      } else {
+        await api.createRecurringExpense(request_body);
+      }
+
+      await refresh_lists();
+      setRecurringForm(null);
+    } catch (err) {
+      setFormErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const filterPills: { id: FilterType; label: string }[] = [
     { id: "fixed", label: "固定" },
     { id: "variable", label: "要確認" },
     { id: "all", label: "すべて" },
   ];
+
+  const input_style: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 12px",
+    border: `1.5px solid ${T.hair}`,
+    borderRadius: 12,
+    fontFamily: "inherit",
+    fontSize: 14,
+    color: T.ink,
+    background: T.bgSoft,
+    outline: "none",
+    boxSizing: "border-box",
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -119,6 +258,7 @@ export function WebRecurring({ onBack }: Props) {
           </div>
         </div>
         <button
+          onClick={open_create_form}
           style={{
             border: "none",
             background: T.coral,
@@ -135,6 +275,155 @@ export function WebRecurring({ onBack }: Props) {
           ＋ 定期支出を追加
         </button>
       </div>
+
+      {/* Inline create / edit form */}
+      {recurring_form && (
+        <div
+          style={{
+            padding: "18px 20px",
+            borderRadius: 20,
+            background: T.bgSoft,
+            border: `1.5px solid ${T.hair}`,
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
+            {recurring_form.id !== null ? "定期支出を編集" : "定期支出を追加"}
+          </div>
+
+          {/* Row 1: emoji + name */}
+          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+            <div style={{ flex: "0 0 80px" }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>絵文字</div>
+              <input
+                type="text"
+                value={recurring_form.emoji}
+                onChange={(e) => setRecurringForm((f) => f && { ...f, emoji: e.target.value })}
+                placeholder="🏠"
+                style={{ ...input_style, textAlign: "center", fontSize: 20 }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>名前</div>
+              <input
+                type="text"
+                value={recurring_form.name}
+                onChange={(e) => setRecurringForm((f) => f && { ...f, name: e.target.value })}
+                placeholder="家賃"
+                style={input_style}
+              />
+            </div>
+          </div>
+
+          {/* Row 2: billing day + amount */}
+          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
+                引落日（1〜31日）
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={31}
+                value={recurring_form.billing_day}
+                onChange={(e) =>
+                  setRecurringForm((f) => f && { ...f, billing_day: e.target.value })
+                }
+                placeholder="25"
+                style={input_style}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
+                金額（円）（任意）
+              </div>
+              <input
+                type="number"
+                min={0}
+                value={recurring_form.amount}
+                onChange={(e) => setRecurringForm((f) => f && { ...f, amount: e.target.value })}
+                placeholder="80000"
+                style={input_style}
+              />
+            </div>
+          </div>
+
+          {/* Row 3: type + category */}
+          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>種別</div>
+              <select
+                value={recurring_form.type}
+                onChange={(e) =>
+                  setRecurringForm(
+                    (f) => f && { ...f, type: e.target.value as "fixed" | "variable" }
+                  )
+                }
+                style={{ ...input_style, appearance: "auto" }}
+              >
+                <option value="fixed">固定（毎月同じ金額）</option>
+                <option value="variable">要確認（毎月変動）</option>
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>カテゴリ</div>
+              <select
+                value={recurring_form.category_id}
+                onChange={(e) =>
+                  setRecurringForm((f) => f && { ...f, category_id: e.target.value })
+                }
+                style={{ ...input_style, appearance: "auto" }}
+              >
+                <option value="">選択してください</option>
+                {expense_categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.category_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {form_error_msg && (
+            <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>
+              {form_error_msg}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={handle_recurring_submit}
+              disabled={submitting}
+              style={{
+                border: "none",
+                background: T.coral,
+                color: "#fff",
+                padding: "9px 20px",
+                borderRadius: 999,
+                fontFamily: "inherit",
+                fontWeight: 700,
+                cursor: "pointer",
+                boxShadow: `0 3px 0 ${T.coralDeep}`,
+              }}
+            >
+              {submitting ? "保存中…" : "保存"}
+            </button>
+            <button
+              onClick={() => setRecurringForm(null)}
+              style={{
+                border: `1px solid ${T.hair}`,
+                background: "#fff",
+                color: T.inkSoft,
+                padding: "9px 20px",
+                borderRadius: 999,
+                fontFamily: "inherit",
+                cursor: "pointer",
+              }}
+            >
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
 
       {pending.length > 0 && (
         <div>
@@ -394,6 +683,7 @@ export function WebRecurring({ onBack }: Props) {
                     style={{ display: "flex", gap: 4, marginTop: 6, justifyContent: "flex-end" }}
                   >
                     <span
+                      onClick={() => open_edit_form(r)}
                       style={{
                         width: 28,
                         height: 28,
@@ -435,6 +725,7 @@ export function WebRecurring({ onBack }: Props) {
           })}
         </div>
         <button
+          onClick={open_create_form}
           style={{
             width: "100%",
             marginTop: 16,
