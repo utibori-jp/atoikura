@@ -56,6 +56,20 @@ const defaultBudget: components["schemas"]["BudgetResponse"] = {
   goal_amount: null,
 };
 
+export const defaultBudgetSummary: components["schemas"]["BudgetSummaryResponse"] = {
+  income_total: 300000,
+  recurring_total: 80000,
+  savings_total: 20000,
+  variable_budget: 200000,
+  daily_budget: 6666,
+  days_remaining: 18,
+  history: [
+    { year_month: "2026-04", budget: 195000, actual: 180000 },
+    { year_month: "2026-05", budget: 198000, actual: 210000 },
+    { year_month: "2026-06", budget: 200000, actual: 50000 },
+  ],
+};
+
 const defaultUser: components["schemas"]["UserResponse"] = {
   id: 1,
   email: "dev@atoikura.local",
@@ -90,6 +104,18 @@ const defaultDailyNotes: components["schemas"]["DailyNoteListResponse"] = {
   notes: [],
 };
 
+const defaultRecurringExpenses: components["schemas"]["RecurringExpenseListResponse"] = {
+  recurring_expenses: [],
+};
+
+const defaultSavingsGoals: components["schemas"]["SavingsGoalListResponse"] = {
+  savings_goals: [],
+};
+
+const defaultIncomeRecords: components["schemas"]["IncomeRecordListResponse"] = {
+  income_records: [],
+};
+
 export const handlers = [
   http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(defaultCategoryGroups)),
 
@@ -114,4 +140,12 @@ export const handlers = [
   ),
 
   http.get(`${API_BASE}/notes/daily`, () => HttpResponse.json(defaultDailyNotes)),
+
+  http.get(`${API_BASE}/budget-summary`, () => HttpResponse.json(defaultBudgetSummary)),
+
+  http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(defaultRecurringExpenses)),
+
+  http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(defaultSavingsGoals)),
+
+  http.get(`${API_BASE}/income-records`, () => HttpResponse.json(defaultIncomeRecords)),
 ];

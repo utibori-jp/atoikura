@@ -69,13 +69,14 @@ export function WebBudget({ onNavigate }: Props) {
     );
   }
 
+  // Find actual spending for the current month from the history array.
+  // The history contains up to 3 months including the current month.
+  const current_month_history = summary.history.find((h) => h.year_month === ym);
+  const current_month_spent_yen = current_month_history?.actual ?? 0;
+
   const spent_pct =
     summary.variable_budget > 0
-      ? Math.round(
-          ((summary.variable_budget - Math.max(0, summary.variable_budget - 0)) /
-            summary.variable_budget) *
-            100
-        )
+      ? Math.round((current_month_spent_yen / summary.variable_budget) * 100)
       : 0;
 
   const tiles = [
@@ -235,7 +236,7 @@ export function WebBudget({ onNavigate }: Props) {
               fontFamily: "'DM Sans', sans-serif",
             }}
           >
-            <span>残り {yen(Math.max(0, summary.variable_budget))}</span>
+            <span>残り {yen(Math.max(0, summary.variable_budget - current_month_spent_yen))}</span>
             <span>予算 {yen(summary.variable_budget)}</span>
           </div>
         </div>
