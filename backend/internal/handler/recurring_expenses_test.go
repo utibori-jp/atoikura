@@ -10,11 +10,12 @@ import (
 )
 
 type fakeRecurringRepo struct {
-	listRecurringExpenses  func(context.Context, int64) ([]repository.RecurringExpenseResult, error)
-	listPendingRecurring   func(context.Context, int64, string) ([]repository.PendingRecurringResult, error)
-	createRecurringExpense func(context.Context, int64, repository.CreateRecurringExpenseParams) (*repository.RecurringExpenseResult, error)
-	updateRecurringExpense func(context.Context, int64, repository.UpdateRecurringExpenseParams) (*repository.RecurringExpenseResult, error)
-	deleteRecurringExpense func(context.Context, int64, int64) (bool, error)
+	listRecurringExpenses   func(context.Context, int64) ([]repository.RecurringExpenseResult, error)
+	listPendingRecurring    func(context.Context, int64, string) ([]repository.PendingRecurringResult, error)
+	createRecurringExpense  func(context.Context, int64, repository.CreateRecurringExpenseParams) (*repository.RecurringExpenseResult, error)
+	updateRecurringExpense  func(context.Context, int64, repository.UpdateRecurringExpenseParams) (*repository.RecurringExpenseResult, error)
+	deleteRecurringExpense  func(context.Context, int64, int64) (bool, error)
+	confirmRecurringExpense func(context.Context, int64, int64, int32, string) (*repository.JournalEntryView, error)
 }
 
 func (f *fakeRecurringRepo) ListRecurringExpenses(ctx context.Context, user_id int64) ([]repository.RecurringExpenseResult, error) {
@@ -67,6 +68,13 @@ func (f *fakeRecurringRepo) DeleteRecurringExpense(ctx context.Context, id, user
 		return f.deleteRecurringExpense(ctx, id, user_id)
 	}
 	return true, nil
+}
+
+func (f *fakeRecurringRepo) ConfirmRecurringExpense(ctx context.Context, recurring_expense_id, user_id int64, amount int32, year_month string) (*repository.JournalEntryView, error) {
+	if f.confirmRecurringExpense != nil {
+		return f.confirmRecurringExpense(ctx, recurring_expense_id, user_id, amount, year_month)
+	}
+	return &repository.JournalEntryView{ID: 1, Amount: amount}, nil
 }
 
 func TestListRecurringExpensesHandler(t *testing.T) {
@@ -242,6 +250,70 @@ func TestUpdateRecurringExpenseHandler(t *testing.T) {
 			}
 			w := testutil.NewRecorder()
 			UpdateRecurringExpenseHandler(tc.repo)(w, r)
+			testutil.AssertStatus(t, w, tc.wantStatus)
+		})
+	}
+}
+
+func TestConfirmRecurringExpenseHandler(t *testing.T) {
+	validBody := map[string]any{"amount": 7480, "year_month": "2026-06"}
+
+	tests := []struct {
+		name       string
+		authed     bool
+		pathID     string
+		body       any
+		repo       *fakeRecurringRepo
+		wantStatus int
+	}{
+		{name: "success", authed: true, pathID: "1", body: validBody, repo: &fakeRecurringRepo{}, wantStatus: http.StatusCreated},
+		{name: "unauthorized", authed: false, pathID: "1", body: validBody, repo: &fakeRecurringRepo{}, wantStatus: http.StatusUnauthorized},
+		{name: "bad request when id not numeric", authed: true, pathID: "abc", body: validBody, repo: &fakeRecurringRepo{}, wantStatus: http.StatusBadRequest},
+		{
+			name:   "bad request when amount missing",
+			authed: true, pathID: "1",
+			body:       map[string]any{"year_month": "2026-06"},
+			repo:       &fakeRecurringRepo{},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:   "bad request when year_month invalid",
+			authed: true, pathID: "1",
+			body:       map[string]any{"amount": 7480, "year_month": "202606"},
+			repo:       &fakeRecurringRepo{},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:   "not found",
+			authed: true, pathID: "99", body: validBody,
+			repo: &fakeRecurringRepo{
+				confirmRecurringExpense: func(_ context.Context, _, _ int64, _ int32, _ string) (*repository.JournalEntryView, error) {
+					return nil, nil
+				},
+			},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:   "conflict when already confirmed",
+			authed: true, pathID: "1", body: validBody,
+			repo: &fakeRecurringRepo{
+				confirmRecurringExpense: func(_ context.Context, _, _ int64, _ int32, _ string) (*repository.JournalEntryView, error) {
+					return nil, repository.ErrRecurringAlreadyConfirmed
+				},
+			},
+			wantStatus: http.StatusConflict,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := testutil.NewRequest(t, http.MethodPost, "/recurring-expenses/"+tc.pathID+"/confirm", tc.body)
+			r.SetPathValue("id", tc.pathID)
+			if tc.authed {
+				r = authCtx(r, 1)
+			}
+			w := testutil.NewRecorder()
+			ConfirmRecurringExpenseHandler(tc.repo)(w, r)
 			testutil.AssertStatus(t, w, tc.wantStatus)
 		})
 	}

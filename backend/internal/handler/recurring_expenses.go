@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -15,6 +16,7 @@ type recurringExpenseRepo interface {
 	CreateRecurringExpense(ctx context.Context, user_id int64, params repository.CreateRecurringExpenseParams) (*repository.RecurringExpenseResult, error)
 	UpdateRecurringExpense(ctx context.Context, user_id int64, params repository.UpdateRecurringExpenseParams) (*repository.RecurringExpenseResult, error)
 	DeleteRecurringExpense(ctx context.Context, id int64, user_id int64) (bool, error)
+	ConfirmRecurringExpense(ctx context.Context, recurring_expense_id int64, user_id int64, amount int32, year_month string) (*repository.JournalEntryView, error)
 }
 
 type recurringExpenseJSON struct {
@@ -251,6 +253,57 @@ func UpdateRecurringExpenseHandler(repo recurringExpenseRepo) http.HandlerFunc {
 		}
 
 		WriteJSON(w, http.StatusOK, toRecurringExpenseJSON(*expense))
+	}
+}
+
+func ConfirmRecurringExpenseHandler(repo recurringExpenseRepo) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user_id, ok := UserIDFromContext(r.Context())
+		if !ok {
+			WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "認証情報が不正です")
+			return
+		}
+
+		recurring_expense_id, ok := parsePathID(w, r)
+		if !ok {
+			return
+		}
+
+		type request struct {
+			Amount    *int32  `json:"amount"`
+			YearMonth *string `json:"year_month"`
+		}
+		var req request
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "リクエストの形式が不正です")
+			return
+		}
+
+		if req.Amount == nil || *req.Amount < 1 {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "amountは正の整数で指定してください")
+			return
+		}
+		if req.YearMonth == nil || !yearMonthPattern.MatchString(*req.YearMonth) {
+			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "year_monthはYYYY-MM形式で指定してください")
+			return
+		}
+
+		entry, err := repo.ConfirmRecurringExpense(r.Context(), recurring_expense_id, user_id, *req.Amount, *req.YearMonth)
+		if errors.Is(err, repository.ErrRecurringAlreadyConfirmed) {
+			WriteError(w, http.StatusConflict, "CONFLICT", "当月分は既に確定済みです")
+			return
+		}
+		if err != nil {
+			slog.Error("confirming recurring expense", "error", err)
+			WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
+			return
+		}
+		if entry == nil {
+			WriteError(w, http.StatusNotFound, "NOT_FOUND", "定期支出が見つかりません")
+			return
+		}
+
+		WriteJSON(w, http.StatusCreated, viewToJournalEntryJSON(*entry))
 	}
 }
 
