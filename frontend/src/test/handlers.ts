@@ -108,6 +108,10 @@ const defaultRecurringExpenses: components["schemas"]["RecurringExpenseListRespo
   recurring_expenses: [],
 };
 
+const defaultPendingRecurring: components["schemas"]["PendingRecurringListResponse"] = {
+  pending: [],
+};
+
 const defaultSavingsGoals: components["schemas"]["SavingsGoalListResponse"] = {
   savings_goals: [],
 };
@@ -144,6 +148,18 @@ export const handlers = [
   http.get(`${API_BASE}/budget-summary`, () => HttpResponse.json(defaultBudgetSummary)),
 
   http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(defaultRecurringExpenses)),
+
+  http.get(`${API_BASE}/recurring-expenses/pending`, () =>
+    HttpResponse.json(defaultPendingRecurring)
+  ),
+
+  http.post(`${API_BASE}/recurring-expenses`, () =>
+    HttpResponse.json(defaultRecurringExpenses.recurring_expenses[0] ?? {}, { status: 201 })
+  ),
+
+  http.put(`${API_BASE}/recurring-expenses/:id`, () =>
+    HttpResponse.json(defaultRecurringExpenses.recurring_expenses[0] ?? {})
+  ),
 
   http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(defaultSavingsGoals)),
 
