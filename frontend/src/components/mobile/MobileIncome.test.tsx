@@ -1,7 +1,12 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { server } from "../../test/server";
-import { MobileIncome, MobileIncomeSheet, MobileEditBaseSheet } from "./MobileIncome";
+import {
+  MobileIncome,
+  MobileIncomeSheet,
+  MobileEditBaseSheet,
+  MobileAllocateSheet,
+} from "./MobileIncome";
 import type { components } from "../../api/types";
 
 const TOKEN_KEY = "atoikura.jwt_token";
@@ -346,5 +351,281 @@ describe("MobileEditBaseSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "✕" }));
 
     expect(on_close).toHaveBeenCalledOnce();
+  });
+});
+
+// ── MobileIncome — surplus allocation badge and sheet ───────────────────────
+
+const sample_savings_goal: components["schemas"]["SavingsGoal"] = {
+  id: 10,
+  name: "旅行積立",
+  emoji: "✈️",
+  monthly_amount: 20000,
+  target_amount: 250000,
+  accumulated_amount: 170000,
+  deadline: null,
+  memo: "",
+  is_posted_this_month: false,
+};
+
+describe("MobileIncome — surplus allocation", () => {
+  function setup_income_handlers(
+    surplus_amount: number,
+    allocations: components["schemas"]["SurplusAllocation"][] = []
+  ) {
+    // base_income = 280000, income = 280000 + surplus_amount
+    const income_total = 280000 + surplus_amount;
+    server.use(
+      http.get("http://localhost:8080/income-records", () =>
+        HttpResponse.json({
+          income_records: [
+            {
+              ...sample_income,
+              amount: income_total,
+            },
+          ],
+        })
+      ),
+      http.get("http://localhost:8080/base-income", () => HttpResponse.json({ amount: 280000 })),
+      http.get("http://localhost:8080/savings-goals", () =>
+        HttpResponse.json({ savings_goals: [sample_savings_goal] })
+      ),
+      http.get("http://localhost:8080/surplus-allocations", () =>
+        HttpResponse.json({ surplus_allocations: allocations })
+      )
+    );
+  }
+
+  it("shows 未振分 badge when there is unallocated surplus", async () => {
+    setup_income_handlers(50000, []);
+
+    render(<MobileIncome onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("未振分")).toBeInTheDocument());
+  });
+
+  it("hides 未振分 badge when surplus is fully allocated", async () => {
+    setup_income_handlers(50000, [
+      {
+        id: 1,
+        year_month: "2026-06",
+        amount: 50000,
+        destination: "budget",
+        savings_goal_id: null,
+        created_at: "2026-06-13T10:00:00+09:00",
+      },
+    ]);
+
+    render(<MobileIncome onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("基準収入")).toBeInTheDocument());
+    expect(screen.queryByText("未振分")).not.toBeInTheDocument();
+  });
+
+  it("opens allocate sheet when 振り分ける → is clicked", async () => {
+    setup_income_handlers(50000, []);
+
+    render(<MobileIncome onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("振り分ける →")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("振り分ける →"));
+
+    await waitFor(() => expect(screen.getByText("余剰を振り分ける")).toBeInTheDocument());
+  });
+
+  it("re-fetches allocations after allocation and updates badge", async () => {
+    let alloc_posted = false;
+    server.use(
+      http.get("http://localhost:8080/income-records", () =>
+        HttpResponse.json({
+          income_records: [{ ...sample_income, amount: 330000 }],
+        })
+      ),
+      http.get("http://localhost:8080/base-income", () => HttpResponse.json({ amount: 280000 })),
+      http.get("http://localhost:8080/savings-goals", () =>
+        HttpResponse.json({ savings_goals: [sample_savings_goal] })
+      ),
+      http.get("http://localhost:8080/surplus-allocations", () => {
+        if (alloc_posted) {
+          return HttpResponse.json({
+            surplus_allocations: [
+              {
+                id: 1,
+                year_month: "2026-06",
+                amount: 50000,
+                destination: "budget",
+                savings_goal_id: null,
+                created_at: "2026-06-13T10:00:00+09:00",
+              },
+            ],
+          });
+        }
+        return HttpResponse.json({ surplus_allocations: [] });
+      }),
+      http.post("http://localhost:8080/surplus-allocations", async () => {
+        alloc_posted = true;
+        return HttpResponse.json(
+          {
+            id: 1,
+            year_month: "2026-06",
+            amount: 50000,
+            destination: "budget",
+            savings_goal_id: null,
+            created_at: "2026-06-13T10:00:00+09:00",
+          },
+          { status: 201 }
+        );
+      })
+    );
+
+    render(<MobileIncome onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("未振分")).toBeInTheDocument());
+
+    // Open allocate sheet
+    fireEvent.click(screen.getByText("振り分ける →"));
+    await waitFor(() => expect(screen.getByText("余剰を振り分ける")).toBeInTheDocument());
+
+    // Set amount
+    const amount_input = screen.getByPlaceholderText("振り分け額");
+    fireEvent.change(amount_input, { target: { value: "50000" } });
+
+    // Switch to budget destination
+    fireEvent.click(screen.getByRole("button", { name: /今月の予算に追加/ }));
+
+    // Submit
+    fireEvent.click(screen.getByText("＋ 振り分ける"));
+
+    // Badge should disappear after allocation
+    await waitFor(() => expect(screen.queryByText("未振分")).not.toBeInTheDocument());
+  });
+});
+
+// ── MobileAllocateSheet — unit tests ────────────────────────────────────────
+
+describe("MobileAllocateSheet", () => {
+  const default_goals = [sample_savings_goal];
+
+  it("renders with unallocated amount displayed", () => {
+    render(
+      <MobileAllocateSheet
+        onClose={vi.fn()}
+        unallocated={50000}
+        active_ym="2026-06"
+        savings_goals={default_goals}
+        onAllocated={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("余剰を振り分ける")).toBeInTheDocument();
+    expect(screen.getByText(/余剰 ¥50,000/)).toBeInTheDocument();
+  });
+
+  it("POSTs with destination:budget when budget is selected", async () => {
+    let posted_body: unknown = null;
+    server.use(
+      http.post("http://localhost:8080/surplus-allocations", async ({ request }) => {
+        posted_body = await request.json();
+        return HttpResponse.json(
+          {
+            id: 1,
+            year_month: "2026-06",
+            amount: 10000,
+            destination: "budget",
+            savings_goal_id: null,
+            created_at: "2026-06-13T10:00:00+09:00",
+          },
+          { status: 201 }
+        );
+      }),
+      http.get("http://localhost:8080/savings-goals", () =>
+        HttpResponse.json({ savings_goals: default_goals })
+      ),
+      http.get("http://localhost:8080/surplus-allocations", () =>
+        HttpResponse.json({ surplus_allocations: [] })
+      )
+    );
+
+    const on_allocated = vi.fn();
+    const on_close = vi.fn();
+    render(
+      <MobileAllocateSheet
+        onClose={on_close}
+        unallocated={50000}
+        active_ym="2026-06"
+        savings_goals={default_goals}
+        onAllocated={on_allocated}
+      />
+    );
+
+    // Enter amount
+    const amount_input = screen.getByPlaceholderText("振り分け額");
+    fireEvent.change(amount_input, { target: { value: "10000" } });
+
+    // Select budget destination (button contains emoji + label + sub-label)
+    fireEvent.click(screen.getByRole("button", { name: /今月の予算に追加/ }));
+
+    // Submit
+    fireEvent.click(screen.getByText("＋ 振り分ける"));
+
+    await waitFor(() => expect(on_allocated).toHaveBeenCalledOnce());
+    expect(on_close).toHaveBeenCalledOnce();
+    expect(posted_body).toMatchObject({
+      year_month: "2026-06",
+      amount: 10000,
+      destination: "budget",
+    });
+  });
+
+  it("POSTs with savings_goal_id when savings destination is selected", async () => {
+    let posted_body: unknown = null;
+    server.use(
+      http.post("http://localhost:8080/surplus-allocations", async ({ request }) => {
+        posted_body = await request.json();
+        return HttpResponse.json(
+          {
+            id: 2,
+            year_month: "2026-06",
+            amount: 20000,
+            destination: "savings",
+            savings_goal_id: 10,
+            created_at: "2026-06-13T10:00:00+09:00",
+          },
+          { status: 201 }
+        );
+      }),
+      http.get("http://localhost:8080/savings-goals", () =>
+        HttpResponse.json({ savings_goals: default_goals })
+      ),
+      http.get("http://localhost:8080/surplus-allocations", () =>
+        HttpResponse.json({ surplus_allocations: [] })
+      )
+    );
+
+    const on_allocated = vi.fn();
+    render(
+      <MobileAllocateSheet
+        onClose={vi.fn()}
+        unallocated={50000}
+        active_ym="2026-06"
+        savings_goals={default_goals}
+        onAllocated={on_allocated}
+      />
+    );
+
+    // savings destination is selected by default; goal is auto-selected
+    const amount_input = screen.getByPlaceholderText("振り分け額");
+    fireEvent.change(amount_input, { target: { value: "20000" } });
+
+    fireEvent.click(screen.getByText("＋ 振り分ける"));
+
+    await waitFor(() => expect(on_allocated).toHaveBeenCalledOnce());
+    expect(posted_body).toMatchObject({
+      year_month: "2026-06",
+      amount: 20000,
+      destination: "savings",
+      savings_goal_id: 10,
+    });
   });
 });
