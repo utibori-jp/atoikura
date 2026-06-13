@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/utibori-jp/atoikura/backend/internal/handler"
-	"github.com/utibori-jp/atoikura/backend/internal/job"
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
 
@@ -60,9 +59,9 @@ func run(parent_ctx context.Context) error {
 
 	repo := repository.New(db_pool)
 
-	poster := job.NewRecurringPoster(db_pool)
-	poster.Start()
-	defer poster.Stop()
+	// Recurring expenses and monthly savings are auto-posted lazily on the first
+	// dashboard read of each month (see Repository.EnsureMonthlyAutoPosting wired into
+	// GET /budget-summary). No scheduler or background job is required.
 
 	mux := http.NewServeMux()
 	registerRoutes(mux, repo, jwt_secret)

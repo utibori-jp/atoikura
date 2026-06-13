@@ -9,6 +9,33 @@ import (
 	"context"
 )
 
+const autoPostMonthlySavingsForMonth = `-- name: AutoPostMonthlySavingsForMonth :execrows
+UPDATE savings_goals
+SET accumulated_amount = accumulated_amount + monthly_amount,
+    last_posted_month = $2::text,
+    updated_at = NOW()
+WHERE user_id = $1
+  AND monthly_amount > 0
+  AND (last_posted_month IS NULL OR last_posted_month < $2::text)
+`
+
+type AutoPostMonthlySavingsForMonthParams struct {
+	UserID  int32  `json:"user_id"`
+	Column2 string `json:"column_2"`
+}
+
+// Adds the monthly amount to accumulated_amount for every savings goal of the user
+// that has a positive monthly_amount and has not yet been posted for the given month.
+// The last_posted_month guard makes this idempotent per (goal, month); callers serialize
+// concurrent first-requests of the month with an advisory lock. Returns rows affected.
+func (q *Queries) AutoPostMonthlySavingsForMonth(ctx context.Context, arg AutoPostMonthlySavingsForMonthParams) (int64, error) {
+	result, err := q.db.Exec(ctx, autoPostMonthlySavingsForMonth, arg.UserID, arg.Column2)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createSavingsGoal = `-- name: CreateSavingsGoal :one
 INSERT INTO savings_goals (user_id, name, emoji, monthly_amount, target_amount, accumulated_amount, deadline, memo)
 VALUES ($1, $2, $3, $4, $5, 0, $6, $7)

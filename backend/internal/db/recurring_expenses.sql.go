@@ -9,6 +9,53 @@ import (
 	"context"
 )
 
+const autoPostFixedRecurringForMonth = `-- name: AutoPostFixedRecurringForMonth :execrows
+INSERT INTO journal_entries (
+  transaction_date, item, amount, category_id, user_id, is_excluded, recurring_expense_id
+)
+SELECT
+  make_date(
+    EXTRACT(YEAR FROM m.month_start)::int,
+    EXTRACT(MONTH FROM m.month_start)::int,
+    LEAST(re.billing_day, EXTRACT(DAY FROM (m.month_start + INTERVAL '1 month - 1 day'))::int)
+  ),
+  re.name,
+  re.amount,
+  re.category_id,
+  re.user_id,
+  false,
+  re.id
+FROM recurring_expenses re
+CROSS JOIN (SELECT ($2::text || '-01')::date AS month_start) AS m
+WHERE re.user_id = $1
+  AND re.type = 'fixed'
+  AND re.amount IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM journal_entries je
+    WHERE je.recurring_expense_id = re.id
+      AND TO_CHAR(je.transaction_date, 'YYYY-MM') = $2::text
+  )
+`
+
+type AutoPostFixedRecurringForMonthParams struct {
+	UserID  int32  `json:"user_id"`
+	Column2 string `json:"column_2"`
+}
+
+// Inserts journal entries for all of the user's FIXED recurring expenses that have a
+// defined amount and are not yet linked to a journal entry in the given month. The
+// transaction date is the billing day clamped to the last day of the month. The
+// NOT EXISTS guard makes this idempotent per (recurring_expense, month); callers
+// serialize concurrent first-requests of the month with an advisory lock to close the
+// check-then-insert race window. Returns the number of entries inserted.
+func (q *Queries) AutoPostFixedRecurringForMonth(ctx context.Context, arg AutoPostFixedRecurringForMonthParams) (int64, error) {
+	result, err := q.db.Exec(ctx, autoPostFixedRecurringForMonth, arg.UserID, arg.Column2)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createRecurringExpense = `-- name: CreateRecurringExpense :one
 INSERT INTO recurring_expenses (user_id, name, emoji, billing_day, amount, type, category_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
