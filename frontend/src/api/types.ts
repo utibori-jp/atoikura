@@ -687,6 +687,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/surplus-allocations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 余剰振り分け一覧取得 */
+    get: operations["listSurplusAllocations"];
+    put?: never;
+    /**
+     * 余剰振り分け作成
+     * @description 余剰（当月収入 − 基準収入）のうち未振り分け分を budget または savings に振り分ける。
+     *     destination=savings の場合は savings_goal_id が必須で、対象貯金目標の accumulated_amount を加算する。
+     *     振り分け金額が残余剰を超える場合は 400 を返す。
+     *     取り消し・編集は V1 スコープ外（追記専用）。
+     */
+    post: operations["createSurplusAllocation"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1350,7 +1374,7 @@ export interface components {
        */
       savings_total: number;
       /**
-       * @description 変動費予算 = 収入 − 定期支出 − 貯金（円）
+       * @description 変動費予算 = 収入 − 定期支出 − 貯金 − 余剰振り分け（savings行きのみ）（円）
        * @example 182200
        */
       variable_budget: number;
@@ -1365,6 +1389,56 @@ export interface components {
        */
       days_remaining: number;
       history: components["schemas"]["BudgetHistoryItem"][];
+    };
+    SurplusAllocation: {
+      /** @example 1 */
+      id: number;
+      /** @example 2026-06 */
+      year_month: string;
+      /**
+       * @description 振り分け金額（円）
+       * @example 20000
+       */
+      amount: number;
+      /**
+       * @description budget = 今月の変動費予算に追加（記録のみ）
+       *     savings = 貯金目標に振り分け（accumulated_amountを加算）
+       * @example savings
+       * @enum {string}
+       */
+      destination: "budget" | "savings";
+      /**
+       * @description 貯金先の savings_goals.id。destination=budget の場合は null
+       * @example 3
+       */
+      savings_goal_id: number | null;
+      /**
+       * Format: date-time
+       * @example 2026-06-13T10:00:00+09:00
+       */
+      created_at: string;
+    };
+    SurplusAllocationRequest: {
+      /** @example 2026-06 */
+      year_month: string;
+      /**
+       * @description 振り分け金額（円）
+       * @example 20000
+       */
+      amount: number;
+      /**
+       * @example savings
+       * @enum {string}
+       */
+      destination: "budget" | "savings";
+      /**
+       * @description destination=savings の場合は必須。destination=budget の場合は指定不可
+       * @example 3
+       */
+      savings_goal_id?: number;
+    };
+    SurplusAllocationListResponse: {
+      surplus_allocations: components["schemas"]["SurplusAllocation"][];
     };
   };
   responses: {
@@ -3483,6 +3557,84 @@ export interface operations {
         };
       };
       401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  listSurplusAllocations: {
+    parameters: {
+      query: {
+        /** @example 2026-06 */
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SurplusAllocationListResponse"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  createSurplusAllocation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SurplusAllocationRequest"];
+      };
+    };
+    responses: {
+      /** @description 作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SurplusAllocation"];
+        };
+      };
+      /** @description 入力値不正または振り分け金額が余剰を超過 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 指定の savings_goal_id が存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
       500: components["responses"]["InternalServerError"];
     };
   };
