@@ -29,3 +29,16 @@ DELETE FROM savings_goals WHERE id = $1 AND user_id = $2;
 -- name: GetSavingsGoalByID :one
 SELECT id, name, emoji, monthly_amount, target_amount, accumulated_amount, deadline, last_posted_month, memo
 FROM savings_goals WHERE id = $1 AND user_id = $2;
+
+-- name: AutoPostMonthlySavingsForMonth :execrows
+-- Adds the monthly amount to accumulated_amount for every savings goal of the user
+-- that has a positive monthly_amount and has not yet been posted for the given month.
+-- The last_posted_month guard makes this idempotent per (goal, month); callers serialize
+-- concurrent first-requests of the month with an advisory lock. Returns rows affected.
+UPDATE savings_goals
+SET accumulated_amount = accumulated_amount + monthly_amount,
+    last_posted_month = $2::text,
+    updated_at = NOW()
+WHERE user_id = $1
+  AND monthly_amount > 0
+  AND (last_posted_month IS NULL OR last_posted_month < $2::text);
