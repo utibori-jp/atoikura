@@ -44,7 +44,15 @@ func (r *Repository) GetBudgetSummary(ctx context.Context, user_id int64, year_m
 		return nil, fmt.Errorf("summing savings monthly: %w", err)
 	}
 
-	variable_budget := income_total - recurring_total - savings_total
+	savings_allocated, err := r.queries.SumSavingsAllocatedByMonth(ctx, db.SumSavingsAllocatedByMonthParams{
+		UserID:  int32(user_id),
+		Column2: year_month,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("summing savings-destined surplus allocations: %w", err)
+	}
+
+	variable_budget := income_total - recurring_total - savings_total - savings_allocated
 
 	// Compute days remaining in the target month
 	parsed_month, err := time.Parse("2006-01", year_month)
@@ -101,7 +109,15 @@ func (r *Repository) GetBudgetSummary(ctx context.Context, user_id int64, year_m
 			return nil, fmt.Errorf("summing actual spend for history month %s: %w", ym, err)
 		}
 
-		h_budget := h_income - recurring_total - savings_total
+		h_savings_allocated, err := r.queries.SumSavingsAllocatedByMonth(ctx, db.SumSavingsAllocatedByMonthParams{
+			UserID:  int32(user_id),
+			Column2: ym,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("summing savings allocations for history month %s: %w", ym, err)
+		}
+
+		h_budget := h_income - recurring_total - savings_total - h_savings_allocated
 		history[i] = BudgetHistoryItem{
 			YearMonth: ym,
 			Budget:    h_budget,

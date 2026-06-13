@@ -146,4 +146,6 @@ func registerRoutes(mux *http.ServeMux, repo *repository.Repository, jwt_secret 
 	mux.Handle("GET /base-income", handler.GetBaseIncomeHandler(repo))
 	mux.Handle("PUT /base-income", handler.UpdateBaseIncomeHandler(repo))
 	mux.Handle("GET /budget-summary", handler.GetBudgetSummaryHandler(repo))
+	mux.Handle("GET /surplus-allocations", handler.ListSurplusAllocationsHandler(repo))
+	mux.Handle("POST /surplus-allocations", handler.CreateSurplusAllocationHandler(repo))
 }
