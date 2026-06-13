@@ -49,6 +49,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    // Scope to unit tests under src/ so the Playwright e2e specs (e2e/*.spec.ts),
+    // which use Playwright's own runner, are not picked up by Vitest.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
     setupFiles: ["./src/test/setup.ts"],
     env: {
       VITE_API_URL: "http://localhost:8080",
