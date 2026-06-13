@@ -5,6 +5,7 @@ import type { components } from "../../api/types";
 
 type RecurringExpense = components["schemas"]["RecurringExpense"];
 type PendingRecurring = components["schemas"]["PendingRecurring"];
+type ExpenseCategory = components["schemas"]["ExpenseCategory"];
 
 interface MobileRecurringProps {
   onBack: () => void;
@@ -13,44 +14,159 @@ interface MobileRecurringProps {
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 const yenSlim = (n: number) => Math.round(n).toLocaleString("ja-JP");
 
-const SHEET_GROUPS = [
-  { id: 1, name: "食費", emoji: "🍙" },
-  { id: 2, name: "日用品", emoji: "🧺" },
-  { id: 3, name: "交通", emoji: "🚃" },
-  { id: 4, name: "趣味・娯楽", emoji: "🎈" },
-  { id: 5, name: "交際", emoji: "🍻" },
-  { id: 6, name: "美容・健康", emoji: "🌿" },
-];
-
-const SHEET_CATEGORIES = ["家賃", "光熱費", "通信費"];
-
-interface MobileRecurringSheetProps {
-  onClose: () => void;
+// Form state for create / edit. id=null means "create mode".
+interface RecurringFormState {
+  id: number | null;
+  name: string;
+  emoji: string;
+  billing_day: string;
+  amount: string;
+  type: "fixed" | "variable";
+  category_id: string;
 }
 
-export function MobileRecurringSheet({ onClose }: MobileRecurringSheetProps) {
+function blank_recurring_form(): RecurringFormState {
+  return {
+    id: null,
+    name: "",
+    emoji: "",
+    billing_day: "",
+    amount: "",
+    type: "fixed",
+    category_id: "",
+  };
+}
+
+function recurring_to_form(r: RecurringExpense): RecurringFormState {
+  return {
+    id: r.id,
+    name: r.name,
+    emoji: r.emoji,
+    billing_day: String(r.billing_day),
+    amount: r.amount != null ? String(r.amount) : "",
+    type: r.type,
+    category_id: String(r.category_id),
+  };
+}
+
+// Bottom-sheet wrapper shared style
+const sheet_overlay_style: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 200,
+  background: "rgba(42,37,32,0.45)",
+};
+
+const sheet_inner_style: React.CSSProperties = {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  bottom: 0,
+  background: T.card,
+  borderTopLeftRadius: 32,
+  borderTopRightRadius: 32,
+  padding: "12px 20px",
+  paddingBottom: "max(env(safe-area-inset-bottom, 0px), 28px)",
+  boxShadow: "0 -20px 50px -20px rgba(0,0,0,0.3)",
+  maxHeight: "90dvh",
+  overflowY: "auto",
+};
+
+const input_style: React.CSSProperties = {
+  width: "100%",
+  padding: "11px 14px",
+  border: `1.5px solid ${T.hair}`,
+  borderRadius: 12,
+  fontFamily: "inherit",
+  fontSize: 14,
+  color: T.ink,
+  background: T.bgSoft,
+  outline: "none",
+  boxSizing: "border-box",
+};
+
+interface RecurringSheetProps {
+  /** null = create mode */
+  initial_form: RecurringFormState;
+  expense_categories: ExpenseCategory[];
+  on_close: () => void;
+  on_saved: () => void;
+}
+
+function RecurringSheet({
+  initial_form,
+  expense_categories,
+  on_close,
+  on_saved,
+}: RecurringSheetProps) {
+  const [form, setForm] = useState<RecurringFormState>(initial_form);
+  const [submitting, setSubmitting] = useState(false);
+  const [form_error_msg, setFormErrorMsg] = useState("");
+
+  const is_edit = form.id !== null;
+  const title_text = is_edit ? "定期支出を編集" : "定期支出を追加";
+
+  const handle_submit = async () => {
+    setFormErrorMsg("");
+
+    if (!form.name.trim()) {
+      setFormErrorMsg("名前を入力してください");
+      return;
+    }
+    if (!form.emoji.trim()) {
+      setFormErrorMsg("絵文字を入力してください");
+      return;
+    }
+
+    const parsed_billing_day = parseInt(form.billing_day, 10);
+    if (isNaN(parsed_billing_day) || parsed_billing_day < 1 || parsed_billing_day > 31) {
+      setFormErrorMsg("引落日を1〜31で入力してください");
+      return;
+    }
+
+    const parsed_category_id = parseInt(form.category_id, 10);
+    if (isNaN(parsed_category_id)) {
+      setFormErrorMsg("カテゴリを選択してください");
+      return;
+    }
+
+    let parsed_amount: number | null = null;
+    if (form.amount.trim() !== "") {
+      parsed_amount = parseInt(form.amount, 10);
+      if (isNaN(parsed_amount) || parsed_amount < 0) {
+        setFormErrorMsg("金額を正しく入力してください");
+        return;
+      }
+    }
+
+    const request_body: components["schemas"]["RecurringExpenseRequest"] = {
+      name: form.name.trim(),
+      emoji: form.emoji.trim(),
+      billing_day: parsed_billing_day,
+      amount: parsed_amount,
+      type: form.type,
+      category_id: parsed_category_id,
+    };
+
+    setSubmitting(true);
+    try {
+      if (form.id !== null) {
+        await api.updateRecurringExpense(form.id, request_body);
+      } else {
+        await api.createRecurringExpense(request_body);
+      }
+      on_saved();
+    } catch (err) {
+      setFormErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div
-      style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(42,37,32,0.45)" }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: T.card,
-          borderTopLeftRadius: 32,
-          borderTopRightRadius: 32,
-          padding: "12px 20px",
-          paddingBottom: "max(env(safe-area-inset-bottom, 0px), 28px)",
-          boxShadow: "0 -20px 50px -20px rgba(0,0,0,0.3)",
-          maxHeight: "90dvh",
-          overflowY: "auto",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div style={sheet_overlay_style} onClick={on_close}>
+      <div style={sheet_inner_style} onClick={(e) => e.stopPropagation()}>
+        {/* Drag handle */}
         <div
           style={{
             width: 42,
@@ -60,6 +176,8 @@ export function MobileRecurringSheet({ onClose }: MobileRecurringSheetProps) {
             margin: "0 auto 14px",
           }}
         />
+
+        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -68,10 +186,10 @@ export function MobileRecurringSheet({ onClose }: MobileRecurringSheetProps) {
             marginBottom: 16,
           }}
         >
-          <div style={{ fontSize: 19, fontWeight: 900 }}>定期支出を追加</div>
+          <div style={{ fontSize: 19, fontWeight: 900 }}>{title_text}</div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={on_close}
             style={{
               width: 30,
               height: 30,
@@ -92,131 +210,61 @@ export function MobileRecurringSheet({ onClose }: MobileRecurringSheetProps) {
           </button>
         </div>
 
-        {/* 項目名 */}
-        <div
-          style={{
-            background: T.bgSoft,
-            border: `1.5px solid ${T.hair}`,
-            borderRadius: 14,
-            padding: "12px 14px",
-            marginBottom: 10,
-          }}
-        >
-          <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 3 }}>項目名</div>
-          <div style={{ fontWeight: 600, fontSize: 14, color: T.inkSoft, fontStyle: "italic" }}>
-            例：電気代
+        {/* Emoji + 名前 */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+          <div style={{ flex: "0 0 70px" }}>
+            <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>絵文字</div>
+            <input
+              type="text"
+              value={form.emoji}
+              onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))}
+              placeholder="🏠"
+              style={{ ...input_style, textAlign: "center", fontSize: 20 }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>名前</div>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="家賃"
+              style={input_style}
+            />
           </div>
         </div>
 
-        {/* 大分類 */}
-        <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600, marginBottom: 8 }}>
-          大分類
-        </div>
-        <div
-          style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 12 }}
-        >
-          {SHEET_GROUPS.map((g) => (
-            <div
-              key={g.id}
-              style={{
-                flexShrink: 0,
-                padding: "9px 14px",
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: "#fff",
-                color: T.ink,
-                fontSize: 13,
-                fontWeight: 600,
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-              }}
-            >
-              <span>{g.emoji}</span>
-              {g.name}
-            </div>
-          ))}
-        </div>
-
-        {/* 生活区分 */}
-        <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600, marginBottom: 8 }}>
-          生活区分
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-          {SHEET_CATEGORIES.map((name) => (
-            <div
-              key={name}
-              style={{
-                padding: "9px 14px",
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: "#fff",
-                color: T.ink,
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              {name}
-            </div>
-          ))}
-        </div>
-
-        {/* 金額 + 毎月何日 */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-          <div
-            style={{
-              flex: 1,
-              background: T.bgSoft,
-              border: `1.5px solid ${T.hair}`,
-              borderRadius: 14,
-              padding: "12px 14px",
-            }}
-          >
-            <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 3 }}>金額（任意）</div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-              <span
-                style={{
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: 700,
-                  fontSize: 18,
-                  color: T.coralDeep,
-                }}
-              >
-                ¥
-              </span>
-              <span
-                style={{
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: 700,
-                  fontSize: 18,
-                  color: T.inkSoft,
-                }}
-              >
-                —
-              </span>
-            </div>
+        {/* 引落日 + 金額 */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>引落日（1〜31日）</div>
+            <input
+              type="number"
+              min={1}
+              max={31}
+              value={form.billing_day}
+              onChange={(e) => setForm((f) => ({ ...f, billing_day: e.target.value }))}
+              placeholder="25"
+              style={input_style}
+            />
           </div>
-          <div
-            style={{
-              flex: "0 0 116px",
-              background: T.bgSoft,
-              border: `1.5px solid ${T.hair}`,
-              borderRadius: 14,
-              padding: "12px 14px",
-            }}
-          >
-            <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 3 }}>毎月</div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-              <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 18 }}>
-                —
-              </span>
-              <span style={{ fontSize: 11, color: T.inkSoft }}>日</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
+              金額（円）（任意）
             </div>
+            <input
+              type="number"
+              min={0}
+              value={form.amount}
+              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+              placeholder="80000"
+              style={input_style}
+            />
           </div>
         </div>
 
         {/* タイプ segmented */}
-        <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600, marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: T.inkSoft, fontWeight: 600, marginBottom: 6 }}>
           タイプ
         </div>
         <div
@@ -226,57 +274,62 @@ export function MobileRecurringSheet({ onClose }: MobileRecurringSheetProps) {
             padding: 4,
             background: T.bgSoft,
             borderRadius: 14,
-            marginBottom: 14,
+            marginBottom: 12,
           }}
         >
-          <div
-            style={{
-              flex: 1,
-              textAlign: "center",
-              padding: "10px",
-              borderRadius: 10,
-              fontWeight: 600,
-              fontSize: 13,
-              background: T.coral,
-              color: "#fff",
-              boxShadow: `0 2px 0 ${T.coralDeep}`,
-            }}
-          >
-            固定（毎月同額）
-          </div>
-          <div
-            style={{
-              flex: 1,
-              textAlign: "center",
-              padding: "10px",
-              borderRadius: 10,
-              fontWeight: 600,
-              fontSize: 13,
-              color: T.inkSoft,
-            }}
-          >
-            要確認（変動）
-          </div>
+          {(["fixed", "variable"] as const).map((type_option) => {
+            const is_active = form.type === type_option;
+            return (
+              <button
+                key={type_option}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, type: type_option }))}
+                style={{
+                  flex: 1,
+                  textAlign: "center",
+                  padding: "10px",
+                  borderRadius: 10,
+                  fontFamily: "inherit",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  border: "none",
+                  cursor: "pointer",
+                  background: is_active ? T.coral : "transparent",
+                  color: is_active ? "#fff" : T.inkSoft,
+                  boxShadow: is_active ? `0 2px 0 ${T.coralDeep}` : "none",
+                }}
+              >
+                {type_option === "fixed" ? "固定（毎月同額）" : "要確認（変動）"}
+              </button>
+            );
+          })}
         </div>
 
-        {/* メモ */}
-        <div
-          style={{
-            background: T.bgSoft,
-            border: `1.5px solid ${T.hair}`,
-            borderRadius: 14,
-            padding: "12px 14px",
-            marginBottom: 18,
-          }}
+        {/* カテゴリ */}
+        <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>カテゴリ</div>
+        <select
+          value={form.category_id}
+          onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))}
+          style={{ ...input_style, appearance: "auto", marginBottom: 16 }}
         >
-          <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 3 }}>メモ（任意）</div>
-          <div style={{ fontSize: 13, color: T.inkSoft, fontStyle: "italic" }}>
-            例：検針日に確認
-          </div>
-        </div>
+          <option value="">選択してください</option>
+          {expense_categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.category_name}
+            </option>
+          ))}
+        </select>
 
+        {/* Error */}
+        {form_error_msg && (
+          <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>{form_error_msg}</div>
+        )}
+
+        {/* Submit */}
         <button
           type="button"
+          onClick={handle_submit}
+          disabled={submitting}
           style={{
             width: "100%",
             border: "none",
@@ -289,9 +342,10 @@ export function MobileRecurringSheet({ onClose }: MobileRecurringSheetProps) {
             fontSize: 16,
             boxShadow: `0 6px 0 ${T.coralDeep}`,
             cursor: "pointer",
+            opacity: submitting ? 0.7 : 1,
           }}
         >
-          保存する
+          {submitting ? "保存中…" : "保存する"}
         </button>
       </div>
     </div>
@@ -301,20 +355,84 @@ export function MobileRecurringSheet({ onClose }: MobileRecurringSheetProps) {
 export function MobileRecurring({ onBack }: MobileRecurringProps) {
   const [recurring, setRecurring] = useState<RecurringExpense[] | null>(null);
   const [pending, setPending] = useState<PendingRecurring[] | null>(null);
-  const [show_sheet, setShowSheet] = useState(false);
+  const [expense_categories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  // sheet_form=null means the sheet is hidden
+  const [sheet_form, setSheetForm] = useState<RecurringFormState | null>(null);
+  // Map of pending item id → confirm amount string
+  const [confirm_amounts, setConfirmAmounts] = useState<Record<number, string>>({});
+  const [confirming_id, setConfirmingId] = useState<number | null>(null);
 
   const currentMonthJST = () =>
     new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(0, 7);
 
+  const ym = currentMonthJST();
+
+  const refresh_lists = async () => {
+    const [rec_res, pend_res] = await Promise.all([
+      api.listRecurringExpenses(),
+      api.listPendingRecurring(ym),
+    ]);
+    setRecurring(rec_res.recurring_expenses);
+    setPending(pend_res.pending);
+  };
+
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
-      api.listRecurringExpenses().then((r) => r.recurring_expenses),
-      api.listPendingRecurring(currentMonthJST()).then((r) => r.pending),
-    ]).then(([r, p]) => {
-      setRecurring(r);
-      setPending(p);
-    });
-  }, []);
+      api.listRecurringExpenses(),
+      api.listPendingRecurring(ym),
+      api.listExpenseCategories(),
+    ])
+      .then(([rec_res, pend_res, cat_res]) => {
+        if (cancelled) return;
+        setRecurring(rec_res.recurring_expenses);
+        setPending(pend_res.pending);
+        setExpenseCategories(cat_res.expense_categories);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [ym]);
+
+  const handle_delete = async (id: number) => {
+    if (!window.confirm("この定期支出を削除しますか？")) return;
+    await api.deleteRecurringExpense(id).catch(() => {});
+    setRecurring((prev) => (prev ? prev.filter((r) => r.id !== id) : prev));
+  };
+
+  const handle_confirm = async (pending_item: PendingRecurring) => {
+    const amount_str = confirm_amounts[pending_item.id];
+    const confirm_amount = parseInt(amount_str ?? "", 10);
+    if (isNaN(confirm_amount) || confirm_amount < 1) return;
+    setConfirmingId(pending_item.id);
+    try {
+      await api.confirmRecurringExpense(pending_item.id, confirm_amount, ym);
+      await refresh_lists();
+      setConfirmAmounts((prev) => {
+        const updated = { ...prev };
+        delete updated[pending_item.id];
+        return updated;
+      });
+    } catch {
+      // Silently ignore (e.g. 409 already confirmed)
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
+  const open_create_sheet = () => {
+    setSheetForm(blank_recurring_form());
+  };
+
+  const open_edit_sheet = (r: RecurringExpense) => {
+    setSheetForm(recurring_to_form(r));
+  };
+
+  const handle_sheet_saved = async () => {
+    setSheetForm(null);
+    await refresh_lists();
+  };
 
   const is_loading = recurring === null;
 
@@ -449,25 +567,51 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
                     {p.billing_day}日
                   </div>
                 </div>
-                <button
-                  type="button"
-                  style={{
-                    width: "100%",
-                    marginTop: 12,
-                    border: "none",
-                    background: T.coral,
-                    color: "#fff",
-                    padding: "11px",
-                    borderRadius: 14,
-                    fontFamily: "inherit",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    boxShadow: `0 4px 0 ${T.coralDeep}`,
-                    cursor: "pointer",
-                  }}
-                >
-                  金額を確定
-                </button>
+
+                {/* Confirm amount input + button */}
+                <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="number"
+                    placeholder={String(p.last_amount)}
+                    value={confirm_amounts[p.id] ?? ""}
+                    onChange={(e) =>
+                      setConfirmAmounts((prev) => ({ ...prev, [p.id]: e.target.value }))
+                    }
+                    style={{
+                      flex: 1,
+                      padding: "10px 12px",
+                      border: `1.5px solid ${T.hair}`,
+                      borderRadius: 10,
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: 15,
+                      fontWeight: 700,
+                      outline: "none",
+                      background: T.bgSoft,
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handle_confirm(p)}
+                    disabled={confirming_id === p.id}
+                    style={{
+                      flex: 1,
+                      border: "none",
+                      background: T.coral,
+                      color: "#fff",
+                      padding: "11px",
+                      borderRadius: 14,
+                      fontFamily: "inherit",
+                      fontWeight: 700,
+                      fontSize: 13,
+                      boxShadow: `0 4px 0 ${T.coralDeep}`,
+                      cursor: "pointer",
+                      opacity: confirming_id === p.id ? 0.7 : 1,
+                    }}
+                  >
+                    {confirming_id === p.id ? "確定中…" : "金額を確定"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -560,36 +704,46 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
                         {r.amount ? yen(r.amount) : "—"}
                       </div>
                       <div style={{ display: "flex", gap: 4 }}>
-                        <span
+                        <button
+                          type="button"
+                          aria-label="編集"
+                          onClick={() => open_edit_sheet(r)}
                           style={{
-                            width: 26,
-                            height: 26,
+                            width: 30,
+                            height: 30,
                             borderRadius: 8,
                             background: T.bgSoft,
+                            border: "none",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             fontSize: 12,
                             color: T.inkSoft,
+                            cursor: "pointer",
                           }}
                         >
                           ✎
-                        </span>
-                        <span
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="削除"
+                          onClick={() => handle_delete(r.id)}
                           style={{
-                            width: 26,
-                            height: 26,
+                            width: 30,
+                            height: 30,
                             borderRadius: 8,
                             background: T.bgSoft,
+                            border: "none",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             fontSize: 12,
                             color: T.inkSoft,
+                            cursor: "pointer",
                           }}
                         >
                           🗑
-                        </span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -602,7 +756,7 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
 
       <button
         type="button"
-        onClick={() => setShowSheet(true)}
+        onClick={open_create_sheet}
         style={{
           width: "100%",
           marginTop: 16,
@@ -620,7 +774,14 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
         ＋ 定期支出を追加
       </button>
 
-      {show_sheet && <MobileRecurringSheet onClose={() => setShowSheet(false)} />}
+      {sheet_form !== null && (
+        <RecurringSheet
+          initial_form={sheet_form}
+          expense_categories={expense_categories}
+          on_close={() => setSheetForm(null)}
+          on_saved={handle_sheet_saved}
+        />
+      )}
     </div>
   );
 }
