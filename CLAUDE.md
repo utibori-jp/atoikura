@@ -45,6 +45,24 @@ Read additional documents based on the work area:
 - Do NOT manually run `uv tool install headroom-ai` or `headroom mcp install` — postStartCommand handles it.
 - If `headroom --help` fails after the container is fully started, ask the user to stop and restart the container to trigger postStartCommand again.
 
+### Docker (devcontainer)
+
+Configured in issue #90 via the `docker-outside-of-docker` devcontainer feature and `COMPOSE_PROJECT_NAME`. These take effect only after a devcontainer **REBUILD**. After rebuilding, verify with `docker ps`, `docker compose ps`, and `docker logs <backend-container>`.
+
+- **NEVER run a bare `docker compose down` or `docker compose stop`** (no service arguments) from inside the devcontainer. The devcontainer itself is the `dev` service of the same compose project — a bare down/stop kills the running container and the Claude Code session.
+- Manage app services explicitly by naming them:
+  ```bash
+  docker compose up -d backend frontend
+  docker compose stop backend frontend
+  ```
+- The following read-only commands are safe inside the container:
+  ```bash
+  docker ps
+  docker logs <container-name>
+  docker compose ps
+  ```
+- `COMPOSE_PROJECT_NAME=atoikura` is set in `containerEnv` so in-container compose commands target the existing project (the one VS Code started), preventing a duplicate `db` container from being created.
+
 ---
 
 ## Conventions
