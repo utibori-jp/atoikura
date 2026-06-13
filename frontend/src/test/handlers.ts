@@ -120,6 +120,10 @@ const defaultIncomeRecords: components["schemas"]["IncomeRecordListResponse"] = 
   income_records: [],
 };
 
+const defaultBaseIncome: components["schemas"]["BaseIncomeSetting"] = {
+  amount: 280000,
+};
+
 export const handlers = [
   http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(defaultCategoryGroups)),
 
@@ -164,4 +168,18 @@ export const handlers = [
   http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(defaultSavingsGoals)),
 
   http.get(`${API_BASE}/income-records`, () => HttpResponse.json(defaultIncomeRecords)),
+
+  http.post(`${API_BASE}/income-records`, () =>
+    HttpResponse.json(defaultIncomeRecords.income_records[0] ?? {}, { status: 201 })
+  ),
+
+  http.put(`${API_BASE}/income-records/:id`, () =>
+    HttpResponse.json(defaultIncomeRecords.income_records[0] ?? {})
+  ),
+
+  http.delete(`${API_BASE}/income-records/:id`, () => new HttpResponse(null, { status: 204 })),
+
+  http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
+
+  http.put(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
 ];
