@@ -116,6 +116,10 @@ const defaultSavingsGoals: components["schemas"]["SavingsGoalListResponse"] = {
   savings_goals: [],
 };
 
+const defaultSurplusAllocations: components["schemas"]["SurplusAllocationListResponse"] = {
+  surplus_allocations: [],
+};
+
 const defaultIncomeRecords: components["schemas"]["IncomeRecordListResponse"] = {
   income_records: [],
 };
@@ -182,4 +186,20 @@ export const handlers = [
   http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
 
   http.put(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
+
+  http.get(`${API_BASE}/surplus-allocations`, () => HttpResponse.json(defaultSurplusAllocations)),
+
+  http.post(`${API_BASE}/surplus-allocations`, () =>
+    HttpResponse.json(
+      {
+        id: 1,
+        year_month: "2026-06",
+        amount: 10000,
+        destination: "budget",
+        savings_goal_id: null,
+        created_at: "2026-06-13T10:00:00+09:00",
+      },
+      { status: 201 }
+    )
+  ),
 ];

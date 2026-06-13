@@ -5,6 +5,8 @@ import { T } from "../../theme";
 
 type IncomeRecord = components["schemas"]["IncomeRecord"];
 type BaseIncomeSetting = components["schemas"]["BaseIncomeSetting"];
+type SavingsGoal = components["schemas"]["SavingsGoal"];
+type SurplusAllocation = components["schemas"]["SurplusAllocation"];
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 
@@ -82,11 +84,28 @@ function income_record_to_form(record: IncomeRecord): IncomeRecordFormState {
   };
 }
 
+// Allocation form state (null = hidden)
+interface AllocFormState {
+  amount_yen: string;
+  destination: "savings" | "budget";
+  savings_goal_id: number | null;
+}
+
+function blank_alloc_form(savings_goals: SavingsGoal[]): AllocFormState {
+  return {
+    amount_yen: "",
+    destination: "savings",
+    savings_goal_id: savings_goals.length > 0 ? savings_goals[0].id : null,
+  };
+}
+
 export function WebIncome({ onBack }: Props) {
   const current_ym = currentMonthJST();
   const [active_ym, setActiveYm] = useState(current_ym);
   const [records, setRecords] = useState<IncomeRecord[]>([]);
   const [base_income, setBaseIncome] = useState<BaseIncomeSetting | null>(null);
+  const [savings_goals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [surplus_allocations, setSurplusAllocations] = useState<SurplusAllocation[]>([]);
   const [editing_base, setEditingBase] = useState(false);
   const [base_draft, setBaseDraft] = useState("");
 
@@ -94,6 +113,11 @@ export function WebIncome({ onBack }: Props) {
   const [income_form, setIncomeForm] = useState<IncomeRecordFormState | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form_error_msg, setFormErrorMsg] = useState("");
+
+  // alloc_form=null means allocation form is hidden
+  const [alloc_form, setAllocForm] = useState<AllocFormState | null>(null);
+  const [alloc_submitting, setAllocSubmitting] = useState(false);
+  const [alloc_error_msg, setAllocErrorMsg] = useState("");
 
   const available_months = [
     addMonths(current_ym, -2),
@@ -107,13 +131,30 @@ export function WebIncome({ onBack }: Props) {
     setRecords(res.income_records);
   };
 
+  const refresh_allocations = async () => {
+    const res = await api.listSurplusAllocations(active_ym);
+    setSurplusAllocations(res.surplus_allocations);
+  };
+
+  const refresh_savings_goals = async () => {
+    const res = await api.listSavingsGoals();
+    setSavingsGoals(res.savings_goals);
+  };
+
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.listIncomeRecords(active_ym), api.getBaseIncome()])
-      .then(([income_res, base_res]) => {
+    Promise.all([
+      api.listIncomeRecords(active_ym),
+      api.getBaseIncome(),
+      api.listSavingsGoals(),
+      api.listSurplusAllocations(active_ym),
+    ])
+      .then(([income_res, base_res, goals_res, allocs_res]) => {
         if (cancelled) return;
         setRecords(income_res.income_records);
         setBaseIncome(base_res);
+        setSavingsGoals(goals_res.savings_goals);
+        setSurplusAllocations(allocs_res.surplus_allocations);
       })
       .catch(() => {});
     return () => {
@@ -124,6 +165,8 @@ export function WebIncome({ onBack }: Props) {
   const income_total = records.reduce((s, r) => s + r.amount, 0);
   const base_amount = base_income?.amount ?? 0;
   const surplus = income_total - base_amount;
+  const allocated_total = surplus_allocations.reduce((s, a) => s + a.amount, 0);
+  const unallocated = Math.max(0, surplus - allocated_total);
 
   const days_with_income = [...new Set(records.map((r) => r.transaction_date))].sort().reverse();
 
@@ -204,6 +247,40 @@ export function WebIncome({ onBack }: Props) {
       setFormErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handle_alloc_submit = async () => {
+    if (!alloc_form) return;
+    setAllocErrorMsg("");
+
+    const parsed_amount = parseInt(alloc_form.amount_yen, 10);
+    if (isNaN(parsed_amount) || parsed_amount <= 0 || parsed_amount > unallocated) {
+      setAllocErrorMsg("金額を正しく入力してください（余剰以内）");
+      return;
+    }
+    if (alloc_form.destination === "savings" && alloc_form.savings_goal_id === null) {
+      setAllocErrorMsg("貯金目標を選択してください");
+      return;
+    }
+
+    setAllocSubmitting(true);
+    try {
+      await api.createSurplusAllocation({
+        year_month: active_ym,
+        amount: parsed_amount,
+        destination: alloc_form.destination,
+        ...(alloc_form.destination === "savings" && alloc_form.savings_goal_id !== null
+          ? { savings_goal_id: alloc_form.savings_goal_id }
+          : {}),
+      });
+      await refresh_allocations();
+      await refresh_savings_goals();
+      setAllocForm(null);
+    } catch (err) {
+      setAllocErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
+    } finally {
+      setAllocSubmitting(false);
     }
   };
 
@@ -553,6 +630,21 @@ export function WebIncome({ onBack }: Props) {
                 >
                   余剰金額
                 </span>
+                {unallocated > 0 && (
+                  <span
+                    style={{
+                      padding: "2px 7px",
+                      borderRadius: 999,
+                      background: T.bgSoft,
+                      border: `1px solid ${T.hair}`,
+                      fontSize: 9,
+                      fontWeight: 700,
+                      color: T.inkSoft,
+                    }}
+                  >
+                    未振分
+                  </span>
+                )}
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 6 }}>
                 <span
@@ -580,6 +672,199 @@ export function WebIncome({ onBack }: Props) {
               <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 3 }}>
                 基準を超えた今月の上振れ
               </div>
+              <button
+                onClick={() => {
+                  setAllocForm(blank_alloc_form(savings_goals));
+                  setAllocErrorMsg("");
+                }}
+                style={{
+                  marginTop: 10,
+                  padding: "9px 16px",
+                  border: "none",
+                  borderRadius: 999,
+                  background: T.mustard,
+                  color: T.ink,
+                  fontFamily: "inherit",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  boxShadow: "0 3px 0 #F0A92E",
+                }}
+              >
+                振り分ける →
+              </button>
+
+              {/* Inline allocation form */}
+              {alloc_form && (
+                <div
+                  style={{
+                    marginTop: 14,
+                    padding: "14px 16px",
+                    borderRadius: 16,
+                    background: T.bgSoft,
+                    border: `1.5px solid ${T.hair}`,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
+                    余剰を振り分ける
+                  </div>
+
+                  {/* Amount */}
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
+                      金額（円）※ 余剰 {yen(unallocated)} 以内
+                    </div>
+                    <input
+                      type="number"
+                      min={1}
+                      max={unallocated}
+                      value={alloc_form.amount_yen}
+                      onChange={(e) =>
+                        setAllocForm((f) => f && { ...f, amount_yen: e.target.value })
+                      }
+                      placeholder={String(unallocated)}
+                      style={input_style}
+                    />
+                    {/* Quick-fill chips */}
+                    <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                      {[
+                        { label: "全額", value: unallocated },
+                        { label: "½", value: Math.floor(unallocated / 2) },
+                        { label: "¥10,000", value: 10000 },
+                      ].map((chip) => (
+                        <button
+                          key={chip.label}
+                          type="button"
+                          onClick={() =>
+                            setAllocForm((f) => f && { ...f, amount_yen: String(chip.value) })
+                          }
+                          style={{
+                            padding: "5px 10px",
+                            borderRadius: 8,
+                            border: `1.5px solid ${String(chip.value) === alloc_form.amount_yen ? T.mustard : T.hair}`,
+                            background:
+                              String(chip.value) === alloc_form.amount_yen ? T.mustardSoft : "#fff",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            color: T.ink,
+                          }}
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Destination */}
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
+                      振り分け先
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {(["savings", "budget"] as const).map((dest) => {
+                        const labels = { savings: "貯金", budget: "今月の予算に追加" };
+                        const sel = alloc_form.destination === dest;
+                        return (
+                          <button
+                            key={dest}
+                            type="button"
+                            onClick={() => setAllocForm((f) => f && { ...f, destination: dest })}
+                            style={{
+                              padding: "9px 14px",
+                              borderRadius: 999,
+                              border: `1.5px solid ${sel ? T.coral : T.hair}`,
+                              background: sel ? T.coralSoft : "#fff",
+                              color: sel ? T.coralDeep : T.ink,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              fontFamily: "inherit",
+                            }}
+                          >
+                            {labels[dest]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Savings goal selector */}
+                  {alloc_form.destination === "savings" && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
+                        貯金目標
+                      </div>
+                      <select
+                        value={alloc_form.savings_goal_id ?? ""}
+                        onChange={(e) =>
+                          setAllocForm(
+                            (f) =>
+                              f && {
+                                ...f,
+                                savings_goal_id: e.target.value ? Number(e.target.value) : null,
+                              }
+                          )
+                        }
+                        style={input_style}
+                      >
+                        <option value="">選択してください</option>
+                        {savings_goals.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.emoji} {g.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {alloc_error_msg && (
+                    <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>
+                      {alloc_error_msg}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={handle_alloc_submit}
+                      disabled={
+                        alloc_submitting ||
+                        !alloc_form.amount_yen ||
+                        (alloc_form.destination === "savings" &&
+                          alloc_form.savings_goal_id === null)
+                      }
+                      style={{
+                        border: "none",
+                        background: T.mustard,
+                        color: T.ink,
+                        padding: "9px 20px",
+                        borderRadius: 999,
+                        fontFamily: "inherit",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        boxShadow: "0 3px 0 #F0A92E",
+                      }}
+                    >
+                      {alloc_submitting ? "振り分け中…" : "振り分ける"}
+                    </button>
+                    <button
+                      onClick={() => setAllocForm(null)}
+                      style={{
+                        border: `1px solid ${T.hair}`,
+                        background: "#fff",
+                        color: T.inkSoft,
+                        padding: "9px 20px",
+                        borderRadius: 999,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                      }}
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

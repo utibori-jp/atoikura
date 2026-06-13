@@ -142,6 +142,22 @@ Table account_transactions {
   version integer
 }
 
+Table surplus_allocations {
+  id integer [primary key]
+  user_id integer [not null]
+  year_month varchar(7) [not null]
+  amount integer [not null, note: 'CHECK (amount >= 1)']
+  destination varchar(10) [not null, note: "CHECK (destination IN ('budget', 'savings'))"]
+  savings_goal_id integer [note: 'NULL when destination = budget']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, year_month) [name: 'idx_surplus_allocations_user_ym']
+  }
+
+  note: "destination = budget: record only. destination = savings: also increments savings_goals.accumulated_amount. Append-only in V1."
+}
+
 Ref: users.id < journal_entries.user_id
 Ref: users.id < expense_categories.user_id
 Ref: users.id < category_groups.user_id
@@ -154,3 +170,5 @@ Ref: journal_entries.category_id > expense_categories.id
 Ref: expense_categories.group_id > category_groups.id
 Ref: category_groups.statement_type_id > statement_types.id
 Ref: accounts.id < account_transactions.account_id
+Ref: users.id < surplus_allocations.user_id
+Ref: savings_goals.id < surplus_allocations.savings_goal_id

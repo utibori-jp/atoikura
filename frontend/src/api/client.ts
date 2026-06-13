@@ -207,4 +207,13 @@ export const api = {
     request<components["schemas"]["BudgetSummaryResponse"]>(
       `/budget-summary?year_month=${year_month}`
     ),
+  listSurplusAllocations: (year_month: string) =>
+    request<components["schemas"]["SurplusAllocationListResponse"]>(
+      `/surplus-allocations?year_month=${year_month}`
+    ),
+  createSurplusAllocation: (body: components["schemas"]["SurplusAllocationRequest"]) =>
+    request<components["schemas"]["SurplusAllocation"]>("/surplus-allocations", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };

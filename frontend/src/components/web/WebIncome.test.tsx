@@ -248,3 +248,200 @@ describe("WebIncome — edit form", () => {
     expect(screen.queryByText("収入記録を編集")).not.toBeInTheDocument();
   });
 });
+
+// ── WebIncome — surplus allocation ───────────────────────────────────────────
+
+const sample_savings_goal: components["schemas"]["SavingsGoal"] = {
+  id: 10,
+  name: "旅行積立",
+  emoji: "✈️",
+  monthly_amount: 20000,
+  target_amount: 250000,
+  accumulated_amount: 170000,
+  deadline: null,
+  memo: "",
+  is_posted_this_month: false,
+};
+
+describe("WebIncome — surplus allocation", () => {
+  function setup_allocation_handlers(
+    income_amount: number,
+    base_amount: number,
+    allocations: components["schemas"]["SurplusAllocation"][] = []
+  ) {
+    server.use(
+      http.get(`${API_BASE}/income-records`, () =>
+        HttpResponse.json(makeIncomeList([makeIncomeRecord({ amount: income_amount })]))
+      ),
+      http.get(`${API_BASE}/base-income`, () => HttpResponse.json({ amount: base_amount })),
+      http.get(`${API_BASE}/savings-goals`, () =>
+        HttpResponse.json({ savings_goals: [sample_savings_goal] })
+      ),
+      http.get(`${API_BASE}/surplus-allocations`, () =>
+        HttpResponse.json({ surplus_allocations: allocations })
+      )
+    );
+  }
+
+  it("shows 未振分 badge when there is unallocated surplus", async () => {
+    setup_allocation_handlers(330000, 280000, []);
+
+    render(<WebIncome onBack={() => {}} />);
+    await waitForReady();
+
+    expect(screen.getByText("未振分")).toBeInTheDocument();
+  });
+
+  it("hides 未振分 badge when surplus is fully allocated", async () => {
+    setup_allocation_handlers(330000, 280000, [
+      {
+        id: 1,
+        year_month: "2026-06",
+        amount: 50000,
+        destination: "budget",
+        savings_goal_id: null,
+        created_at: "2026-06-13T10:00:00+09:00",
+      },
+    ]);
+
+    render(<WebIncome onBack={() => {}} />);
+    await waitForReady();
+
+    expect(screen.queryByText("未振分")).not.toBeInTheDocument();
+  });
+
+  it("opens allocation form when 振り分ける → is clicked", async () => {
+    setup_allocation_handlers(330000, 280000, []);
+
+    render(<WebIncome onBack={() => {}} />);
+    await waitForReady();
+
+    fireEvent.click(screen.getByRole("button", { name: "振り分ける →" }));
+
+    expect(screen.getByText("余剰を振り分ける")).toBeInTheDocument();
+  });
+
+  it("POSTs with destination:budget when budget is selected", async () => {
+    let posted_body: unknown = null;
+    let alloc_fetched_after = false;
+    server.use(
+      http.get(`${API_BASE}/income-records`, () =>
+        HttpResponse.json(makeIncomeList([makeIncomeRecord({ amount: 330000 })]))
+      ),
+      http.get(`${API_BASE}/base-income`, () => HttpResponse.json({ amount: 280000 })),
+      http.get(`${API_BASE}/savings-goals`, () =>
+        HttpResponse.json({ savings_goals: [sample_savings_goal] })
+      ),
+      http.get(`${API_BASE}/surplus-allocations`, () => {
+        if (alloc_fetched_after) {
+          return HttpResponse.json({
+            surplus_allocations: [
+              {
+                id: 1,
+                year_month: "2026-06",
+                amount: 10000,
+                destination: "budget",
+                savings_goal_id: null,
+                created_at: "2026-06-13T10:00:00+09:00",
+              },
+            ],
+          });
+        }
+        return HttpResponse.json({ surplus_allocations: [] });
+      }),
+      http.post(`${API_BASE}/surplus-allocations`, async ({ request }) => {
+        posted_body = await request.json();
+        alloc_fetched_after = true;
+        return HttpResponse.json(
+          {
+            id: 1,
+            year_month: "2026-06",
+            amount: 10000,
+            destination: "budget",
+            savings_goal_id: null,
+            created_at: "2026-06-13T10:00:00+09:00",
+          },
+          { status: 201 }
+        );
+      })
+    );
+
+    render(<WebIncome onBack={() => {}} />);
+    await waitForReady();
+
+    fireEvent.click(screen.getByRole("button", { name: "振り分ける →" }));
+    expect(screen.getByText("余剰を振り分ける")).toBeInTheDocument();
+
+    // Enter amount
+    fireEvent.change(screen.getByPlaceholderText("50000"), { target: { value: "10000" } });
+
+    // Select budget destination
+    fireEvent.click(screen.getByRole("button", { name: "今月の予算に追加" }));
+
+    // Submit
+    fireEvent.click(screen.getByRole("button", { name: "振り分ける" }));
+
+    await waitFor(() => expect(posted_body).not.toBeNull());
+    expect(posted_body).toMatchObject({
+      year_month: expect.stringMatching(/^\d{4}-\d{2}$/),
+      amount: 10000,
+      destination: "budget",
+    });
+
+    // Form closes after allocation
+    await waitFor(() => expect(screen.queryByText("余剰を振り分ける")).not.toBeInTheDocument());
+  });
+
+  it("POSTs with savings_goal_id when savings destination is selected", async () => {
+    let posted_body: unknown = null;
+    server.use(
+      http.get(`${API_BASE}/income-records`, () =>
+        HttpResponse.json(makeIncomeList([makeIncomeRecord({ amount: 330000 })]))
+      ),
+      http.get(`${API_BASE}/base-income`, () => HttpResponse.json({ amount: 280000 })),
+      http.get(`${API_BASE}/savings-goals`, () =>
+        HttpResponse.json({ savings_goals: [sample_savings_goal] })
+      ),
+      http.get(`${API_BASE}/surplus-allocations`, () =>
+        HttpResponse.json({ surplus_allocations: [] })
+      ),
+      http.post(`${API_BASE}/surplus-allocations`, async ({ request }) => {
+        posted_body = await request.json();
+        return HttpResponse.json(
+          {
+            id: 2,
+            year_month: "2026-06",
+            amount: 20000,
+            destination: "savings",
+            savings_goal_id: 10,
+            created_at: "2026-06-13T10:00:00+09:00",
+          },
+          { status: 201 }
+        );
+      })
+    );
+
+    render(<WebIncome onBack={() => {}} />);
+    await waitForReady();
+
+    fireEvent.click(screen.getByRole("button", { name: "振り分ける →" }));
+
+    // Set amount
+    fireEvent.change(screen.getByPlaceholderText("50000"), { target: { value: "20000" } });
+
+    // savings is default — select the goal from the dropdown
+    const goal_select = screen.getByRole("combobox");
+    fireEvent.change(goal_select, { target: { value: "10" } });
+
+    // Submit
+    fireEvent.click(screen.getByRole("button", { name: "振り分ける" }));
+
+    await waitFor(() => expect(posted_body).not.toBeNull());
+    expect(posted_body).toMatchObject({
+      year_month: expect.stringMatching(/^\d{4}-\d{2}$/),
+      amount: 20000,
+      destination: "savings",
+      savings_goal_id: 10,
+    });
+  });
+});

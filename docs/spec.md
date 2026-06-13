@@ -135,6 +135,43 @@ Ver1スコープ（本仕様書の対象）：
 | 同時実行の保護 | 固定費・貯金の記録を1つのトランザクションにまとめ、ユーザー単位の `pg_advisory_xact_lock` で直列化 | 月初の同時リクエストが冪等ガードの判定と更新の間で競合して二重記録するのを防ぐ |
 | 失敗時の扱い | 自動記録が失敗してもダッシュボードのレスポンスはブロックしない（ログのみ） | 参照系APIの可用性を優先 |
 
+### 4-6. 余剰の振り分け
+
+#### 余剰（surplus）の定義
+
+余剰 = `SUM(income_records.amount)` （当月） − `base_income_settings.amount`
+
+基準収入を超えた分の収入が「余剰」であり、ユーザーが明示的に使い道を決めるための原資となる。
+
+#### 振り分け先（destination）
+
+| destination | 意味 | データへの影響 |
+|---|---|---|
+| `budget` | 今月の変動費予算に追加 | `surplus_allocations` に記録のみ（`variable_budget` の計算式には影響しない。余剰は既に収入として計上されているため） |
+| `savings` | 貯金目標に振り分け | `surplus_allocations` に記録し、同一トランザクション内で `savings_goals.accumulated_amount` に加算 |
+
+#### variable_budget への影響
+
+`variable_budget = income_total − recurring_total − savings_total − savings_allocated(year_month)`
+
+- `savings_allocated` = 当月の `surplus_allocations.amount` のうち `destination = 'savings'` のもの合計
+- `destination = 'budget'` の振り分けは `variable_budget` を変えない（その収入は既に可処分予算に含まれている）
+- 同じロジックが過去月の履歴（history）にも適用される
+
+#### 未振り分け余剰の上限バリデーション
+
+振り分け登録時に以下を検証する：
+```
+amount ≤ max(0, income_total(ym) − base_income) − already_allocated_total(ym)
+```
+違反した場合は 400 エラーを返す（メッセージ：「指定金額が振り分け可能な余剰を超えています」）。
+
+#### その他の設計決定
+
+- 振り分けレコードは追記専用。取り消し・編集は V1 スコープ外
+- `destination = 'savings'` かつ `savings_goal_id` が他ユーザーのものを参照した場合は 404 を返す（リソースの存在を露出しない）
+- `destination = 'budget'` の場合 `savings_goal_id` は NULL（指定不可）
+
 ### 4-3. マスタ・カテゴリ設計
 
 | 項目 | 決定内容 |
@@ -200,6 +237,8 @@ Ver1スコープ（本仕様書の対象）：
 | 20 | DELETE | `/journal-entries/{id}` | 仕訳削除（物理削除） | 完了 |
 | 21 | GET | `/notes/daily` | 日次コメント一覧取得 | 完了 |
 | 22 | PUT | `/notes/daily/{date}` | 日次コメント保存 | 完了 |
+| 23 | GET | `/surplus-allocations?year_month=YYYY-MM` | 余剰振り分け一覧取得 | 完了 |
+| 24 | POST | `/surplus-allocations` | 余剰振り分け作成 | 完了 |
 
 ---
 
