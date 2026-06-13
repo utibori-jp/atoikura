@@ -29,6 +29,13 @@ const INCOME_TYPES: Record<string, { label: string; bg: string; fg: string }> = 
   oneoff: { label: "一時収入", bg: "#FFE8DD", fg: "#F26B3F" },
 };
 
+const INCOME_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "salary", label: "給与" },
+  { value: "side", label: "副業" },
+  { value: "bonus", label: "ボーナス" },
+  { value: "oneoff", label: "一時収入" },
+];
+
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
 function dateSquareParts(date_str: string): { day: number; month: number; weekday: string } {
@@ -40,6 +47,41 @@ interface Props {
   onBack: () => void;
 }
 
+// Form state for create / edit. id=null means "create mode".
+interface IncomeRecordFormState {
+  id: number | null;
+  name: string;
+  emoji: string;
+  amount_yen: string;
+  transaction_date: string;
+  income_type: string;
+  note: string;
+}
+
+function blank_income_form(default_date: string): IncomeRecordFormState {
+  return {
+    id: null,
+    name: "",
+    emoji: "",
+    amount_yen: "",
+    transaction_date: default_date,
+    income_type: "salary",
+    note: "",
+  };
+}
+
+function income_record_to_form(record: IncomeRecord): IncomeRecordFormState {
+  return {
+    id: record.id,
+    name: record.name,
+    emoji: record.emoji,
+    amount_yen: String(record.amount),
+    transaction_date: record.transaction_date,
+    income_type: record.income_type,
+    note: record.note ?? "",
+  };
+}
+
 export function WebIncome({ onBack }: Props) {
   const current_ym = currentMonthJST();
   const [active_ym, setActiveYm] = useState(current_ym);
@@ -48,12 +90,22 @@ export function WebIncome({ onBack }: Props) {
   const [editing_base, setEditingBase] = useState(false);
   const [base_draft, setBaseDraft] = useState("");
 
+  // income_form=null means the form is hidden
+  const [income_form, setIncomeForm] = useState<IncomeRecordFormState | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [form_error_msg, setFormErrorMsg] = useState("");
+
   const available_months = [
     addMonths(current_ym, -2),
     addMonths(current_ym, -1),
     current_ym,
     addMonths(current_ym, 1),
   ];
+
+  const refresh_records = async () => {
+    const res = await api.listIncomeRecords(active_ym);
+    setRecords(res.income_records);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +145,81 @@ export function WebIncome({ onBack }: Props) {
     setRecords((prev) => prev.filter((r) => r.id !== id));
   };
 
+  const open_create_form = () => {
+    // Default transaction date to the first day of the active month
+    const default_date = `${active_ym}-01`;
+    setIncomeForm(blank_income_form(default_date));
+    setFormErrorMsg("");
+  };
+
+  const open_edit_form = (record: IncomeRecord) => {
+    setIncomeForm(income_record_to_form(record));
+    setFormErrorMsg("");
+  };
+
+  const handle_income_submit = async () => {
+    if (!income_form) return;
+    setFormErrorMsg("");
+
+    if (!income_form.name.trim()) {
+      setFormErrorMsg("名前を入力してください");
+      return;
+    }
+    if (!income_form.emoji.trim()) {
+      setFormErrorMsg("絵文字を入力してください");
+      return;
+    }
+
+    const parsed_amount = parseInt(income_form.amount_yen, 10);
+    if (isNaN(parsed_amount) || parsed_amount < 1) {
+      setFormErrorMsg("金額を正しく入力してください");
+      return;
+    }
+
+    if (!income_form.transaction_date) {
+      setFormErrorMsg("日付を入力してください");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const request_body: components["schemas"]["IncomeRecordRequest"] = {
+        name: income_form.name.trim(),
+        emoji: income_form.emoji.trim(),
+        amount: parsed_amount,
+        transaction_date: income_form.transaction_date,
+        income_type: income_form.income_type as "salary" | "side" | "bonus" | "oneoff",
+        note: income_form.note.trim() || undefined,
+      };
+
+      if (income_form.id !== null) {
+        await api.updateIncomeRecord(income_form.id, request_body);
+      } else {
+        await api.createIncomeRecord(request_body);
+      }
+
+      await refresh_records();
+      setIncomeForm(null);
+    } catch (err) {
+      setFormErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const input_style: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 12px",
+    border: `1.5px solid ${T.hair}`,
+    borderRadius: 12,
+    fontFamily: "inherit",
+    fontSize: 14,
+    color: T.ink,
+    background: T.bgSoft,
+    outline: "none",
+    boxSizing: "border-box",
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
@@ -129,6 +256,7 @@ export function WebIncome({ onBack }: Props) {
           </div>
         </div>
         <button
+          onClick={open_create_form}
           style={{
             border: "none",
             background: T.sage,
@@ -145,6 +273,140 @@ export function WebIncome({ onBack }: Props) {
           ＋ 収入を記録
         </button>
       </div>
+
+      {/* Inline create / edit form */}
+      {income_form && (
+        <div
+          style={{
+            padding: "18px 20px",
+            borderRadius: 20,
+            background: T.bgSoft,
+            border: `1.5px solid ${T.hair}`,
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
+            {income_form.id !== null ? "収入記録を編集" : "収入を記録"}
+          </div>
+
+          {/* Row 1: emoji + name */}
+          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+            <div style={{ flex: "0 0 80px" }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>絵文字</div>
+              <input
+                type="text"
+                value={income_form.emoji}
+                onChange={(e) => setIncomeForm((f) => f && { ...f, emoji: e.target.value })}
+                placeholder="🏢"
+                style={{ ...input_style, textAlign: "center", fontSize: 20 }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>名前</div>
+              <input
+                type="text"
+                value={income_form.name}
+                onChange={(e) => setIncomeForm((f) => f && { ...f, name: e.target.value })}
+                placeholder="6月給与"
+                style={input_style}
+              />
+            </div>
+          </div>
+
+          {/* Row 2: amount + income type */}
+          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>金額（円）</div>
+              <input
+                type="number"
+                min={1}
+                value={income_form.amount_yen}
+                onChange={(e) => setIncomeForm((f) => f && { ...f, amount_yen: e.target.value })}
+                placeholder="280000"
+                style={input_style}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>収入種別</div>
+              <select
+                value={income_form.income_type}
+                onChange={(e) => setIncomeForm((f) => f && { ...f, income_type: e.target.value })}
+                style={{ ...input_style }}
+              >
+                {INCOME_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Row 3: transaction date + note */}
+          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>日付</div>
+              <input
+                type="date"
+                value={income_form.transaction_date}
+                onChange={(e) =>
+                  setIncomeForm((f) => f && { ...f, transaction_date: e.target.value })
+                }
+                style={input_style}
+              />
+            </div>
+            <div style={{ flex: 2 }}>
+              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>メモ（任意）</div>
+              <input
+                type="text"
+                value={income_form.note}
+                onChange={(e) => setIncomeForm((f) => f && { ...f, note: e.target.value })}
+                placeholder="先月繰越分を含む"
+                style={input_style}
+              />
+            </div>
+          </div>
+
+          {form_error_msg && (
+            <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>
+              {form_error_msg}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={handle_income_submit}
+              disabled={submitting}
+              style={{
+                border: "none",
+                background: T.sage,
+                color: "#fff",
+                padding: "9px 20px",
+                borderRadius: 999,
+                fontFamily: "inherit",
+                fontWeight: 700,
+                cursor: "pointer",
+                boxShadow: `0 3px 0 ${T.sageDeep}`,
+              }}
+            >
+              {submitting ? "保存中…" : "保存"}
+            </button>
+            <button
+              onClick={() => setIncomeForm(null)}
+              style={{
+                border: `1px solid ${T.hair}`,
+                background: "#fff",
+                color: T.inkSoft,
+                padding: "9px 20px",
+                borderRadius: 999,
+                fontFamily: "inherit",
+                cursor: "pointer",
+              }}
+            >
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
         {/* Left: summary */}
@@ -530,6 +792,7 @@ export function WebIncome({ onBack }: Props) {
                           </div>
                           <div style={{ display: "flex", gap: 6, opacity: 0.45 }}>
                             <span
+                              onClick={() => open_edit_form(e)}
                               style={{
                                 padding: "4px 8px",
                                 borderRadius: 8,
