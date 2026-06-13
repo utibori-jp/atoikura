@@ -25,18 +25,123 @@ const INCOME_TYPES: Record<string, { label: string; bg: string; fg: string }> = 
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
+const EMOJI_OPTIONS = ["🏢", "💼", "📈", "💰", "🎁", "⭐"];
+
+type IncomeType = "salary" | "side" | "bonus" | "oneoff";
+
 function formatDateParts(date_str: string): { day: number; month: number; weekday: string } {
   const [y, m, d] = date_str.split("-").map(Number);
   return { day: d, month: m, weekday: WEEKDAYS[new Date(y, m - 1, d).getDay()] };
 }
 
+// Form state for create / edit. editing_id=null means create mode.
+interface IncomeFormState {
+  editing_id: number | null;
+  name: string;
+  emoji: string;
+  amount_yen: string;
+  transaction_date: string;
+  income_type: IncomeType;
+  note: string;
+}
+
+function blank_income_form(default_date: string): IncomeFormState {
+  return {
+    editing_id: null,
+    name: "",
+    emoji: "🏢",
+    amount_yen: "",
+    transaction_date: default_date,
+    income_type: "salary",
+    note: "",
+  };
+}
+
+function income_record_to_form(record: IncomeRecord): IncomeFormState {
+  return {
+    editing_id: record.id,
+    name: record.name,
+    emoji: record.emoji,
+    amount_yen: String(record.amount),
+    transaction_date: record.transaction_date,
+    income_type: record.income_type,
+    note: record.note ?? "",
+  };
+}
+
 // ── Sheets ──────────────────────────────────────────────────────────────
 
 interface IncomeSheetProps {
+  initial_form: IncomeFormState;
   onClose: () => void;
+  onSaved: () => void;
 }
 
-export function MobileIncomeSheet({ onClose }: IncomeSheetProps) {
+export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeSheetProps) {
+  const [form, setForm] = useState<IncomeFormState>(initial_form);
+  const [submitting, setSubmitting] = useState(false);
+  const [error_msg, setErrorMsg] = useState("");
+
+  const handle_submit = async () => {
+    setErrorMsg("");
+
+    if (!form.name.trim()) {
+      setErrorMsg("収入名を入力してください");
+      return;
+    }
+    if (!form.emoji.trim()) {
+      setErrorMsg("絵文字を入力してください");
+      return;
+    }
+    const parsed_amount = parseInt(form.amount_yen, 10);
+    if (isNaN(parsed_amount) || parsed_amount < 1) {
+      setErrorMsg("金額を正しく入力してください");
+      return;
+    }
+    if (!form.transaction_date) {
+      setErrorMsg("日付を入力してください");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const request_body: components["schemas"]["IncomeRecordRequest"] = {
+        name: form.name.trim(),
+        emoji: form.emoji.trim(),
+        amount: parsed_amount,
+        transaction_date: form.transaction_date,
+        income_type: form.income_type,
+        note: form.note.trim() || undefined,
+      };
+
+      if (form.editing_id !== null) {
+        await api.updateIncomeRecord(form.editing_id, request_body);
+      } else {
+        await api.createIncomeRecord(request_body);
+      }
+
+      onSaved();
+      onClose();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const input_style: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 12px",
+    border: `1.5px solid ${T.hair}`,
+    borderRadius: 12,
+    fontFamily: "inherit",
+    fontSize: 14,
+    color: T.ink,
+    background: "transparent",
+    outline: "none",
+    boxSizing: "border-box",
+  };
+
   return (
     <div
       style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(42,37,32,0.45)" }}
@@ -76,7 +181,9 @@ export function MobileIncomeSheet({ onClose }: IncomeSheetProps) {
             marginBottom: 16,
           }}
         >
-          <div style={{ fontSize: 19, fontWeight: 900 }}>収入を記録</div>
+          <div style={{ fontSize: 19, fontWeight: 900 }}>
+            {form.editing_id !== null ? "収入を編集" : "収入を記録"}
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -123,17 +230,25 @@ export function MobileIncomeSheet({ onClose }: IncomeSheetProps) {
           >
             ¥
           </span>
-          <span
+          <input
+            type="number"
+            inputMode="numeric"
+            value={form.amount_yen}
+            onChange={(e) => setForm((f) => ({ ...f, amount_yen: e.target.value }))}
+            placeholder="例: 280000"
             style={{
+              flex: 1,
+              border: "none",
+              background: "transparent",
               fontFamily: "'DM Sans', sans-serif",
               fontWeight: 700,
               fontSize: 30,
-              color: T.inkSoft,
+              color: T.ink,
+              outline: "none",
+              minWidth: 0,
             }}
-          >
-            —
-          </span>
-          <span style={{ marginLeft: "auto", fontSize: 12, color: T.inkSoft }}>金額</span>
+          />
+          <span style={{ fontSize: 12, color: T.inkSoft }}>金額</span>
         </div>
 
         {/* 収入名 + 日付 */}
@@ -148,9 +263,13 @@ export function MobileIncomeSheet({ onClose }: IncomeSheetProps) {
             }}
           >
             <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 3 }}>収入名</div>
-            <div style={{ fontWeight: 600, fontSize: 14, color: T.inkSoft, fontStyle: "italic" }}>
-              例：ライティング案件
-            </div>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="例：ライティング案件"
+              style={{ ...input_style, padding: "0", border: "none", fontSize: 14 }}
+            />
           </div>
           <div
             style={{
@@ -162,37 +281,96 @@ export function MobileIncomeSheet({ onClose }: IncomeSheetProps) {
             }}
           >
             <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 3 }}>日付</div>
-            <div
+            <input
+              type="date"
+              value={form.transaction_date}
+              onChange={(e) => setForm((f) => ({ ...f, transaction_date: e.target.value }))}
               style={{
+                ...input_style,
+                padding: "0",
+                border: "none",
                 fontFamily: "'DM Sans', sans-serif",
+                fontSize: 13,
                 fontWeight: 600,
-                fontSize: 14,
-                color: T.inkSoft,
+                width: "100%",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* 絵文字 */}
+        <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600, marginBottom: 8 }}>
+          絵文字
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
+          {EMOJI_OPTIONS.map((emoji_option) => (
+            <button
+              key={emoji_option}
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, emoji: emoji_option }))}
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 11,
+                border: `1.5px solid ${form.emoji === emoji_option ? T.sage : T.hair}`,
+                background: form.emoji === emoji_option ? T.sageSoft : "#fff",
+                fontSize: 18,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              —
-            </div>
-          </div>
+              {emoji_option}
+            </button>
+          ))}
+          <input
+            type="text"
+            value={form.emoji}
+            onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))}
+            placeholder="🏢"
+            style={{
+              flex: 1,
+              padding: "8px 10px",
+              border: `1.5px solid ${T.hair}`,
+              borderRadius: 11,
+              fontFamily: "inherit",
+              fontSize: 18,
+              color: T.ink,
+              background: T.bgSoft,
+              outline: "none",
+              minWidth: 0,
+            }}
+          />
         </div>
 
         {/* 種別 */}
         <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600, marginBottom: 8 }}>種別</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-          {Object.entries(INCOME_TYPES).map(([k, t]) => (
-            <div
+          {(
+            Object.entries(INCOME_TYPES) as [
+              IncomeType,
+              { label: string; bg: string; fg: string },
+            ][]
+          ).map(([k, t]) => (
+            <button
               key={k}
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, income_type: k }))}
               style={{
                 padding: "9px 14px",
                 borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: "#fff",
-                color: T.ink,
+                border: `1.5px solid ${form.income_type === k ? t.fg : T.hair}`,
+                background: form.income_type === k ? t.bg : "#fff",
+                color: form.income_type === k ? t.fg : T.ink,
                 fontSize: 13,
                 fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
               }}
             >
               {t.label}
-            </div>
+            </button>
           ))}
         </div>
 
@@ -208,28 +386,60 @@ export function MobileIncomeSheet({ onClose }: IncomeSheetProps) {
           }}
         >
           <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 3 }}>メモ（任意）</div>
-          <div style={{ fontSize: 13, color: T.inkSoft, fontStyle: "italic" }}>
-            例：フリーランスnote
-          </div>
+          <textarea
+            value={form.note}
+            onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+            placeholder="例：フリーランスnote"
+            rows={2}
+            style={{
+              width: "100%",
+              border: "none",
+              background: "transparent",
+              fontFamily: "inherit",
+              fontSize: 13,
+              color: T.ink,
+              outline: "none",
+              resize: "none",
+              boxSizing: "border-box",
+            }}
+          />
         </div>
+
+        {error_msg && (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: "10px 14px",
+              borderRadius: 12,
+              background: T.coralSoft,
+              color: T.coralDeep,
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {error_msg}
+          </div>
+        )}
 
         <button
           type="button"
+          onClick={handle_submit}
+          disabled={submitting}
           style={{
             width: "100%",
             border: "none",
-            background: T.coral,
+            background: submitting ? T.inkSoft : T.coral,
             color: "#fff",
             padding: "16px",
             borderRadius: 18,
             fontFamily: "inherit",
             fontWeight: 700,
             fontSize: 16,
-            boxShadow: `0 6px 0 ${T.coralDeep}`,
-            cursor: "pointer",
+            boxShadow: submitting ? "none" : `0 6px 0 ${T.coralDeep}`,
+            cursor: submitting ? "not-allowed" : "pointer",
           }}
         >
-          ＋ 記録する
+          {submitting ? "保存中…" : form.editing_id !== null ? "更新する" : "＋ 記録する"}
         </button>
       </div>
     </div>
@@ -583,14 +793,38 @@ export function MobileAllocateSheet({ onClose, surplus, savings_goals }: Allocat
 interface EditBaseSheetProps {
   onClose: () => void;
   base_amount: number;
+  onSaved: (new_amount: number) => void;
 }
 
-export function MobileEditBaseSheet({ onClose, base_amount }: EditBaseSheetProps) {
+export function MobileEditBaseSheet({ onClose, base_amount, onSaved }: EditBaseSheetProps) {
+  const [draft_amount, setDraftAmount] = useState(String(base_amount));
+  const [submitting, setSubmitting] = useState(false);
+  const [error_msg, setErrorMsg] = useState("");
+
   const PRESETS = [
     { label: "先月", value: base_amount },
     { label: "3ヶ月平均", value: 291000 },
     { label: "半年平均", value: 286500 },
   ];
+
+  const handle_save = async () => {
+    setErrorMsg("");
+    const parsed_amount = parseInt(draft_amount, 10);
+    if (isNaN(parsed_amount) || parsed_amount < 1) {
+      setErrorMsg("金額を正しく入力してください");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await api.updateBaseIncome(parsed_amount);
+      onSaved(res.amount);
+      onClose();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div
@@ -655,7 +889,7 @@ export function MobileEditBaseSheet({ onClose, base_amount }: EditBaseSheetProps
           </button>
         </div>
 
-        {/* Amount */}
+        {/* Amount input */}
         <div
           style={{
             background: T.bgSoft,
@@ -678,18 +912,25 @@ export function MobileEditBaseSheet({ onClose, base_amount }: EditBaseSheetProps
           >
             ¥
           </span>
-          <span
+          <input
+            type="number"
+            inputMode="numeric"
+            value={draft_amount}
+            onChange={(e) => setDraftAmount(e.target.value)}
             style={{
+              flex: 1,
+              border: "none",
+              background: "transparent",
               fontFamily: "'DM Sans', sans-serif",
               fontWeight: 700,
               fontSize: 34,
               color: T.ink,
               letterSpacing: "-0.02em",
+              outline: "none",
+              minWidth: 0,
             }}
-          >
-            {yenSlim(base_amount)}
-          </span>
-          <span style={{ marginLeft: "auto", fontSize: 12, color: T.inkSoft }}>基準</span>
+          />
+          <span style={{ fontSize: 12, color: T.inkSoft }}>基準</span>
         </div>
 
         {/* Help */}
@@ -720,15 +961,19 @@ export function MobileEditBaseSheet({ onClose, base_amount }: EditBaseSheetProps
         </div>
         <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
           {PRESETS.map((p, i) => (
-            <div
+            <button
               key={p.label}
+              type="button"
+              onClick={() => setDraftAmount(String(p.value))}
               style={{
                 flex: 1,
                 padding: "9px 8px",
                 borderRadius: 12,
-                border: `1.5px solid ${i === 0 ? T.sage : T.hair}`,
-                background: i === 0 ? T.sageSoft : "#fff",
+                border: `1.5px solid ${String(p.value) === draft_amount ? T.sage : T.hair}`,
+                background: String(p.value) === draft_amount ? T.sageSoft : "#fff",
                 textAlign: "center",
+                cursor: "pointer",
+                fontFamily: "inherit",
               }}
             >
               <div style={{ fontSize: 10, color: T.inkSoft, fontWeight: 600 }}>{p.label}</div>
@@ -743,27 +988,45 @@ export function MobileEditBaseSheet({ onClose, base_amount }: EditBaseSheetProps
               >
                 ¥{yenSlim(p.value)}
               </div>
-            </div>
+            </button>
           ))}
         </div>
 
+        {error_msg && (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: "10px 14px",
+              borderRadius: 12,
+              background: T.coralSoft,
+              color: T.coralDeep,
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {error_msg}
+          </div>
+        )}
+
         <button
           type="button"
+          onClick={handle_save}
+          disabled={submitting}
           style={{
             width: "100%",
             border: "none",
-            background: T.coral,
+            background: submitting ? T.inkSoft : T.coral,
             color: "#fff",
             padding: "16px",
             borderRadius: 18,
             fontFamily: "inherit",
             fontWeight: 700,
             fontSize: 16,
-            boxShadow: `0 6px 0 ${T.coralDeep}`,
-            cursor: "pointer",
+            boxShadow: submitting ? "none" : `0 6px 0 ${T.coralDeep}`,
+            cursor: submitting ? "not-allowed" : "pointer",
           }}
         >
-          保存する
+          {submitting ? "保存中…" : "保存する"}
         </button>
       </div>
     </div>
@@ -777,11 +1040,19 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
   const [base_income, setBaseIncome] = useState<BaseIncomeSetting | null>(null);
   const [savings_goals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [active_sheet, setActiveSheet] = useState<ActiveSheet>(null);
+  // income_form_state=null when sheet is closed; set when opening create or edit
+  const [income_form_state, setIncomeFormState] = useState<IncomeFormState | null>(null);
+
+  const current_ym = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(0, 7);
+
+  const refresh_incomes = async () => {
+    const res = await api.listIncomeRecords(current_ym);
+    setIncomes(res.income_records);
+  };
 
   useEffect(() => {
-    const ym = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(0, 7);
     Promise.all([
-      api.listIncomeRecords(ym).then((r) => r.income_records),
+      api.listIncomeRecords(current_ym).then((r) => r.income_records),
       api.getBaseIncome(),
       api.listSavingsGoals().then((r) => r.savings_goals),
     ]).then(([inc, base, goals]) => {
@@ -789,6 +1060,7 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
       setBaseIncome(base);
       setSavingsGoals(goals);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const is_loading = incomes === null;
@@ -797,6 +1069,32 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
   const unique_dates = incomes
     ? [...new Set(incomes.map((e) => e.transaction_date))].sort().reverse()
     : [];
+
+  const handle_open_create = () => {
+    const default_date = `${current_ym}-01`;
+    setIncomeFormState(blank_income_form(default_date));
+    setActiveSheet("income");
+  };
+
+  const handle_open_edit = (record: IncomeRecord) => {
+    setIncomeFormState(income_record_to_form(record));
+    setActiveSheet("income");
+  };
+
+  const handle_delete = async (record_id: number) => {
+    if (!window.confirm("この収入記録を削除しますか？")) return;
+    await api.deleteIncomeRecord(record_id).catch(() => {});
+    setIncomes((prev) => (prev ? prev.filter((r) => r.id !== record_id) : prev));
+  };
+
+  const handle_close_income_sheet = () => {
+    setActiveSheet(null);
+    setIncomeFormState(null);
+  };
+
+  const handle_base_saved = (new_amount: number) => {
+    setBaseIncome({ amount: new_amount });
+  };
 
   return (
     <div>
@@ -1180,6 +1478,47 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
                           >
                             +¥{yenSlim(e.amount)}
                           </div>
+                          {/* Edit / delete action buttons */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <button
+                              type="button"
+                              onClick={() => handle_open_edit(e)}
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 8,
+                                background: T.bgSoft,
+                                border: "none",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 13,
+                                color: T.inkSoft,
+                                cursor: "pointer",
+                              }}
+                            >
+                              ✎
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handle_delete(e.id)}
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 8,
+                                background: T.bgSoft,
+                                border: "none",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 13,
+                                color: T.inkSoft,
+                                cursor: "pointer",
+                              }}
+                            >
+                              🗑
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -1192,7 +1531,7 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
           {/* Record income button */}
           <button
             type="button"
-            onClick={() => setActiveSheet("income")}
+            onClick={handle_open_create}
             style={{
               width: "100%",
               marginTop: 16,
@@ -1213,7 +1552,13 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
       )}
 
       {/* Sheets */}
-      {active_sheet === "income" && <MobileIncomeSheet onClose={() => setActiveSheet(null)} />}
+      {active_sheet === "income" && income_form_state && (
+        <MobileIncomeSheet
+          initial_form={income_form_state}
+          onClose={handle_close_income_sheet}
+          onSaved={refresh_incomes}
+        />
+      )}
       {active_sheet === "allocate" && (
         <MobileAllocateSheet
           onClose={() => setActiveSheet(null)}
@@ -1225,6 +1570,7 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
         <MobileEditBaseSheet
           onClose={() => setActiveSheet(null)}
           base_amount={base_income.amount}
+          onSaved={handle_base_saved}
         />
       )}
     </div>
