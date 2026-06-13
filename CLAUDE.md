@@ -89,6 +89,37 @@ make logs SERVICES=backend
 docker compose logs -f --tail=100 backend
 ```
 
+### E2E tests (Playwright)
+
+Run the full happy-path E2E suite with a single command:
+
+```bash
+cd frontend && npm run test:e2e
+```
+
+The `webServer` config in `playwright.config.ts` automatically boots the Go backend (`make -C ../backend run` on `:8080`) and the Vite dev server (`npm run dev` on `:3000`) before running tests, and shuts them down after. No manual startup is needed.
+
+**Prerequisites before first run:**
+- The backend DB must be migrated so the signup endpoint works:
+  ```bash
+  make -C backend migrate-up
+  ```
+- The devcontainer image must be **rebuilt** after this change was introduced — Chromium is baked into the image at build time and is not installed at container-start time.
+
+**Headless-only:** Tests run headless inside the container (no display server). Do not attempt headed mode.
+
+**Reports and traces:**
+- `frontend/playwright-report/` — HTML report (open `index.html` in a browser). Generated after every run.
+- `frontend/test-results/` — Raw test results, including traces on first retry.
+- `frontend/blob-report/` — Intermediate blob artifacts (merge scenarios).
+
+Traces are recorded on the first retry of a failing test. To inspect a trace, open the HTML report and click the failing test, or use `npx playwright show-trace <path-to-trace.zip>`.
+
+**Interpreting failures:**
+1. Read the list reporter output in the terminal for a quick summary of what failed.
+2. Open `frontend/playwright-report/index.html` for the full HTML report with screenshots and step-by-step detail.
+3. If a trace was recorded, open it to replay the exact browser state at the point of failure.
+
 ---
 
 ## Conventions
