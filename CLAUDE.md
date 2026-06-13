@@ -63,6 +63,32 @@ Configured in issue #90 via the `docker-outside-of-docker` devcontainer feature 
   ```
 - `COMPOSE_PROJECT_NAME=atoikura` is set in `containerEnv` so in-container compose commands target the existing project (the one VS Code started), preventing a duplicate `db` container from being created.
 
+### Container logs (devcontainer)
+
+Requires the #90 docker access to be active (devcontainer rebuild must have taken effect).
+
+There are two distinct log sources in this project:
+
+- **Dev-loop logs** (normal development): `make run` (Go backend) and `npm run dev` (Vite frontend) run natively in the devcontainer. Their output appears directly in the terminal where those commands are running — no Docker needed.
+- **Production-style compose-service logs**: the `backend` and `frontend` containers launched via `docker compose up` write logs that are only reachable via `docker compose logs` / `docker logs`.
+
+Use compose logs only when the production-style `backend`/`frontend` containers are running. For the normal dev loop, just read the terminal where `make run` / `npm run dev` is running.
+
+**Stream logs for both services (root Makefile target):**
+
+```bash
+make logs
+# wraps: docker compose logs -f --tail=100 backend frontend
+```
+
+**Filter to a single service:**
+
+```bash
+make logs SERVICES=backend
+# or directly:
+docker compose logs -f --tail=100 backend
+```
+
 ---
 
 ## Conventions
