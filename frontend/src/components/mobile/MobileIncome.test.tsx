@@ -10,10 +10,6 @@ beforeEach(() => {
   sessionStorage.setItem(TOKEN_KEY, "test-token");
   // jsdom does not implement window.confirm; stub it to return true by default
   vi.spyOn(window, "confirm").mockReturnValue(true);
-  // MobileIncome also loads savings-goals for the allocate sheet
-  server.use(
-    http.get("http://localhost:8080/savings-goals", () => HttpResponse.json({ savings_goals: [] }))
-  );
 });
 
 afterEach(() => {

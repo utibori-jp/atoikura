@@ -553,19 +553,6 @@ export function WebIncome({ onBack }: Props) {
                 >
                   余剰金額
                 </span>
-                <span
-                  style={{
-                    padding: "2px 7px",
-                    borderRadius: 999,
-                    background: T.bgSoft,
-                    border: `1px solid ${T.hair}`,
-                    fontSize: 9,
-                    fontWeight: 700,
-                    color: T.inkSoft,
-                  }}
-                >
-                  未振分
-                </span>
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 6 }}>
                 <span
@@ -593,23 +580,6 @@ export function WebIncome({ onBack }: Props) {
               <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 3 }}>
                 基準を超えた今月の上振れ
               </div>
-              <button
-                style={{
-                  marginTop: 10,
-                  padding: "9px 16px",
-                  border: "none",
-                  borderRadius: 999,
-                  background: T.mustard,
-                  color: T.ink,
-                  fontFamily: "inherit",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  boxShadow: "0 3px 0 #F0A92E",
-                }}
-              >
-                振り分ける →
-              </button>
             </div>
           </div>
         </div>

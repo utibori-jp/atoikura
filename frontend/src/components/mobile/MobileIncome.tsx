@@ -5,13 +5,12 @@ import type { components } from "../../api/types";
 
 type IncomeRecord = components["schemas"]["IncomeRecord"];
 type BaseIncomeSetting = components["schemas"]["BaseIncomeSetting"];
-type SavingsGoal = components["schemas"]["SavingsGoal"];
 
 interface MobileIncomeProps {
   onBack: () => void;
 }
 
-type ActiveSheet = null | "income" | "allocate" | "edit-base";
+type ActiveSheet = null | "income" | "edit-base";
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 const yenSlim = (n: number) => Math.round(n).toLocaleString("ja-JP");
@@ -446,350 +445,6 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
   );
 }
 
-interface AllocateSheetProps {
-  onClose: () => void;
-  surplus: number;
-  savings_goals: SavingsGoal[];
-}
-
-export function MobileAllocateSheet({ onClose, surplus, savings_goals }: AllocateSheetProps) {
-  return (
-    <div
-      style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(42,37,32,0.45)" }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: T.card,
-          borderTopLeftRadius: 32,
-          borderTopRightRadius: 32,
-          padding: "12px 20px",
-          paddingBottom: "max(env(safe-area-inset-bottom, 0px), 28px)",
-          boxShadow: "0 -20px 50px -20px rgba(0,0,0,0.3)",
-          maxHeight: "90dvh",
-          overflowY: "auto",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          style={{
-            width: 42,
-            height: 5,
-            borderRadius: 999,
-            background: T.hair,
-            margin: "0 auto 14px",
-          }}
-        />
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 16,
-          }}
-        >
-          <div style={{ fontSize: 19, fontWeight: 900 }}>余剰を振り分ける</div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              width: 30,
-              height: 30,
-              minWidth: 44,
-              minHeight: 44,
-              borderRadius: 999,
-              background: T.bgSoft,
-              border: "none",
-              cursor: "pointer",
-              color: T.inkSoft,
-              fontSize: 15,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Amount */}
-        <div
-          style={{
-            background: T.bgSoft,
-            border: `1.5px solid ${T.mustard}`,
-            borderRadius: 18,
-            padding: "14px 18px",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 14,
-          }}
-        >
-          <span
-            style={{
-              fontFamily: "'DM Sans', sans-serif",
-              fontWeight: 700,
-              fontSize: 28,
-              color: T.mustardDeep,
-            }}
-          >
-            ¥
-          </span>
-          <span
-            style={{
-              fontFamily: "'DM Sans', sans-serif",
-              fontWeight: 700,
-              fontSize: 28,
-              color: T.inkSoft,
-            }}
-          >
-            —
-          </span>
-          <div
-            style={{
-              marginLeft: "auto",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: 2,
-            }}
-          >
-            <span style={{ fontSize: 11, color: T.inkSoft, fontWeight: 600 }}>振り分け額</span>
-            <span
-              style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 10,
-                color: T.mustardDeep,
-                fontWeight: 700,
-              }}
-            >
-              余剰 ¥{yenSlim(surplus)}
-            </span>
-          </div>
-        </div>
-
-        {/* Quick-fill */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-          {["全額", "½", "¥10,000"].map((p, i) => (
-            <div
-              key={p}
-              style={{
-                flex: 1,
-                padding: "7px 0",
-                textAlign: "center",
-                borderRadius: 10,
-                border: `1.5px solid ${T.hair}`,
-                background: i === 2 ? T.mustardSoft : "#fff",
-                color: T.ink,
-                fontSize: 11,
-                fontWeight: 700,
-              }}
-            >
-              {p}
-            </div>
-          ))}
-        </div>
-
-        {/* Destination */}
-        <div style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600, marginBottom: 8 }}>
-          振り分け先
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-          {[
-            {
-              id: "savings",
-              emoji: "💰",
-              label: "貯金",
-              sub: "貯金目標を選んで積立",
-              selected: true,
-            },
-            {
-              id: "budget",
-              emoji: "📅",
-              label: "今月の予算に追加",
-              sub: "今月の変動費予算に上乗せ",
-              selected: false,
-            },
-          ].map((o) => (
-            <div
-              key={o.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "13px 14px",
-                borderRadius: 16,
-                border: `1.5px solid ${o.selected ? T.coral : T.hair}`,
-                background: o.selected ? T.coralSoft : "#fff",
-              }}
-            >
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 11,
-                  background: o.selected ? "#fff" : T.bgSoft,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 18,
-                }}
-              >
-                {o.emoji}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{o.label}</div>
-                <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 2 }}>{o.sub}</div>
-              </div>
-              <div
-                style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 999,
-                  border: `2px solid ${o.selected ? T.coral : T.hair}`,
-                  background: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                {o.selected && (
-                  <div style={{ width: 10, height: 10, borderRadius: 999, background: T.coral }} />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Savings goal sub-selector */}
-        <div
-          style={{
-            padding: "12px 14px 14px",
-            borderRadius: 16,
-            background: T.coralSoft,
-            border: `1.5px dashed ${T.coral}`,
-            marginBottom: 14,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 9 }}>
-            <span style={{ color: T.coralDeep, fontSize: 14, fontWeight: 900 }}>↳</span>
-            <span style={{ fontSize: 11, color: T.coralDeep, fontWeight: 700 }}>
-              どの貯金目標に積み立てますか？
-            </span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {savings_goals.map((g, i) => {
-              const sel = i === 1;
-              return (
-                <div
-                  key={g.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    background: "#fff",
-                    border: `1.5px solid ${sel ? T.coral : "transparent"}`,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: 9,
-                      background: T.mustardSoft,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 16,
-                    }}
-                  >
-                    {g.emoji}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{g.name}</div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: T.inkSoft,
-                        marginTop: 1,
-                        fontFamily: "'DM Sans', sans-serif",
-                      }}
-                    >
-                      累計 ¥{yenSlim(g.accumulated_amount)} / ¥{yenSlim(g.target_amount)}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: 999,
-                      border: `2px solid ${sel ? T.coral : T.hair}`,
-                      background: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {sel && (
-                      <div
-                        style={{ width: 8, height: 8, borderRadius: 999, background: T.coral }}
-                      />
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* メモ */}
-        <div
-          style={{
-            background: T.bgSoft,
-            border: `1.5px solid ${T.hair}`,
-            borderRadius: 14,
-            padding: "12px 14px",
-            marginBottom: 18,
-            minHeight: 56,
-          }}
-        >
-          <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 3 }}>メモ（任意）</div>
-          <div style={{ fontSize: 13, color: T.inkSoft, fontStyle: "italic" }}>
-            例：5月の副業分を緊急費用に。
-          </div>
-        </div>
-
-        <button
-          type="button"
-          style={{
-            width: "100%",
-            border: "none",
-            background: T.coral,
-            color: "#fff",
-            padding: "16px",
-            borderRadius: 18,
-            fontFamily: "inherit",
-            fontWeight: 700,
-            fontSize: 16,
-            boxShadow: `0 6px 0 ${T.coralDeep}`,
-            cursor: "pointer",
-          }}
-        >
-          ＋ 記録する
-        </button>
-      </div>
-    </div>
-  );
-}
-
 interface EditBaseSheetProps {
   onClose: () => void;
   base_amount: number;
@@ -1038,7 +693,6 @@ export function MobileEditBaseSheet({ onClose, base_amount, onSaved }: EditBaseS
 export function MobileIncome({ onBack }: MobileIncomeProps) {
   const [incomes, setIncomes] = useState<IncomeRecord[] | null>(null);
   const [base_income, setBaseIncome] = useState<BaseIncomeSetting | null>(null);
-  const [savings_goals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [active_sheet, setActiveSheet] = useState<ActiveSheet>(null);
   // income_form_state=null when sheet is closed; set when opening create or edit
   const [income_form_state, setIncomeFormState] = useState<IncomeFormState | null>(null);
@@ -1054,11 +708,9 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
     Promise.all([
       api.listIncomeRecords(current_ym).then((r) => r.income_records),
       api.getBaseIncome(),
-      api.listSavingsGoals().then((r) => r.savings_goals),
-    ]).then(([inc, base, goals]) => {
+    ]).then(([inc, base]) => {
       setIncomes(inc);
       setBaseIncome(base);
-      setSavingsGoals(goals);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1241,19 +893,6 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
                   >
                     余剰金額
                   </span>
-                  <span
-                    style={{
-                      padding: "1px 6px",
-                      borderRadius: 999,
-                      background: T.bgSoft,
-                      border: `1px solid ${T.hair}`,
-                      color: T.inkSoft,
-                      fontSize: 9,
-                      fontWeight: 700,
-                    }}
-                  >
-                    未振分
-                  </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 2, marginTop: 6 }}>
                   <span
@@ -1281,29 +920,6 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
                 <div style={{ fontSize: 10, color: T.inkSoft, marginTop: 3 }}>
                   基準を超えた今月の上振れ
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveSheet("allocate")}
-                  style={{
-                    marginTop: 10,
-                    padding: "7px 13px",
-                    border: "none",
-                    borderRadius: 999,
-                    background: T.mustard,
-                    color: T.ink,
-                    fontFamily: "inherit",
-                    fontSize: 11,
-                    fontWeight: 800,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    boxShadow: `0 3px 0 ${T.mustardDeep}`,
-                    cursor: "pointer",
-                  }}
-                >
-                  <span>振り分ける</span>
-                  <span>→</span>
-                </button>
               </div>
             </div>
           </div>
@@ -1557,13 +1173,6 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
           initial_form={income_form_state}
           onClose={handle_close_income_sheet}
           onSaved={refresh_incomes}
-        />
-      )}
-      {active_sheet === "allocate" && (
-        <MobileAllocateSheet
-          onClose={() => setActiveSheet(null)}
-          surplus={Math.max(0, surplus)}
-          savings_goals={savings_goals}
         />
       )}
       {active_sheet === "edit-base" && base_income && (
