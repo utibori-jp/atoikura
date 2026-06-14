@@ -17,6 +17,20 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    # Grant the `node` user access to the host Docker socket.
+    #
+    # Docker Desktop / WSL2 exposes /var/run/docker.sock owned by root:root with
+    # mode 660. The docker-outside-of-docker feature's runtime helper would
+    # normally fix this by chgrp-ing the socket or starting a socat proxy, but
+    # both paths go through `sudo`, and this devcontainer only grants passwordless
+    # sudo for init-firewall.sh — so the helper fails and the socket stays
+    # inaccessible to `node`. Adding `node` to group 0 (root) makes the socket's
+    # group rw bit apply, which is enough for `docker` / `docker compose`.
+    #
+    # Group 0 membership does NOT grant uid-0 / CAP_NET_ADMIN, so it does not let
+    # the container bypass the egress firewall (init-firewall.sh still needs sudo).
+    group_add:
+      - "0"
     volumes:
       - ..:/workspace:cached
       - claude-code-bashhistory:/commandhistory
