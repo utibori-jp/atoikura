@@ -3,6 +3,7 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "./groupEmoji";
+import { DateField } from "../DateField";
 
 type CategoryGroup = components["schemas"]["CategoryGroup"];
 type ExpenseCategory = components["schemas"]["ExpenseCategory"];
@@ -196,11 +197,11 @@ export function MobileEntryForm({ onSuccess, edit_entry }: Props) {
           }}
         >
           <span style={{ fontSize: 11, color: T.inkSoft }}>日付</span>
-          <input
-            type="date"
+          <DateField
             value={transaction_date}
-            onChange={(e) => setTransactionDate(e.target.value)}
+            onChange={setTransactionDate}
             required
+            ariaLabel="日付"
             style={{
               background: "transparent",
               border: "none",

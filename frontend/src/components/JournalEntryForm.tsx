@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { api } from "../api/client";
 import type { components } from "../api/types";
 import { T } from "../theme";
+import { DateField } from "./DateField";
 
 type CategoryGroup = components["schemas"]["CategoryGroup"];
 type ExpenseCategory = components["schemas"]["ExpenseCategory"];
@@ -204,11 +205,11 @@ export function JournalEntryForm({ onSuccess }: Props) {
 
       <div className="form-top-row" style={{ display: "flex", gap: 14, marginBottom: 16 }}>
         <Field label="日付" flex="0 0 160px">
-          <input
-            type="date"
+          <DateField
             value={transaction_date}
-            onChange={(e) => setTransactionDate(e.target.value)}
+            onChange={setTransactionDate}
             required
+            ariaLabel="日付"
           />
         </Field>
         <Field label="金額" flex="0 0 140px">
