@@ -3,6 +3,7 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "./groupEmoji";
+import { chartMaxY } from "../chartScale";
 
 type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
 type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
@@ -132,14 +133,18 @@ function MMiniChart(props: MMiniChartProps) {
     padB = 20;
   const w = width - padL - padR;
   const h = height - padT - padB;
-  const maxY = Math.max(monthly_budget * 1.05, 1);
+  const past = data.filter((d) => d.is_actual);
+  const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
+  const projected_end = daily_pace * days_in_month;
+  // Scale the y-axis to fit both the budget and the largest plotted total so the
+  // cumulative line never renders off-canvas (#106), including when no budget is
+  // set yet or when spending exceeds the budget.
+  const maxY = chartMaxY(monthly_budget, [...past.map((d) => d.total), projected_end]);
   const xAt = (d: number) => padL + ((d - 1) / Math.max(days_in_month - 1, 1)) * w;
   const yAt = (v: number) => padT + h - (v / maxY) * h;
-  const past = data.filter((d) => d.is_actual);
   const past_pts: [number, number][] = past.map((s) => [xAt(s.day), yAt(s.total)]);
   const fc_pts: [number, number][] = [];
   if (today_day >= 1 && today_day <= days_in_month) {
-    const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
     for (let d = today_day; d <= days_in_month; d++) {
       fc_pts.push([xAt(d), yAt(Math.min(maxY, d === today_day ? spent_so_far : daily_pace * d))]);
     }
