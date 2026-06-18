@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { T } from "../../theme";
 import { api } from "../../api/client";
 import type { components } from "../../api/types";
+import { DateField } from "../DateField";
 
 type IncomeRecord = components["schemas"]["IncomeRecord"];
 type BaseIncomeSetting = components["schemas"]["BaseIncomeSetting"];
@@ -278,10 +279,10 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
             }}
           >
             <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 3 }}>日付</div>
-            <input
-              type="date"
+            <DateField
               value={form.transaction_date}
-              onChange={(e) => setForm((f) => ({ ...f, transaction_date: e.target.value }))}
+              onChange={(iso) => setForm((f) => ({ ...f, transaction_date: iso }))}
+              ariaLabel="日付"
               style={{
                 ...input_style,
                 padding: "0",

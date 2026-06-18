@@ -3,6 +3,7 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
+import { DateField } from "../DateField";
 import { chartMaxY } from "../chartScale";
 
 type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
@@ -537,10 +538,10 @@ function EntryForm({ onSuccess }: EntryFormProps) {
       <div style={{ display: "flex", gap: 14, marginBottom: 16 }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 6, flex: 0.7 }}>
           <span style={{ fontSize: 12, color: T.inkSoft, fontWeight: 500 }}>日付</span>
-          <input
-            type="date"
+          <DateField
             value={transaction_date}
-            onChange={(e) => setTransactionDate(e.target.value)}
+            onChange={setTransactionDate}
+            ariaLabel="日付"
             style={{ ...input_base }}
           />
         </label>

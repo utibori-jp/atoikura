@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { api } from "../api/client";
 import type { components } from "../api/types";
 import { T } from "../theme";
+import { DateField } from "./DateField";
 
 type DailyJournalEntries = components["schemas"]["DailyJournalEntries"];
 type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
@@ -139,11 +140,11 @@ function InlineEditForm({
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <label style={{ fontSize: 12, color: T.inkSoft, fontWeight: 600 }}>日付</label>
-          <input
-            type="date"
+          <DateField
             value={transaction_date}
-            onChange={(e) => setTransactionDate(e.target.value)}
+            onChange={setTransactionDate}
             required
+            ariaLabel="日付"
           />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>

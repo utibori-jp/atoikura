@@ -3,6 +3,7 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
+import { DateField } from "../DateField";
 
 type IncomeRecord = components["schemas"]["IncomeRecord"];
 type BaseIncomeSetting = components["schemas"]["BaseIncomeSetting"];
@@ -433,12 +434,10 @@ export function WebIncome({ onBack }: Props) {
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>日付</div>
-              <input
-                type="date"
+              <DateField
                 value={income_form.transaction_date}
-                onChange={(e) =>
-                  setIncomeForm((f) => f && { ...f, transaction_date: e.target.value })
-                }
+                onChange={(iso) => setIncomeForm((f) => f && { ...f, transaction_date: iso })}
+                ariaLabel="日付"
                 style={input_style}
               />
             </div>
