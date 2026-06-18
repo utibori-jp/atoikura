@@ -3,6 +3,7 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
+import { chartMaxY } from "../chartScale";
 
 type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
 type CategoryGroup = components["schemas"]["CategoryGroup"];
@@ -159,18 +160,21 @@ function AreaChart({
     padB = 40;
   const w = width - padL - padR;
   const h = height - padT - padB;
-  const maxY = Math.max(monthly_budget * 1.05, 1);
+  const actual_days = days.filter((d) => d.is_actual);
+  const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
+  const projected_end = daily_pace * days_in_month;
+  // Scale the y-axis to fit both the budget and the largest plotted total so the
+  // cumulative line never renders off-canvas (#106), including when no budget is
+  // set yet or when spending exceeds the budget.
+  const maxY = chartMaxY(monthly_budget, [...actual_days.map((d) => d.total), projected_end]);
 
   const xAt = (d: number) => padL + ((d - 1) / Math.max(days_in_month - 1, 1)) * w;
   const yAt = (v: number) => padT + h - (v / maxY) * h;
-
-  const actual_days = days.filter((d) => d.is_actual);
 
   const total_pts: [number, number][] = actual_days.map((d, i) => [xAt(i + 1), yAt(d.total)]);
   const food_pts: [number, number][] = actual_days.map((d, i) => [xAt(i + 1), yAt(d.food ?? 0)]);
   const other_pts: [number, number][] = actual_days.map((d, i) => [xAt(i + 1), yAt(d.other ?? 0)]);
 
-  const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
   const fc_pts: [number, number][] = [];
   for (let d = today_day; d <= days_in_month; d++) {
     fc_pts.push([xAt(d), yAt(Math.min(maxY, d === today_day ? spent_so_far : daily_pace * d))]);
