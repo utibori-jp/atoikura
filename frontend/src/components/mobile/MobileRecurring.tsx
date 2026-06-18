@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { T } from "../../theme";
 import { api } from "../../api/client";
 import type { components } from "../../api/types";
+import { EmojiPicker } from "../EmojiPicker";
 
 type RecurringExpense = components["schemas"]["RecurringExpense"];
 type PendingRecurring = components["schemas"]["PendingRecurring"];
@@ -10,6 +11,10 @@ type ExpenseCategory = components["schemas"]["ExpenseCategory"];
 interface MobileRecurringProps {
   onBack: () => void;
 }
+
+// Fixed emoji choices for recurring expenses; the first is the pre-filled default.
+const RECURRING_EMOJI_OPTIONS = ["🏠", "📱", "💡", "🚗", "📺", "💳"];
+const DEFAULT_RECURRING_EMOJI = RECURRING_EMOJI_OPTIONS[0];
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 const yenSlim = (n: number) => Math.round(n).toLocaleString("ja-JP");
@@ -29,7 +34,7 @@ function blank_recurring_form(): RecurringFormState {
   return {
     id: null,
     name: "",
-    emoji: "",
+    emoji: DEFAULT_RECURRING_EMOJI,
     billing_day: "",
     amount: "",
     type: "fixed",
@@ -113,11 +118,6 @@ function RecurringSheet({
       setFormErrorMsg("名前を入力してください");
       return;
     }
-    if (!form.emoji.trim()) {
-      setFormErrorMsg("絵文字を入力してください");
-      return;
-    }
-
     const parsed_billing_day = parseInt(form.billing_day, 10);
     if (isNaN(parsed_billing_day) || parsed_billing_day < 1 || parsed_billing_day > 31) {
       setFormErrorMsg("引落日を1〜31で入力してください");
@@ -141,7 +141,7 @@ function RecurringSheet({
 
     const request_body: components["schemas"]["RecurringExpenseRequest"] = {
       name: form.name.trim(),
-      emoji: form.emoji.trim(),
+      emoji: form.emoji.trim() || DEFAULT_RECURRING_EMOJI,
       billing_day: parsed_billing_day,
       amount: parsed_amount,
       type: form.type,
@@ -232,6 +232,17 @@ function RecurringSheet({
               style={input_style}
             />
           </div>
+        </div>
+
+        {/* Quick emoji picker */}
+        <div style={{ marginBottom: 12 }}>
+          <EmojiPicker
+            value={form.emoji}
+            onSelect={(emoji) => setForm((f) => ({ ...f, emoji }))}
+            options={RECURRING_EMOJI_OPTIONS}
+            accent={T.coral}
+            accentSoft={T.coralSoft}
+          />
         </div>
 
         {/* 引落日 + 金額 */}

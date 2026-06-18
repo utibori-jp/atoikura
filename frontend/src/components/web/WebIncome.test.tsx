@@ -129,8 +129,41 @@ describe("WebIncome — create form", () => {
     expect(screen.getByText("名前を入力してください")).toBeInTheDocument();
   });
 
-  it("shows validation error when emoji is empty", async () => {
-    useDefaultHandlers();
+  it("submits the default emoji when the emoji field is untouched", async () => {
+    let posted_body: components["schemas"]["IncomeRecordRequest"] | null = null;
+    server.use(
+      http.get(`${API_BASE}/income-records`, () => HttpResponse.json(makeIncomeList([]))),
+      http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
+      http.post(`${API_BASE}/income-records`, async ({ request }) => {
+        posted_body = (await request.json()) as components["schemas"]["IncomeRecordRequest"];
+        return HttpResponse.json(makeIncomeRecord(), { status: 201 });
+      })
+    );
+
+    render(<WebIncome onBack={() => {}} />);
+    await waitForReady();
+
+    fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
+
+    // Fill only the non-emoji required fields, then submit.
+    fireEvent.change(screen.getByPlaceholderText("6月給与"), { target: { value: "給与" } });
+    fireEvent.change(screen.getByPlaceholderText("280000"), { target: { value: "5000" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(posted_body).not.toBeNull());
+    expect(posted_body).toMatchObject({ emoji: "🏢" });
+  });
+
+  it("lets the user pick a different emoji from the list", async () => {
+    let posted_body: components["schemas"]["IncomeRecordRequest"] | null = null;
+    server.use(
+      http.get(`${API_BASE}/income-records`, () => HttpResponse.json(makeIncomeList([]))),
+      http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
+      http.post(`${API_BASE}/income-records`, async ({ request }) => {
+        posted_body = (await request.json()) as components["schemas"]["IncomeRecordRequest"];
+        return HttpResponse.json(makeIncomeRecord(), { status: 201 });
+      })
+    );
 
     render(<WebIncome onBack={() => {}} />);
     await waitForReady();
@@ -138,10 +171,13 @@ describe("WebIncome — create form", () => {
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
 
     fireEvent.change(screen.getByPlaceholderText("6月給与"), { target: { value: "給与" } });
-    // Leave emoji empty and submit
+    fireEvent.change(screen.getByPlaceholderText("280000"), { target: { value: "5000" } });
+    // Choose a non-default emoji from the picker.
+    fireEvent.click(screen.getByRole("button", { name: "💼" }));
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
-    expect(screen.getByText("絵文字を入力してください")).toBeInTheDocument();
+    await waitFor(() => expect(posted_body).not.toBeNull());
+    expect(posted_body).toMatchObject({ emoji: "💼" });
   });
 
   it("shows validation error when amount is zero or invalid", async () => {

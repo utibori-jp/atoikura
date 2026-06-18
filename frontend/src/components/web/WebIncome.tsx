@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
+import { EmojiPicker } from "../EmojiPicker";
 
 type IncomeRecord = components["schemas"]["IncomeRecord"];
 type BaseIncomeSetting = components["schemas"]["BaseIncomeSetting"];
@@ -9,6 +10,10 @@ type SavingsGoal = components["schemas"]["SavingsGoal"];
 type SurplusAllocation = components["schemas"]["SurplusAllocation"];
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
+
+// Fixed emoji choices for income records; the first is the pre-filled default.
+const INCOME_EMOJI_OPTIONS = ["🏢", "💼", "📈", "💰", "🎁", "⭐"];
+const DEFAULT_INCOME_EMOJI = INCOME_EMOJI_OPTIONS[0];
 
 function currentMonthJST(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(0, 7);
@@ -64,7 +69,7 @@ function blank_income_form(default_date: string): IncomeRecordFormState {
   return {
     id: null,
     name: "",
-    emoji: "",
+    emoji: DEFAULT_INCOME_EMOJI,
     amount_yen: "",
     transaction_date: default_date,
     income_type: "salary",
@@ -208,11 +213,6 @@ export function WebIncome({ onBack }: Props) {
       setFormErrorMsg("名前を入力してください");
       return;
     }
-    if (!income_form.emoji.trim()) {
-      setFormErrorMsg("絵文字を入力してください");
-      return;
-    }
-
     const parsed_amount = parseInt(income_form.amount_yen, 10);
     if (isNaN(parsed_amount) || parsed_amount < 1) {
       setFormErrorMsg("金額を正しく入力してください");
@@ -228,7 +228,7 @@ export function WebIncome({ onBack }: Props) {
     try {
       const request_body: components["schemas"]["IncomeRecordRequest"] = {
         name: income_form.name.trim(),
-        emoji: income_form.emoji.trim(),
+        emoji: income_form.emoji.trim() || DEFAULT_INCOME_EMOJI,
         amount: parsed_amount,
         transaction_date: income_form.transaction_date,
         income_type: income_form.income_type as "salary" | "side" | "bonus" | "oneoff",
@@ -387,6 +387,17 @@ export function WebIncome({ onBack }: Props) {
                 style={input_style}
               />
             </div>
+          </div>
+
+          {/* Quick emoji picker */}
+          <div style={{ marginBottom: 12 }}>
+            <EmojiPicker
+              value={income_form.emoji}
+              onSelect={(emoji) => setIncomeForm((f) => f && { ...f, emoji })}
+              options={INCOME_EMOJI_OPTIONS}
+              accent={T.sage}
+              accentSoft={T.sageSoft}
+            />
           </div>
 
           {/* Row 2: amount + income type */}

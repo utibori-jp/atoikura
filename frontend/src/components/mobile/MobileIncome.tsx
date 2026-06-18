@@ -90,10 +90,6 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
       setErrorMsg("収入名を入力してください");
       return;
     }
-    if (!form.emoji.trim()) {
-      setErrorMsg("絵文字を入力してください");
-      return;
-    }
     const parsed_amount = parseInt(form.amount_yen, 10);
     if (isNaN(parsed_amount) || parsed_amount < 1) {
       setErrorMsg("金額を正しく入力してください");
@@ -108,7 +104,7 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
     try {
       const request_body: components["schemas"]["IncomeRecordRequest"] = {
         name: form.name.trim(),
-        emoji: form.emoji.trim(),
+        emoji: form.emoji.trim() || EMOJI_OPTIONS[0],
         amount: parsed_amount,
         transaction_date: form.transaction_date,
         income_type: form.income_type,
