@@ -80,7 +80,7 @@ describe("WebSavings — create form", () => {
 
     // Fill required fields
     fireEvent.change(screen.getByPlaceholderText("旅行積立"), { target: { value: "新目標" } });
-    fireEvent.change(screen.getByPlaceholderText("✈️"), { target: { value: "🎯" } });
+    fireEvent.change(screen.getByPlaceholderText("📷"), { target: { value: "🎯" } });
     fireEvent.change(screen.getByPlaceholderText("20000"), { target: { value: "5000" } });
 
     // Submit
@@ -96,6 +96,55 @@ describe("WebSavings — create form", () => {
 
     // Form heading should no longer be visible
     expect(screen.queryByText("貯金目標を追加")).not.toBeInTheDocument();
+  });
+
+  it("submits the default emoji when the emoji field is untouched", async () => {
+    let posted_body: components["schemas"]["SavingsGoalRequest"] | null = null;
+    server.use(
+      http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([]))),
+      http.post(`${API_BASE}/savings-goals`, async ({ request }) => {
+        posted_body = (await request.json()) as components["schemas"]["SavingsGoalRequest"];
+        return HttpResponse.json(makeGoal({ id: 99 }), { status: 201 });
+      })
+    );
+
+    render(<WebSavings onBack={() => {}} />);
+    await waitForReady();
+
+    fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
+
+    // Fill only the non-emoji required fields, then submit.
+    fireEvent.change(screen.getByPlaceholderText("旅行積立"), { target: { value: "新目標" } });
+    fireEvent.change(screen.getByPlaceholderText("20000"), { target: { value: "5000" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(posted_body).not.toBeNull());
+    expect(posted_body).toMatchObject({ emoji: "📷" });
+  });
+
+  it("lets the user pick a different emoji from the list", async () => {
+    let posted_body: components["schemas"]["SavingsGoalRequest"] | null = null;
+    server.use(
+      http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([]))),
+      http.post(`${API_BASE}/savings-goals`, async ({ request }) => {
+        posted_body = (await request.json()) as components["schemas"]["SavingsGoalRequest"];
+        return HttpResponse.json(makeGoal({ id: 99 }), { status: 201 });
+      })
+    );
+
+    render(<WebSavings onBack={() => {}} />);
+    await waitForReady();
+
+    fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
+
+    fireEvent.change(screen.getByPlaceholderText("旅行積立"), { target: { value: "新目標" } });
+    fireEvent.change(screen.getByPlaceholderText("20000"), { target: { value: "5000" } });
+    // Choose a non-default emoji from the picker.
+    fireEvent.click(screen.getByRole("button", { name: "🎁" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(posted_body).not.toBeNull());
+    expect(posted_body).toMatchObject({ emoji: "🎁" });
   });
 
   it("shows validation error when name is empty", async () => {

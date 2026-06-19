@@ -72,11 +72,6 @@ export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileS
       setFormErrorMsg("名前を入力してください");
       return;
     }
-    if (!goal_form.emoji.trim()) {
-      setFormErrorMsg("絵文字を選択してください");
-      return;
-    }
-
     const parsed_monthly = parseInt(goal_form.monthly_amount_yen, 10);
     if (isNaN(parsed_monthly) || parsed_monthly < 0) {
       setFormErrorMsg("毎月の積立額を正しく入力してください");
@@ -93,7 +88,7 @@ export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileS
     try {
       const request_body: components["schemas"]["SavingsGoalRequest"] = {
         name: goal_form.name.trim(),
-        emoji: goal_form.emoji.trim(),
+        emoji: goal_form.emoji.trim() || EMOJI_OPTIONS[0],
         monthly_amount: parsed_monthly,
         target_amount: parsed_target,
         deadline: goal_form.deadline.trim() || null,
