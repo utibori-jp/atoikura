@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { token_store, AuthError, api } from "./client";
+import { token_store, AuthError, api, clearRuntimeCaches } from "./client";
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -25,6 +25,33 @@ describe("token_store", () => {
     token_store.save("first.token");
     token_store.save("second.token");
     expect(token_store.load()).toBe("second.token");
+  });
+});
+
+describe("clearRuntimeCaches", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("deletes every cache key so the next account never sees stale per-user data", async () => {
+    const delete_cache = vi.fn().mockResolvedValue(true);
+    vi.stubGlobal("caches", {
+      keys: vi
+        .fn()
+        .mockResolvedValue(["workbox-precache", "category-groups", "expense-categories"]),
+      delete: delete_cache,
+    });
+
+    await clearRuntimeCaches();
+
+    expect(delete_cache).toHaveBeenCalledTimes(3);
+    expect(delete_cache).toHaveBeenCalledWith("category-groups");
+    expect(delete_cache).toHaveBeenCalledWith("expense-categories");
+  });
+
+  it("is a no-op when the Cache Storage API is unavailable", async () => {
+    vi.stubGlobal("caches", undefined);
+    await expect(clearRuntimeCaches()).resolves.toBeUndefined();
   });
 });
 
