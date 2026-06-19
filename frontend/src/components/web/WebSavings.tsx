@@ -2,11 +2,17 @@ import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
+import { EmojiPicker } from "../EmojiPicker";
 
 type SavingsGoal = components["schemas"]["SavingsGoal"];
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 const yenSlim = (n: number) => Math.round(n).toLocaleString("ja-JP");
+
+// Fixed emoji choices for savings goals; the first is the pre-filled default.
+// Mirrors MobileSavings so both viewports offer the same set (#107).
+const SAVINGS_EMOJI_OPTIONS = ["📷", "✈️", "🏠", "💻", "🛟", "🎁"];
+const DEFAULT_SAVINGS_EMOJI = SAVINGS_EMOJI_OPTIONS[0];
 
 function currentMonthJST(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(0, 7);
@@ -31,7 +37,7 @@ function blank_goal_form(): GoalFormState {
   return {
     id: null,
     name: "",
-    emoji: "",
+    emoji: DEFAULT_SAVINGS_EMOJI,
     monthly_amount_yen: "",
     target_amount_yen: "0",
     deadline: "",
@@ -104,11 +110,6 @@ export function WebSavings({ onBack }: Props) {
       setFormErrorMsg("名前を入力してください");
       return;
     }
-    if (!goal_form.emoji.trim()) {
-      setFormErrorMsg("絵文字を入力してください");
-      return;
-    }
-
     const parsed_monthly = parseInt(goal_form.monthly_amount_yen, 10);
     if (isNaN(parsed_monthly) || parsed_monthly < 0) {
       setFormErrorMsg("毎月の積立額を正しく入力してください");
@@ -125,7 +126,7 @@ export function WebSavings({ onBack }: Props) {
     try {
       const request_body: components["schemas"]["SavingsGoalRequest"] = {
         name: goal_form.name.trim(),
-        emoji: goal_form.emoji.trim(),
+        emoji: goal_form.emoji.trim() || DEFAULT_SAVINGS_EMOJI,
         monthly_amount: parsed_monthly,
         target_amount: parsed_target,
         deadline: goal_form.deadline.trim() || null,
@@ -236,7 +237,7 @@ export function WebSavings({ onBack }: Props) {
                 type="text"
                 value={goal_form.emoji}
                 onChange={(e) => setGoalForm((f) => f && { ...f, emoji: e.target.value })}
-                placeholder="✈️"
+                placeholder="📷"
                 style={{ ...input_style, textAlign: "center", fontSize: 20 }}
               />
             </div>
@@ -250,6 +251,17 @@ export function WebSavings({ onBack }: Props) {
                 style={input_style}
               />
             </div>
+          </div>
+
+          {/* Quick emoji picker */}
+          <div style={{ marginBottom: 12 }}>
+            <EmojiPicker
+              value={goal_form.emoji}
+              onSelect={(emoji) => setGoalForm((f) => f && { ...f, emoji })}
+              options={SAVINGS_EMOJI_OPTIONS}
+              accent={T.mustard}
+              accentSoft={T.mustardSoft}
+            />
           </div>
 
           {/* Row 2: monthly amount + target amount */}
