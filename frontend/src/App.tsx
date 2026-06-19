@@ -17,7 +17,7 @@ import { WebIncome } from "./components/web/WebIncome";
 import { WebReview } from "./components/web/WebReview";
 import { WebJournal } from "./components/web/WebJournal";
 import { WebMaster } from "./components/web/WebMaster";
-import { api, AuthError, token_store } from "./api/client";
+import { api, AuthError, clearRuntimeCaches, token_store } from "./api/client";
 import type { components } from "./api/types";
 import { T } from "./theme";
 
@@ -617,6 +617,9 @@ export default function App() {
 
   function handleLogout() {
     token_store.clear();
+    // Purge cached per-user master data so the next account does not inherit
+    // this user's categories from the service worker cache (#114).
+    void clearRuntimeCaches();
     setActiveTab("home");
     setAuthState({ status: "anonymous" });
   }

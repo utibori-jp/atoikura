@@ -22,6 +22,21 @@ export const token_store = {
   },
 };
 
+// Deletes all service-worker runtime caches. Per-user master data (category
+// groups, expense categories, statement types) is cached by the PWA, so on
+// logout we must purge it — otherwise the next account would see the previous
+// user's cached categories and fail backend validation on save (#114).
+export async function clearRuntimeCaches(): Promise<void> {
+  if (typeof caches === "undefined") return;
+  try {
+    const cache_keys = await caches.keys();
+    await Promise.all(cache_keys.map((key) => caches.delete(key)));
+  } catch {
+    // Cache eviction is best-effort; NetworkFirst revalidation already keeps
+    // per-user data fresh while online, so a failure here is non-fatal.
+  }
+}
+
 async function request<TResponse>(path: string, init?: RequestInit): Promise<TResponse> {
   const stored_token = token_store.load();
 
