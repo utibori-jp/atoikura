@@ -12,6 +12,7 @@ function makeBudgetSummary(
   const current_ym = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(0, 7);
   return {
     income_total: 300000,
+    base_income: 300000,
     recurring_total: 80000,
     savings_total: 20000,
     variable_budget: 200000,
@@ -97,5 +98,40 @@ describe("WebBudget — spending data from history", () => {
     });
 
     expect(screen.getByText("0%")).toBeInTheDocument();
+  });
+
+  // #119 follow-up: the budget breakdown must show 基準収入 (base income), not the
+  // actual recorded income (income_total), since the budget is derived from base income.
+  it("shows base income (基準収入) in the breakdown, not actual recorded income", async () => {
+    server.use(
+      http.get(`${API_BASE}/budget-summary`, () =>
+        HttpResponse.json(
+          // income_total (actual) deliberately differs from base_income so we can
+          // tell which one the breakdown renders.
+          makeBudgetSummary({
+            income_total: 500000,
+            base_income: 400000,
+            recurring_total: 105000,
+            savings_total: 90000,
+            variable_budget: 205000,
+          })
+        )
+      ),
+      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(emptyRecurring)),
+      http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(emptyGoals)),
+      http.get(`${API_BASE}/income-records`, () => HttpResponse.json(emptyIncome))
+    );
+
+    render(<WebBudget onNavigate={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("今月の予算プラン")).toBeInTheDocument();
+    });
+
+    // The breakdown label and dashed formula use 基準収入 with the base-income amount.
+    expect(screen.getByText("基準収入")).toBeInTheDocument();
+    expect(screen.getByText("基準収入 ¥400,000")).toBeInTheDocument();
+    // The actual recorded income (¥500,000) must NOT appear in the breakdown.
+    expect(screen.queryByText("基準収入 ¥500,000")).not.toBeInTheDocument();
   });
 });

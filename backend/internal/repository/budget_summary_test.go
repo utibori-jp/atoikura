@@ -78,6 +78,12 @@ func TestBudgetSummary_UsesBaseIncomeNotRecordedIncome(t *testing.T) {
 		t.Errorf("income_total = %d, want 999999 (display field should show actual recorded income)",
 			summary_with_income.IncomeTotal)
 	}
+
+	// BaseIncome must be exposed so the frontend breakdown can show 基準収入 (#119 display).
+	if summary_with_income.BaseIncome != base_income {
+		t.Errorf("base_income = %d, want %d (must be exposed for the budget breakdown)",
+			summary_with_income.BaseIncome, base_income)
+	}
 }
 
 // TestBudgetSummary_HistoryUsesBaseIncome verifies that the history months also use

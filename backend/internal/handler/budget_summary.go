@@ -49,6 +49,7 @@ func GetBudgetSummaryHandler(repo budgetSummaryRepo) http.HandlerFunc {
 		}
 		type responseJSON struct {
 			IncomeTotal    int32             `json:"income_total"`
+			BaseIncome     int32             `json:"base_income"`
 			RecurringTotal int32             `json:"recurring_total"`
 			SavingsTotal   int32             `json:"savings_total"`
 			VariableBudget int32             `json:"variable_budget"`
@@ -68,6 +69,7 @@ func GetBudgetSummaryHandler(repo budgetSummaryRepo) http.HandlerFunc {
 
 		WriteJSON(w, http.StatusOK, responseJSON{
 			IncomeTotal:    summary.IncomeTotal,
+			BaseIncome:     summary.BaseIncome,
 			RecurringTotal: summary.RecurringTotal,
 			SavingsTotal:   summary.SavingsTotal,
 			VariableBudget: summary.VariableBudget,

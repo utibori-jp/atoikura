@@ -1359,10 +1359,15 @@ export interface components {
     };
     BudgetSummaryResponse: {
       /**
-       * @description 今月の収入合計（円）
+       * @description 今月の実績収入合計（円）。表示用。予算計算には使わない
        * @example 323200
        */
       income_total: number;
+      /**
+       * @description 基準収入（円）。変動費予算の算出基準。フロントの内訳表示はこの値を使う
+       * @example 400000
+       */
+      base_income: number;
       /**
        * @description 定期支出合計（円）
        * @example 96000
@@ -1374,7 +1379,7 @@ export interface components {
        */
       savings_total: number;
       /**
-       * @description 変動費予算 = 収入 − 定期支出 − 貯金 − 余剰振り分け（savings行きのみ）（円）
+       * @description 変動費予算 = 基準収入 − 定期支出 − 貯金 − 余剰振り分け（savings行きのみ）（円）
        * @example 182200
        */
       variable_budget: number;

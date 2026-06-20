@@ -16,6 +16,7 @@ type BudgetHistoryItem struct {
 
 type BudgetSummaryResult struct {
 	IncomeTotal    int32
+	BaseIncome     int32
 	RecurringTotal int32
 	SavingsTotal   int32
 	VariableBudget int32
@@ -125,6 +126,7 @@ func (r *Repository) GetBudgetSummary(ctx context.Context, user_id int64, year_m
 
 	return &BudgetSummaryResult{
 		IncomeTotal:    income_total,
+		BaseIncome:     base_income,
 		RecurringTotal: recurring_total,
 		SavingsTotal:   savings_total,
 		VariableBudget: variable_budget,
