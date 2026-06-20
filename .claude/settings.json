@@ -22,6 +22,10 @@
     ]
   },
   "permissions": {
+    "deny": [
+      "Read(/workspace/*/.env*)",
+      "Bash(git push --force *)"
+    ],
     "allow": [
       "Bash(git status)",
       "Bash(git log*)",
@@ -33,20 +37,43 @@
       "Bash(git commit *)",
       "Bash(git checkout *)",
       "Bash(git pull *)",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(git switch *)",
+      "Bash(git stash *)",
 
       "Bash(go build *)",
       "Bash(go install *)",
+      "Bash(go test *)",
+      "Bash(go env *)",
+      "Bash(go tool *)",
       "Bash(gofmt *)",
       "Bash(golangci-lint run *)",
+
       "Bash(make sqlc-gen *)",
       "Bash(make migrate-up *)",
       "Bash(make run *)",
+      "Bash(make -C backend migrate-up)",
+      "Bash(make logs *)",
 
       "Bash(docker compose *)",
+      "Bash(docker exec *)",
+      "Bash(docker cp *)",
+      "Bash(docker image *)",
 
       "Bash(npm install *)",
       "Bash(npm run *)",
       "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(npx prettier *)",
+      "Bash(npx vitest *)",
+
+      "Bash(pkill -f *)",
+      "Bash(chmod +x *)",
+      "Bash(dig +short A *)",
+
+      "Bash(JWT_SECRET=dev-jwt-secret-change-in-production npm run test:e2e)",
+      "Bash(JWT_SECRET=dev-jwt-secret-change-in-production make run)",
 
       "Bash(curl -s http://localhost:8080/*)",
 

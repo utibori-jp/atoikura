@@ -31,7 +31,7 @@
     "8001": { "label": "adminer" }
   },
 
-  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && npm install --prefix /workspace/atoikura && (headroom --version >/dev/null 2>&1 || (uv tool install \"headroom-ai[mcp,proxy]\" && headroom mcp install))",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && ([ -d /workspace/claude-config ] && ln -sf /workspace/claude-config/settings.json /home/node/.claude/settings.json && ln -sf /workspace/claude-config/CLAUDE.md /home/node/.claude/CLAUDE.md || true) && npm install --prefix /workspace/atoikura && (headroom --version >/dev/null 2>&1 || (uv tool install \"headroom-ai[mcp,proxy]\" && headroom mcp install))",
   "waitFor": "postStartCommand",
 
   "customizations": {
