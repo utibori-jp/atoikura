@@ -448,7 +448,8 @@ function EntryForm({ onSuccess }: EntryFormProps) {
         setAmountStr("");
         setItem("");
         setIsExcluded(false);
-        setTransactionDate(todayJST());
+        // Keep the entered transaction_date (#118) so consecutive entries on the
+        // same past date don't require re-selecting it each time.
         onSuccess();
       } catch (err) {
         setErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
