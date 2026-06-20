@@ -58,6 +58,7 @@ const defaultBudget: components["schemas"]["BudgetResponse"] = {
 
 export const defaultBudgetSummary: components["schemas"]["BudgetSummaryResponse"] = {
   income_total: 300000,
+  base_income: 300000,
   recurring_total: 80000,
   savings_total: 20000,
   variable_budget: 200000,

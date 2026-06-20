@@ -892,12 +892,16 @@ components:
 
     BudgetSummaryResponse:
       type: object
-      required: [income_total, recurring_total, savings_total, variable_budget, daily_budget, days_remaining, history]
+      required: [income_total, base_income, recurring_total, savings_total, variable_budget, daily_budget, days_remaining, history]
       properties:
         income_total:
           type: integer
-          description: 今月の収入合計（円）
+          description: 今月の実績収入合計（円）。表示用。予算計算には使わない
           example: 323200
+        base_income:
+          type: integer
+          description: 基準収入（円）。変動費予算の算出基準。フロントの内訳表示はこの値を使う
+          example: 400000
         recurring_total:
           type: integer
           description: 定期支出合計（円）
@@ -908,7 +912,7 @@ components:
           example: 45000
         variable_budget:
           type: integer
-          description: 変動費予算 = 収入 − 定期支出 − 貯金 − 余剰振り分け（savings行きのみ）（円）
+          description: 変動費予算 = 基準収入 − 定期支出 − 貯金 − 余剰振り分け（savings行きのみ）（円）
           example: 182200
         daily_budget:
           type: integer
