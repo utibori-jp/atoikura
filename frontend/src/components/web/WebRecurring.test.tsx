@@ -60,6 +60,21 @@ async function waitForReady() {
   });
 }
 
+// Category groups where group id=1 is treated as fixed-cost, so that makeCategoryList()
+// categories (group_id=1) pass the fixed-cost filter in WebRecurring.
+function makeDefaultCategoryGroups(): components["schemas"]["CategoryGroupListResponse"] {
+  return {
+    category_groups: [
+      {
+        id: 1,
+        group_name: "固定費",
+        statement_type: { id: 3, type_code: "fixed", statement_type_name: "固定費" },
+        description: null,
+      },
+    ],
+  };
+}
+
 // Override recurring + pending + expense-categories for each test suite
 function useDefaultHandlers(
   recurringList: components["schemas"]["RecurringExpenseListResponse"] = makeRecurringList([])
@@ -67,11 +82,82 @@ function useDefaultHandlers(
   server.use(
     http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(recurringList)),
     http.get(`${API_BASE}/recurring-expenses/pending`, () => HttpResponse.json(makePendingList())),
-    http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList()))
+    http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+    http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups()))
   );
 }
 
+// --- category-filter fixtures ---
+
+function makeFixedOnlyGroups(): components["schemas"]["CategoryGroupListResponse"] {
+  return {
+    category_groups: [
+      {
+        id: 3,
+        group_name: "固定費",
+        statement_type: { id: 3, type_code: "fixed", statement_type_name: "固定費" },
+        description: null,
+      },
+      {
+        id: 1,
+        group_name: "食費",
+        statement_type: { id: 1, type_code: "food", statement_type_name: "食費（変動費）" },
+        description: null,
+      },
+    ],
+  };
+}
+
+function makeMixedCategories(): components["schemas"]["ExpenseCategoryListResponse"] {
+  return {
+    expense_categories: [
+      {
+        id: 10,
+        category_name: "家賃",
+        category_code: "rent",
+        group_id: 3,
+        group_name: "固定費",
+        description: null,
+      },
+      {
+        id: 20,
+        category_name: "スーパー",
+        category_code: "food_super",
+        group_id: 1,
+        group_name: "食費",
+        description: null,
+      },
+    ],
+  };
+}
+
 // --- tests ---
+
+describe("WebRecurring — category filter (fixed-cost only)", () => {
+  it("shows only fixed-cost categories in the recurring picker", async () => {
+    server.use(
+      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(makeRecurringList([]))),
+      http.get(`${API_BASE}/recurring-expenses/pending`, () =>
+        HttpResponse.json(makePendingList())
+      ),
+      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeMixedCategories())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeFixedOnlyGroups()))
+    );
+
+    render(<WebRecurring onBack={() => {}} />);
+    await waitForReady();
+
+    // Open the create form to reveal the category select
+    const add_buttons = screen.getAllByRole("button", { name: /定期支出を追加/ });
+    fireEvent.click(add_buttons[0]);
+
+    // Fixed-cost category should be present
+    expect(screen.getByRole("option", { name: "家賃" })).toBeInTheDocument();
+
+    // Variable category must NOT be present
+    expect(screen.queryByRole("option", { name: "スーパー" })).not.toBeInTheDocument();
+  });
+});
 
 describe("WebRecurring — create form", () => {
   it("opens the create form when ＋ 定期支出を追加 (header button) is clicked", async () => {
@@ -118,6 +204,7 @@ describe("WebRecurring — create form", () => {
         HttpResponse.json(makePendingList())
       ),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.post(`${API_BASE}/recurring-expenses`, async () => {
         post_called = true;
         return HttpResponse.json(created_recurring, { status: 201 });
@@ -176,6 +263,7 @@ describe("WebRecurring — create form", () => {
         HttpResponse.json(makePendingList())
       ),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.post(`${API_BASE}/recurring-expenses`, async ({ request }) => {
         posted_body = (await request.json()) as components["schemas"]["RecurringExpenseRequest"];
         return HttpResponse.json(makeRecurring(), { status: 201 });
@@ -206,6 +294,7 @@ describe("WebRecurring — create form", () => {
         HttpResponse.json(makePendingList())
       ),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.post(`${API_BASE}/recurring-expenses`, async ({ request }) => {
         posted_body = (await request.json()) as components["schemas"]["RecurringExpenseRequest"];
         return HttpResponse.json(makeRecurring(), { status: 201 });
@@ -272,7 +361,8 @@ describe("WebRecurring — edit form", () => {
       http.get(`${API_BASE}/recurring-expenses/pending`, () =>
         HttpResponse.json(makePendingList())
       ),
-      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList()))
+      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups()))
     );
 
     render(<WebRecurring onBack={() => {}} />);
@@ -307,6 +397,7 @@ describe("WebRecurring — edit form", () => {
         HttpResponse.json(makePendingList())
       ),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.put(`${API_BASE}/recurring-expenses/1`, async () => {
         put_called = true;
         return HttpResponse.json(updated_recurring);

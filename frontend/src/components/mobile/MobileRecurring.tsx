@@ -7,6 +7,9 @@ import { EmojiPicker } from "../EmojiPicker";
 type RecurringExpense = components["schemas"]["RecurringExpense"];
 type PendingRecurring = components["schemas"]["PendingRecurring"];
 type ExpenseCategory = components["schemas"]["ExpenseCategory"];
+type CategoryGroup = components["schemas"]["CategoryGroup"];
+
+const FIXED_STATEMENT_TYPE_ID = 3;
 
 interface MobileRecurringProps {
   onBack: () => void;
@@ -367,6 +370,7 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
   const [recurring, setRecurring] = useState<RecurringExpense[] | null>(null);
   const [pending, setPending] = useState<PendingRecurring[] | null>(null);
   const [expense_categories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [category_groups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   // sheet_form=null means the sheet is hidden
   const [sheet_form, setSheetForm] = useState<RecurringFormState | null>(null);
   // Map of pending item id → confirm amount string
@@ -393,18 +397,28 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
       api.listRecurringExpenses(),
       api.listPendingRecurring(ym),
       api.listExpenseCategories(),
+      api.listCategoryGroups(),
     ])
-      .then(([rec_res, pend_res, cat_res]) => {
+      .then(([rec_res, pend_res, cat_res, group_res]) => {
         if (cancelled) return;
         setRecurring(rec_res.recurring_expenses);
         setPending(pend_res.pending);
         setExpenseCategories(cat_res.expense_categories);
+        setCategoryGroups(group_res.category_groups);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [ym]);
+
+  const fixed_group_id_set = new Set(
+    category_groups.filter((g) => g.statement_type.id === FIXED_STATEMENT_TYPE_ID).map((g) => g.id)
+  );
+
+  const fixed_expense_categories = expense_categories.filter((cat) =>
+    fixed_group_id_set.has(cat.group_id)
+  );
 
   const handle_delete = async (id: number) => {
     if (!window.confirm("この定期支出を削除しますか？")) return;
@@ -788,7 +802,7 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
       {sheet_form !== null && (
         <RecurringSheet
           initial_form={sheet_form}
-          expense_categories={expense_categories}
+          expense_categories={fixed_expense_categories}
           on_close={() => setSheetForm(null)}
           on_saved={handle_sheet_saved}
         />

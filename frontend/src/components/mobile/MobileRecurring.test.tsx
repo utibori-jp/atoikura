@@ -67,6 +67,21 @@ function makeCategoryList(): components["schemas"]["ExpenseCategoryListResponse"
   };
 }
 
+// Category groups where group id=1 is treated as fixed-cost, so that makeCategoryList()
+// categories (group_id=1) pass the fixed-cost filter in MobileRecurring.
+function makeDefaultCategoryGroups(): components["schemas"]["CategoryGroupListResponse"] {
+  return {
+    category_groups: [
+      {
+        id: 1,
+        group_name: "固定費",
+        statement_type: { id: 3, type_code: "fixed", statement_type_name: "固定費" },
+        description: null,
+      },
+    ],
+  };
+}
+
 // Override recurring + pending + expense-categories for a test suite
 function useDefaultHandlers(
   recurringList: components["schemas"]["RecurringExpenseListResponse"] = makeRecurringList([]),
@@ -75,7 +90,8 @@ function useDefaultHandlers(
   server.use(
     http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(recurringList)),
     http.get(`${API_BASE}/recurring-expenses/pending`, () => HttpResponse.json(pendingList)),
-    http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList()))
+    http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+    http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups()))
   );
 }
 
@@ -86,7 +102,76 @@ async function waitForReady() {
   });
 }
 
+// --- category-filter fixtures ---
+
+function makeFixedOnlyGroups(): components["schemas"]["CategoryGroupListResponse"] {
+  return {
+    category_groups: [
+      {
+        id: 3,
+        group_name: "固定費",
+        statement_type: { id: 3, type_code: "fixed", statement_type_name: "固定費" },
+        description: null,
+      },
+      {
+        id: 1,
+        group_name: "食費",
+        statement_type: { id: 1, type_code: "food", statement_type_name: "食費（変動費）" },
+        description: null,
+      },
+    ],
+  };
+}
+
+function makeMixedCategories(): components["schemas"]["ExpenseCategoryListResponse"] {
+  return {
+    expense_categories: [
+      {
+        id: 10,
+        category_name: "家賃",
+        category_code: "rent",
+        group_id: 3,
+        group_name: "固定費",
+        description: null,
+      },
+      {
+        id: 20,
+        category_name: "スーパー",
+        category_code: "food_super",
+        group_id: 1,
+        group_name: "食費",
+        description: null,
+      },
+    ],
+  };
+}
+
 // --- tests ---
+
+describe("MobileRecurring — category filter (fixed-cost only)", () => {
+  it("shows only fixed-cost categories in the recurring picker", async () => {
+    server.use(
+      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(makeRecurringList([]))),
+      http.get(`${API_BASE}/recurring-expenses/pending`, () =>
+        HttpResponse.json(makePendingList())
+      ),
+      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeMixedCategories())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeFixedOnlyGroups()))
+    );
+
+    render(<MobileRecurring onBack={() => {}} />);
+    await waitForReady();
+
+    // Open the bottom sheet to reveal the category select
+    fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
+
+    // Fixed-cost category should be present
+    expect(screen.getByRole("option", { name: "家賃" })).toBeInTheDocument();
+
+    // Variable category must NOT be present
+    expect(screen.queryByRole("option", { name: "スーパー" })).not.toBeInTheDocument();
+  });
+});
 
 describe("MobileRecurring — create form", () => {
   it("opens the bottom-sheet when ＋ 定期支出を追加 is clicked", async () => {
@@ -114,6 +199,7 @@ describe("MobileRecurring — create form", () => {
         HttpResponse.json(makePendingList())
       ),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.post(`${API_BASE}/recurring-expenses`, async () => {
         post_called = true;
         return HttpResponse.json(created_recurring, { status: 201 });
@@ -169,6 +255,7 @@ describe("MobileRecurring — create form", () => {
         HttpResponse.json(makePendingList())
       ),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.post(`${API_BASE}/recurring-expenses`, async ({ request }) => {
         posted_body = (await request.json()) as components["schemas"]["RecurringExpenseRequest"];
         return HttpResponse.json(makeRecurring(), { status: 201 });
@@ -198,6 +285,7 @@ describe("MobileRecurring — create form", () => {
         HttpResponse.json(makePendingList())
       ),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.post(`${API_BASE}/recurring-expenses`, async ({ request }) => {
         posted_body = (await request.json()) as components["schemas"]["RecurringExpenseRequest"];
         return HttpResponse.json(makeRecurring(), { status: 201 });
@@ -289,6 +377,7 @@ describe("MobileRecurring — edit form", () => {
         HttpResponse.json(makePendingList())
       ),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.put(`${API_BASE}/recurring-expenses/1`, async () => {
         put_called = true;
         return HttpResponse.json(updated_recurring);
@@ -337,6 +426,7 @@ describe("MobileRecurring — delete", () => {
         HttpResponse.json(makePendingList())
       ),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.delete(`${API_BASE}/recurring-expenses/1`, () => {
         delete_called = true;
         return new HttpResponse(null, { status: 204 });
@@ -376,6 +466,7 @@ describe("MobileRecurring — delete", () => {
         HttpResponse.json(makePendingList())
       ),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.delete(`${API_BASE}/recurring-expenses/1`, () => {
         delete_called = true;
         return new HttpResponse(null, { status: 204 });
@@ -430,6 +521,7 @@ describe("MobileRecurring — confirm pending", () => {
         return HttpResponse.json(makePendingList([pending_item]));
       }),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.post(`${API_BASE}/recurring-expenses/10/confirm`, async ({ request }) => {
         confirm_called = true;
         confirm_body = (await request.json()) as Record<string, unknown>;
@@ -489,6 +581,7 @@ describe("MobileRecurring — confirm pending", () => {
         HttpResponse.json(makePendingList([pending_item]))
       ),
       http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
       http.post(`${API_BASE}/recurring-expenses/10/confirm`, () => {
         confirm_called = true;
         return HttpResponse.json({}, { status: 201 });

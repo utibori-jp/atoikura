@@ -7,6 +7,9 @@ import { EmojiPicker } from "../EmojiPicker";
 type RecurringExpense = components["schemas"]["RecurringExpense"];
 type PendingRecurring = components["schemas"]["PendingRecurring"];
 type ExpenseCategory = components["schemas"]["ExpenseCategory"];
+type CategoryGroup = components["schemas"]["CategoryGroup"];
+
+const FIXED_STATEMENT_TYPE_ID = 3;
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 
@@ -66,6 +69,7 @@ export function WebRecurring({ onBack }: Props) {
   const [confirm_amounts, setConfirmAmounts] = useState<Record<number, string>>({});
   const [confirming_id, setConfirmingId] = useState<number | null>(null);
   const [expense_categories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [category_groups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const ym = currentMonthJST();
 
   // recurring_form=null means the form is hidden
@@ -88,18 +92,28 @@ export function WebRecurring({ onBack }: Props) {
       api.listRecurringExpenses(),
       api.listPendingRecurring(ym),
       api.listExpenseCategories(),
+      api.listCategoryGroups(),
     ])
-      .then(([rec_res, pend_res, cat_res]) => {
+      .then(([rec_res, pend_res, cat_res, group_res]) => {
         if (cancelled) return;
         setRecurring(rec_res.recurring_expenses);
         setPending(pend_res.pending);
         setExpenseCategories(cat_res.expense_categories);
+        setCategoryGroups(group_res.category_groups);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [ym]);
+
+  const fixed_group_id_set = new Set(
+    category_groups.filter((g) => g.statement_type.id === FIXED_STATEMENT_TYPE_ID).map((g) => g.id)
+  );
+
+  const fixed_expense_categories = expense_categories.filter((cat) =>
+    fixed_group_id_set.has(cat.group_id)
+  );
 
   const filtered = recurring.filter((r) => {
     if (filter === "fixed") return r.type === "fixed";
@@ -385,7 +399,7 @@ export function WebRecurring({ onBack }: Props) {
                 style={{ ...input_style, appearance: "auto" }}
               >
                 <option value="">選択してください</option>
-                {expense_categories.map((cat) => (
+                {fixed_expense_categories.map((cat) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.category_name}
                   </option>
