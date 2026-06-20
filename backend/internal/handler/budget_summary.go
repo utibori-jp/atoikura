@@ -9,6 +9,7 @@ import (
 )
 
 type budgetSummaryRepo interface {
+	EnsureMonthlyAutoPosting(ctx context.Context, user_id int64, year_month string) (*repository.MonthlyAutoPostingResult, error)
 	GetBudgetSummary(ctx context.Context, user_id int64, year_month string) (*repository.BudgetSummaryResult, error)
 }
 
@@ -26,6 +27,14 @@ func GetBudgetSummaryHandler(repo budgetSummaryRepo) http.HandlerFunc {
 			return
 		}
 
+		// Lazily post this month's fixed recurring expenses and monthly savings on the
+		// first dashboard read of the month. Idempotent and advisory-lock guarded, so it
+		// is safe to run on every request. Failures here must not break the dashboard, so
+		// they are logged and the summary is still served.
+		if _, err := repo.EnsureMonthlyAutoPosting(r.Context(), user_id, year_month); err != nil {
+			slog.Error("auto-posting monthly entries", "error", err, "year_month", year_month)
+		}
+
 		summary, err := repo.GetBudgetSummary(r.Context(), user_id, year_month)
 		if err != nil {
 			slog.Error("getting budget summary", "error", err)
@@ -40,6 +49,7 @@ func GetBudgetSummaryHandler(repo budgetSummaryRepo) http.HandlerFunc {
 		}
 		type responseJSON struct {
 			IncomeTotal    int32             `json:"income_total"`
+			BaseIncome     int32             `json:"base_income"`
 			RecurringTotal int32             `json:"recurring_total"`
 			SavingsTotal   int32             `json:"savings_total"`
 			VariableBudget int32             `json:"variable_budget"`
@@ -59,6 +69,7 @@ func GetBudgetSummaryHandler(repo budgetSummaryRepo) http.HandlerFunc {
 
 		WriteJSON(w, http.StatusOK, responseJSON{
 			IncomeTotal:    summary.IncomeTotal,
+			BaseIncome:     summary.BaseIncome,
 			RecurringTotal: summary.RecurringTotal,
 			SavingsTotal:   summary.SavingsTotal,
 			VariableBudget: summary.VariableBudget,

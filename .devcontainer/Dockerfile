@@ -57,6 +57,14 @@ RUN ARCH="$(dpkg --print-architecture)" \
 # npm-global so the node user can install Claude Code without sudo.
 RUN mkdir -p /usr/local/share/npm-global && chown -R node:node /usr/local/share
 
+ARG PLAYWRIGHT_VERSION=1.60.0
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# Install Chromium + OS-level dependencies for Playwright at build time.
+# Must run as root (before USER node) so apt-get can install OS deps.
+RUN npx -y playwright@${PLAYWRIGHT_VERSION} install --with-deps chromium \
+  && chmod -R a+rx /ms-playwright
+
 ARG USERNAME=node
 
 # Persist bash history across container rebuilds via a named volume mount.

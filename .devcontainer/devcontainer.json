@@ -10,13 +10,18 @@
   "remoteUser": "node",
   "shutdownAction": "stopCompose",
 
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
     "CLAUDE_CONFIG_DIR": "/home/node/.claude",
     "DATABASE_URL": "postgres://atoikura:dev_password@db:5432/atoikura?sslmode=disable",
     "PORT": "8080",
     "VITE_API_URL": "http://localhost:8080",
-    "CORS_ALLOWED_ORIGIN": "http://localhost:3000"
+    "CORS_ALLOWED_ORIGIN": "http://localhost:3000",
+    "COMPOSE_PROJECT_NAME": "atoikura"
   },
 
   "forwardPorts": [8080, 3000, 8001],
@@ -36,7 +41,8 @@
         "golang.go",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "eamodio.gitlens"
+        "eamodio.gitlens",
+        "ms-playwright.playwright"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash",

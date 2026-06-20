@@ -23,12 +23,12 @@ function daysInMonthJST(): number {
 function computeSummary(data: DailyCumulativeResponse) {
   const last_actual = [...data.days].reverse().find((d) => d.is_actual);
   const total_spend = last_actual?.total ?? 0;
-  const remaining_budget = data.monthly_budget - total_spend;
+  const remaining_budget = data.variable_budget - total_spend;
   const today_day = todayDayJST();
   const days_in_month = daysInMonthJST();
   const days_left = days_in_month - today_day;
   const daily_available = days_left > 0 ? Math.floor(remaining_budget / days_left) : 0;
-  const monthly_budget = data.monthly_budget;
+  const monthly_budget = data.variable_budget;
   const daily_budget = data.daily_budget;
   const baseline_today =
     monthly_budget > 0 ? Math.round((monthly_budget / days_in_month) * today_day) : 0;

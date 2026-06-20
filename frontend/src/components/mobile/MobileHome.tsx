@@ -3,6 +3,8 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "./groupEmoji";
+import { chartMaxY } from "../chartScale";
+import { smoothPath } from "../chartPath";
 
 type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
 type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
@@ -86,24 +88,6 @@ interface ChartPoint {
   is_actual: boolean;
 }
 
-function smoothPath(points: [number, number][]): string {
-  if (points.length === 0) return "";
-  if (points.length === 1) return `M ${points[0][0]} ${points[0][1]}`;
-  let d = `M ${points[0][0]} ${points[0][1]}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i - 1] ?? points[i];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2] ?? p2;
-    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
-    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
-    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
-    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
-    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`;
-  }
-  return d;
-}
-
 interface MMiniChartProps {
   width: number;
   height: number;
@@ -132,14 +116,18 @@ function MMiniChart(props: MMiniChartProps) {
     padB = 20;
   const w = width - padL - padR;
   const h = height - padT - padB;
-  const maxY = Math.max(monthly_budget * 1.05, 1);
+  const past = data.filter((d) => d.is_actual);
+  const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
+  const projected_end = daily_pace * days_in_month;
+  // Scale the y-axis to fit both the budget and the largest plotted total so the
+  // cumulative line never renders off-canvas (#106), including when no budget is
+  // set yet or when spending exceeds the budget.
+  const maxY = chartMaxY(monthly_budget, [...past.map((d) => d.total), projected_end]);
   const xAt = (d: number) => padL + ((d - 1) / Math.max(days_in_month - 1, 1)) * w;
   const yAt = (v: number) => padT + h - (v / maxY) * h;
-  const past = data.filter((d) => d.is_actual);
   const past_pts: [number, number][] = past.map((s) => [xAt(s.day), yAt(s.total)]);
   const fc_pts: [number, number][] = [];
   if (today_day >= 1 && today_day <= days_in_month) {
-    const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
     for (let d = today_day; d <= days_in_month; d++) {
       fc_pts.push([xAt(d), yAt(Math.min(maxY, d === today_day ? spent_so_far : daily_pace * d))]);
     }
@@ -328,7 +316,7 @@ export function MobileHome({ refresh_token, onShowList }: Props) {
   const days_total = daysInMonth(ym);
   const today_day = todayDayJST();
   const days_left = Math.max(0, days_total - today_day);
-  const monthly_budget = cumulative?.monthly_budget ?? 0;
+  const monthly_budget = cumulative?.variable_budget ?? 0;
   const last_actual = cumulative?.days
     ? [...cumulative.days].reverse().find((d) => d.is_actual)
     : null;

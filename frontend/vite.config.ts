@@ -18,8 +18,13 @@ export default defineConfig({
             handler: "NetworkFirst",
           },
           {
+            // These master endpoints are per-user (every row has a user_id). CacheFirst
+            // never revalidates, so after an account switch the service worker would serve
+            // the previous user's category ids — submitting one then fails backend
+            // validation ("category_id does not exist or is deleted"). NetworkFirst keeps
+            // them fresh online and only falls back to cache when offline.
             urlPattern: new RegExp(`^${api_origin}/(category-groups|expense-categories|statement-types)`),
-            handler: "CacheFirst",
+            handler: "NetworkFirst",
           },
         ],
       },
@@ -49,6 +54,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    // Scope to unit tests under src/ so the Playwright e2e specs (e2e/*.spec.ts),
+    // which use Playwright's own runner, are not picked up by Vitest.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
     setupFiles: ["./src/test/setup.ts"],
     env: {
       VITE_API_URL: "http://localhost:8080",

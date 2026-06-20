@@ -99,7 +99,7 @@ components:
       type: object
       required:
         - year_month
-        - monthly_budget
+        - variable_budget
         - daily_budget
         - days
       properties:
@@ -108,15 +108,15 @@ components:
           pattern: '^\d{4}-\d{2}$'
           description: 対象年月（YYYY-MM）
           example: "2025-05"
-        monthly_budget:
+        variable_budget:
           type: integer
-          description: 月次変動費予算（円）
+          description: 変動費予算 = 収入 − 定期支出 − 貯金（円）
           example: 150000
         daily_budget:
           type: integer
           description: |
             日割り予算（円）
-            monthly_budget ÷ 当月日数、小数切り捨て
+            variable_budget ÷ 当月日数、小数切り捨て
           example: 4839
         days:
           type: array
@@ -420,38 +420,6 @@ components:
           description: 生活区分単位の集計リスト
           items:
             $ref: '#/components/schemas/MonthlyBreakdownItem'
-
-    BudgetResponse:
-      type: object
-      properties:
-        monthly_budget:
-          type: [integer, "null"]
-          description: 月次変動費予算（円）。未設定時はnull
-          example: 150000
-        goal_text:
-          type: [string, "null"]
-          description: 貯金目標テキスト。未設定時はnull
-          example: "夏までに旅行費を貯める"
-        goal_amount:
-          type: [integer, "null"]
-          description: 目標金額（円）。未設定時はnull
-          example: 300000
-
-    BudgetRequest:
-      type: object
-      properties:
-        monthly_budget:
-          type: [integer, "null"]
-          description: 月次変動費予算（円）。nullで未設定に戻る。1以上の整数のみ許容
-          example: 120000
-        goal_text:
-          type: [string, "null"]
-          description: 貯金目標テキスト。nullで未設定に戻る
-          example: "夏までに旅行費を貯める"
-        goal_amount:
-          type: [integer, "null"]
-          description: 目標金額（円）。nullで未設定に戻る
-          example: 300000
 
     MonthlyReviewNote:
       type: object
@@ -924,12 +892,16 @@ components:
 
     BudgetSummaryResponse:
       type: object
-      required: [income_total, recurring_total, savings_total, variable_budget, daily_budget, days_remaining, history]
+      required: [income_total, base_income, recurring_total, savings_total, variable_budget, daily_budget, days_remaining, history]
       properties:
         income_total:
           type: integer
-          description: 今月の収入合計（円）
+          description: 今月の実績収入合計（円）。表示用。予算計算には使わない
           example: 323200
+        base_income:
+          type: integer
+          description: 基準収入（円）。変動費予算の算出基準。フロントの内訳表示はこの値を使う
+          example: 400000
         recurring_total:
           type: integer
           description: 定期支出合計（円）
@@ -940,7 +912,7 @@ components:
           example: 45000
         variable_budget:
           type: integer
-          description: 変動費予算 = 収入 − 定期支出 − 貯金（円）
+          description: 変動費予算 = 基準収入 − 定期支出 − 貯金 − 余剰振り分け（savings行きのみ）（円）
           example: 182200
         daily_budget:
           type: integer
@@ -954,6 +926,69 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BudgetHistoryItem'
+
+    SurplusAllocation:
+      type: object
+      required: [id, year_month, amount, destination, savings_goal_id, created_at]
+      properties:
+        id:
+          type: integer
+          example: 1
+        year_month:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+          example: "2026-06"
+        amount:
+          type: integer
+          minimum: 1
+          description: 振り分け金額（円）
+          example: 20000
+        destination:
+          type: string
+          enum: [budget, savings]
+          description: |
+            budget = 今月の変動費予算に追加（記録のみ）
+            savings = 貯金目標に振り分け（accumulated_amountを加算）
+          example: "savings"
+        savings_goal_id:
+          type: [integer, "null"]
+          description: 貯金先の savings_goals.id。destination=budget の場合は null
+          example: 3
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-06-13T10:00:00+09:00"
+
+    SurplusAllocationRequest:
+      type: object
+      required: [year_month, amount, destination]
+      properties:
+        year_month:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+          example: "2026-06"
+        amount:
+          type: integer
+          minimum: 1
+          description: 振り分け金額（円）
+          example: 20000
+        destination:
+          type: string
+          enum: [budget, savings]
+          example: "savings"
+        savings_goal_id:
+          type: integer
+          description: destination=savings の場合は必須。destination=budget の場合は指定不可
+          example: 3
+
+    SurplusAllocationListResponse:
+      type: object
+      required: [surplus_allocations]
+      properties:
+        surplus_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SurplusAllocation'
 
 paths:
   /auth/signup:
@@ -1728,83 +1763,6 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /budgets:
-    get:
-      summary: 予算・目標取得
-      description: |
-        ログインユーザーの予算・目標設定を返す。
-        レコードが未作成の場合も200を返し、全フィールドをnullで返す。
-
-        **利用画面：**
-        - 目標設定画面：初期表示
-      operationId: getBudgets
-      tags:
-        - budgets
-      responses:
-        '200':
-          description: 取得成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BudgetResponse'
-              example:
-                monthly_budget: 150000
-                goal_text: "夏までに旅行費を貯める"
-                goal_amount: 300000
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-    put:
-      summary: 予算・目標更新
-      description: |
-        ログインユーザーの予算・目標設定を更新する。
-        レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
-        全フィールド任意。変更しないフィールドは現在値をそのまま送ること。
-        nullを送ると未設定状態に戻る。
-        `monthly_budget` に0以下の値を送った場合は400を返す。
-
-        **利用画面：**
-        - 目標設定画面：保存
-      operationId: updateBudgets
-      tags:
-        - budgets
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BudgetRequest'
-            example:
-              monthly_budget: 120000
-              goal_text: "夏までに旅行費を貯める"
-              goal_amount: 300000
-      responses:
-        '200':
-          description: 更新成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BudgetResponse'
-              example:
-                monthly_budget: 120000
-                goal_text: "夏までに旅行費を貯める"
-                goal_amount: 300000
-        '400':
-          description: リクエスト不正（monthly_budgetが0以下など）
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                code: BAD_REQUEST
-                message: "monthly_budgetは1以上の整数である必要があります"
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
   /journal-entries:
     get:
       summary: 仕訳一覧取得
@@ -2452,6 +2410,67 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /recurring-expenses/{id}/confirm:
+    post:
+      summary: 確認待ち定期支出の金額を確定し仕訳を記録
+      description: >
+        variable型の定期支出について、当月の金額を確定して journal_entries を
+        recurring_expense_id 付きで作成する。これにより当該月の確認待ち状態が解消される。
+        type を変更せず、毎月の確認フローを維持する。
+      operationId: confirmRecurringExpense
+      tags: [recurring-expenses]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, year_month]
+              properties:
+                amount:
+                  type: integer
+                  minimum: 1
+                  description: 確定する金額（円）
+                year_month:
+                  type: string
+                  pattern: '^\d{4}-\d{2}$'
+                  description: 対象年月（YYYY-MM）。仕訳の日付は billing_day をこの月に当てはめて決定する
+      responses:
+        '201':
+          description: 仕訳作成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JournalEntryResponse'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 当月分は既に確定済み
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /savings-goals:
     get:
       summary: 貯金目標一覧
@@ -2810,5 +2829,74 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /surplus-allocations:
+    get:
+      summary: 余剰振り分け一覧取得
+      operationId: listSurplusAllocations
+      tags: [surplus-allocations]
+      parameters:
+        - name: year_month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+          example: "2026-06"
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SurplusAllocationListResponse'
+        '400':
+          description: 入力値不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: 余剰振り分け作成
+      description: |
+        余剰（当月収入 − 基準収入）のうち未振り分け分を budget または savings に振り分ける。
+        destination=savings の場合は savings_goal_id が必須で、対象貯金目標の accumulated_amount を加算する。
+        振り分け金額が残余剰を超える場合は 400 を返す。
+        取り消し・編集は V1 スコープ外（追記専用）。
+      operationId: createSurplusAllocation
+      tags: [surplus-allocations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SurplusAllocationRequest'
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SurplusAllocation'
+        '400':
+          description: 入力値不正または振り分け金額が余剰を超過
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 指定の savings_goal_id が存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'

@@ -60,9 +60,9 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
       screen: "income",
       sign: "+",
       emoji: "💼",
-      title: "収入",
-      sub: `${counts.income}件 · 給与・副業・一時収入`,
-      amount: summary.income_total,
+      title: "基準収入",
+      sub: "毎月の見込み収入",
+      amount: summary.base_income,
       tone: { bg: T.sageSoft, fg: T.sageDeep, signBg: "rgba(123,196,164,0.18)" },
     },
     {
@@ -102,7 +102,7 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
         >
           今月の予算プラン
         </div>
-        <div style={{ fontSize: 13, color: T.inkSoft, marginTop: 2 }}>収入から自動で算出</div>
+        <div style={{ fontSize: 13, color: T.inkSoft, marginTop: 2 }}>基準収入から自動で算出</div>
       </div>
 
       {/* Hero card */}
@@ -344,7 +344,7 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
           fontFamily: "'DM Sans', sans-serif",
         }}
       >
-        <span style={{ color: T.sageDeep }}>収入</span>
+        <span style={{ color: T.sageDeep }}>基準収入</span>
         <span>−</span>
         <span style={{ color: "#3F6B91" }}>定期支出</span>
         <span>−</span>

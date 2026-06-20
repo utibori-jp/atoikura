@@ -56,6 +56,21 @@ const defaultBudget: components["schemas"]["BudgetResponse"] = {
   goal_amount: null,
 };
 
+export const defaultBudgetSummary: components["schemas"]["BudgetSummaryResponse"] = {
+  income_total: 300000,
+  base_income: 300000,
+  recurring_total: 80000,
+  savings_total: 20000,
+  variable_budget: 200000,
+  daily_budget: 6666,
+  days_remaining: 18,
+  history: [
+    { year_month: "2026-04", budget: 195000, actual: 180000 },
+    { year_month: "2026-05", budget: 198000, actual: 210000 },
+    { year_month: "2026-06", budget: 200000, actual: 50000 },
+  ],
+};
+
 const defaultUser: components["schemas"]["UserResponse"] = {
   id: 1,
   email: "dev@atoikura.local",
@@ -65,7 +80,7 @@ const defaultUser: components["schemas"]["UserResponse"] = {
 
 const defaultDailyCumulative: components["schemas"]["DailyCumulativeResponse"] = {
   year_month: "2026-06",
-  monthly_budget: 150000,
+  variable_budget: 150000,
   daily_budget: 5000,
   days: [
     {
@@ -88,6 +103,30 @@ const defaultDailyCumulative: components["schemas"]["DailyCumulativeResponse"] =
 const defaultDailyNotes: components["schemas"]["DailyNoteListResponse"] = {
   year_month: "2026-06",
   notes: [],
+};
+
+const defaultRecurringExpenses: components["schemas"]["RecurringExpenseListResponse"] = {
+  recurring_expenses: [],
+};
+
+const defaultPendingRecurring: components["schemas"]["PendingRecurringListResponse"] = {
+  pending: [],
+};
+
+const defaultSavingsGoals: components["schemas"]["SavingsGoalListResponse"] = {
+  savings_goals: [],
+};
+
+const defaultSurplusAllocations: components["schemas"]["SurplusAllocationListResponse"] = {
+  surplus_allocations: [],
+};
+
+const defaultIncomeRecords: components["schemas"]["IncomeRecordListResponse"] = {
+  income_records: [],
+};
+
+const defaultBaseIncome: components["schemas"]["BaseIncomeSetting"] = {
+  amount: 280000,
 };
 
 export const handlers = [
@@ -114,4 +153,54 @@ export const handlers = [
   ),
 
   http.get(`${API_BASE}/notes/daily`, () => HttpResponse.json(defaultDailyNotes)),
+
+  http.get(`${API_BASE}/budget-summary`, () => HttpResponse.json(defaultBudgetSummary)),
+
+  http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(defaultRecurringExpenses)),
+
+  http.get(`${API_BASE}/recurring-expenses/pending`, () =>
+    HttpResponse.json(defaultPendingRecurring)
+  ),
+
+  http.post(`${API_BASE}/recurring-expenses`, () =>
+    HttpResponse.json(defaultRecurringExpenses.recurring_expenses[0] ?? {}, { status: 201 })
+  ),
+
+  http.put(`${API_BASE}/recurring-expenses/:id`, () =>
+    HttpResponse.json(defaultRecurringExpenses.recurring_expenses[0] ?? {})
+  ),
+
+  http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(defaultSavingsGoals)),
+
+  http.get(`${API_BASE}/income-records`, () => HttpResponse.json(defaultIncomeRecords)),
+
+  http.post(`${API_BASE}/income-records`, () =>
+    HttpResponse.json(defaultIncomeRecords.income_records[0] ?? {}, { status: 201 })
+  ),
+
+  http.put(`${API_BASE}/income-records/:id`, () =>
+    HttpResponse.json(defaultIncomeRecords.income_records[0] ?? {})
+  ),
+
+  http.delete(`${API_BASE}/income-records/:id`, () => new HttpResponse(null, { status: 204 })),
+
+  http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
+
+  http.put(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
+
+  http.get(`${API_BASE}/surplus-allocations`, () => HttpResponse.json(defaultSurplusAllocations)),
+
+  http.post(`${API_BASE}/surplus-allocations`, () =>
+    HttpResponse.json(
+      {
+        id: 1,
+        year_month: "2026-06",
+        amount: 10000,
+        destination: "budget",
+        savings_goal_id: null,
+        created_at: "2026-06-13T10:00:00+09:00",
+      },
+      { status: 201 }
+    )
+  ),
 ];

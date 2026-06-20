@@ -151,3 +151,15 @@ func (r *Repository) UpsertBaseIncome(ctx context.Context, user_id int64, amount
 	}
 	return result, nil
 }
+
+// GetIncomeTotal returns the total income for the given user and year_month (YYYY-MM).
+func (r *Repository) GetIncomeTotal(ctx context.Context, user_id int64, year_month string) (int32, error) {
+	total, err := r.queries.SumIncomeByMonth(ctx, db.SumIncomeByMonthParams{
+		UserID:  int32(user_id),
+		Column2: year_month,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("summing income by month: %w", err)
+	}
+	return total, nil
+}

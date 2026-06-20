@@ -69,13 +69,14 @@ export function WebBudget({ onNavigate }: Props) {
     );
   }
 
+  // Find actual spending for the current month from the history array.
+  // The history contains up to 3 months including the current month.
+  const current_month_history = summary.history.find((h) => h.year_month === ym);
+  const current_month_spent_yen = current_month_history?.actual ?? 0;
+
   const spent_pct =
     summary.variable_budget > 0
-      ? Math.round(
-          ((summary.variable_budget - Math.max(0, summary.variable_budget - 0)) /
-            summary.variable_budget) *
-            100
-        )
+      ? Math.round((current_month_spent_yen / summary.variable_budget) * 100)
       : 0;
 
   const tiles = [
@@ -83,9 +84,9 @@ export function WebBudget({ onNavigate }: Props) {
       screen: "income" as BudgetSubScreen,
       sign: "+",
       emoji: "💼",
-      title: "収入",
-      sub: `${counts.income}件 · 給与・副業・一時収入`,
-      amount: summary.income_total,
+      title: "基準収入",
+      sub: "毎月の見込み収入",
+      amount: summary.base_income,
       tone: { bg: "#DEF1E6", fg: "#4FA481", signBg: "rgba(79,164,129,0.14)" },
     },
     {
@@ -125,7 +126,7 @@ export function WebBudget({ onNavigate }: Props) {
             今月の予算プラン
           </div>
           <div style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>
-            収入 − 定期支出 − 貯金 で自動算出されます
+            基準収入 − 定期支出 − 貯金 で自動算出されます
           </div>
         </div>
         <div
@@ -235,7 +236,7 @@ export function WebBudget({ onNavigate }: Props) {
               fontFamily: "'DM Sans', sans-serif",
             }}
           >
-            <span>残り {yen(Math.max(0, summary.variable_budget))}</span>
+            <span>残り {yen(Math.max(0, summary.variable_budget - current_month_spent_yen))}</span>
             <span>予算 {yen(summary.variable_budget)}</span>
           </div>
         </div>
@@ -262,8 +263,8 @@ export function WebBudget({ onNavigate }: Props) {
             },
             { label: "消化ペース", value: `${spent_pct}%`, sub: "進行中" },
             {
-              label: "収入 − 固定",
-              value: `¥${yenSlim(summary.income_total - summary.recurring_total)}`,
+              label: "基準収入 − 固定",
+              value: `¥${yenSlim(summary.base_income - summary.recurring_total)}`,
               sub: "変動費 + 貯金の元",
             },
           ].map((s, i) => (
@@ -408,7 +409,9 @@ export function WebBudget({ onNavigate }: Props) {
           fontFamily: "'DM Sans', sans-serif",
         }}
       >
-        <span style={{ color: "#4FA481", fontWeight: 700 }}>収入 {yen(summary.income_total)}</span>
+        <span style={{ color: "#4FA481", fontWeight: 700 }}>
+          基準収入 {yen(summary.base_income)}
+        </span>
         <span style={{ color: T.inkSoft }}>−</span>
         <span style={{ color: "#3F6B91", fontWeight: 700 }}>
           定期支出 {yen(summary.recurring_total)}

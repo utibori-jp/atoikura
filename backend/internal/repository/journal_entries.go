@@ -28,24 +28,26 @@ type JournalEntryView struct {
 }
 
 type CreateJournalEntryParams struct {
-	TransactionDate time.Time
-	Item            *string
-	Amount          int32
-	CategoryID      int32
-	UserID          int32
-	IsExcluded      bool
-	Note            *string
+	TransactionDate    time.Time
+	Item               *string
+	Amount             int32
+	CategoryID         int32
+	UserID             int32
+	IsExcluded         bool
+	Note               *string
+	RecurringExpenseID *int32
 }
 
 func (r *Repository) CreateJournalEntry(ctx context.Context, params CreateJournalEntryParams) (*JournalEntryView, error) {
 	row, err := r.queries.CreateJournalEntry(ctx, db.CreateJournalEntryParams{
-		TransactionDate: pgtype.Date{Time: params.TransactionDate, Valid: true},
-		Item:            params.Item,
-		Amount:          params.Amount,
-		CategoryID:      params.CategoryID,
-		UserID:          params.UserID,
-		IsExcluded:      params.IsExcluded,
-		Note:            params.Note,
+		TransactionDate:    pgtype.Date{Time: params.TransactionDate, Valid: true},
+		Item:               params.Item,
+		Amount:             params.Amount,
+		CategoryID:         params.CategoryID,
+		UserID:             params.UserID,
+		IsExcluded:         params.IsExcluded,
+		Note:               params.Note,
+		RecurringExpenseID: params.RecurringExpenseID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating journal entry: %w", err)
@@ -64,17 +66,18 @@ func (r *Repository) CreateJournalEntry(ctx context.Context, params CreateJourna
 	}
 
 	return &JournalEntryView{
-		ID:              row.ID,
-		TransactionDate: row.TransactionDate.Time.Format("2006-01-02"),
-		Item:            row.Item,
-		Amount:          row.Amount,
-		CategoryID:      row.CategoryID,
-		CategoryName:    category_name,
-		GroupID:         group_id,
-		GroupName:       group_name,
-		IsExcluded:      row.IsExcluded,
-		Note:            row.Note,
-		CreatedAt:       row.CreatedAt,
+		ID:                 row.ID,
+		TransactionDate:    row.TransactionDate.Time.Format("2006-01-02"),
+		Item:               row.Item,
+		Amount:             row.Amount,
+		CategoryID:         row.CategoryID,
+		CategoryName:       category_name,
+		GroupID:            group_id,
+		GroupName:          group_name,
+		IsExcluded:         row.IsExcluded,
+		Note:               row.Note,
+		CreatedAt:          row.CreatedAt,
+		RecurringExpenseID: row.RecurringExpenseID,
 	}, nil
 }
 

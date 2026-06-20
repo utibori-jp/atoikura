@@ -323,41 +323,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/budgets": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * 予算・目標取得
-     * @description ログインユーザーの予算・目標設定を返す。
-     *     レコードが未作成の場合も200を返し、全フィールドをnullで返す。
-     *
-     *     **利用画面：**
-     *     - 目標設定画面：初期表示
-     */
-    get: operations["getBudgets"];
-    /**
-     * 予算・目標更新
-     * @description ログインユーザーの予算・目標設定を更新する。
-     *     レコードが未作成の場合はINSERT、作成済みの場合はUPDATEを行う（upsert）。
-     *     全フィールド任意。変更しないフィールドは現在値をそのまま送ること。
-     *     nullを送ると未設定状態に戻る。
-     *     `monthly_budget` に0以下の値を送った場合は400を返す。
-     *
-     *     **利用画面：**
-     *     - 目標設定画面：保存
-     */
-    put: operations["updateBudgets"];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/journal-entries": {
     parameters: {
       query?: never;
@@ -578,6 +543,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/recurring-expenses/{id}/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 確認待ち定期支出の金額を確定し仕訳を記録
+     * @description variable型の定期支出について、当月の金額を確定して journal_entries を recurring_expense_id 付きで作成する。これにより当該月の確認待ち状態が解消される。 type を変更せず、毎月の確認フローを維持する。
+     */
+    post: operations["confirmRecurringExpense"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/savings-goals": {
     parameters: {
       query?: never;
@@ -702,6 +687,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/surplus-allocations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 余剰振り分け一覧取得 */
+    get: operations["listSurplusAllocations"];
+    put?: never;
+    /**
+     * 余剰振り分け作成
+     * @description 余剰（当月収入 − 基準収入）のうち未振り分け分を budget または savings に振り分ける。
+     *     destination=savings の場合は savings_goal_id が必須で、対象貯金目標の accumulated_amount を加算する。
+     *     振り分け金額が残余剰を超える場合は 400 を返す。
+     *     取り消し・編集は V1 スコープ外（追記専用）。
+     */
+    post: operations["createSurplusAllocation"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -748,13 +757,13 @@ export interface components {
        */
       year_month: string;
       /**
-       * @description 月次変動費予算（円）
+       * @description 変動費予算 = 収入 − 定期支出 − 貯金（円）
        * @example 150000
        */
-      monthly_budget: number;
+      variable_budget: number;
       /**
        * @description 日割り予算（円）
-       *     monthly_budget ÷ 当月日数、小数切り捨て
+       *     variable_budget ÷ 当月日数、小数切り捨て
        * @example 4839
        */
       daily_budget: number;
@@ -1015,40 +1024,6 @@ export interface components {
       year_month: string;
       /** @description 生活区分単位の集計リスト */
       breakdown: components["schemas"]["MonthlyBreakdownItem"][];
-    };
-    BudgetResponse: {
-      /**
-       * @description 月次変動費予算（円）。未設定時はnull
-       * @example 150000
-       */
-      monthly_budget?: number | null;
-      /**
-       * @description 貯金目標テキスト。未設定時はnull
-       * @example 夏までに旅行費を貯める
-       */
-      goal_text?: string | null;
-      /**
-       * @description 目標金額（円）。未設定時はnull
-       * @example 300000
-       */
-      goal_amount?: number | null;
-    };
-    BudgetRequest: {
-      /**
-       * @description 月次変動費予算（円）。nullで未設定に戻る。1以上の整数のみ許容
-       * @example 120000
-       */
-      monthly_budget?: number | null;
-      /**
-       * @description 貯金目標テキスト。nullで未設定に戻る
-       * @example 夏までに旅行費を貯める
-       */
-      goal_text?: string | null;
-      /**
-       * @description 目標金額（円）。nullで未設定に戻る
-       * @example 300000
-       */
-      goal_amount?: number | null;
     };
     MonthlyReviewNote: {
       /**
@@ -1384,10 +1359,15 @@ export interface components {
     };
     BudgetSummaryResponse: {
       /**
-       * @description 今月の収入合計（円）
+       * @description 今月の実績収入合計（円）。表示用。予算計算には使わない
        * @example 323200
        */
       income_total: number;
+      /**
+       * @description 基準収入（円）。変動費予算の算出基準。フロントの内訳表示はこの値を使う
+       * @example 400000
+       */
+      base_income: number;
       /**
        * @description 定期支出合計（円）
        * @example 96000
@@ -1399,7 +1379,7 @@ export interface components {
        */
       savings_total: number;
       /**
-       * @description 変動費予算 = 収入 − 定期支出 − 貯金（円）
+       * @description 変動費予算 = 基準収入 − 定期支出 − 貯金 − 余剰振り分け（savings行きのみ）（円）
        * @example 182200
        */
       variable_budget: number;
@@ -1414,6 +1394,56 @@ export interface components {
        */
       days_remaining: number;
       history: components["schemas"]["BudgetHistoryItem"][];
+    };
+    SurplusAllocation: {
+      /** @example 1 */
+      id: number;
+      /** @example 2026-06 */
+      year_month: string;
+      /**
+       * @description 振り分け金額（円）
+       * @example 20000
+       */
+      amount: number;
+      /**
+       * @description budget = 今月の変動費予算に追加（記録のみ）
+       *     savings = 貯金目標に振り分け（accumulated_amountを加算）
+       * @example savings
+       * @enum {string}
+       */
+      destination: "budget" | "savings";
+      /**
+       * @description 貯金先の savings_goals.id。destination=budget の場合は null
+       * @example 3
+       */
+      savings_goal_id: number | null;
+      /**
+       * Format: date-time
+       * @example 2026-06-13T10:00:00+09:00
+       */
+      created_at: string;
+    };
+    SurplusAllocationRequest: {
+      /** @example 2026-06 */
+      year_month: string;
+      /**
+       * @description 振り分け金額（円）
+       * @example 20000
+       */
+      amount: number;
+      /**
+       * @example savings
+       * @enum {string}
+       */
+      destination: "budget" | "savings";
+      /**
+       * @description destination=savings の場合は必須。destination=budget の場合は指定不可
+       * @example 3
+       */
+      savings_goal_id?: number;
+    };
+    SurplusAllocationListResponse: {
+      surplus_allocations: components["schemas"]["SurplusAllocation"][];
     };
   };
   responses: {
@@ -2331,90 +2361,6 @@ export interface operations {
       500: components["responses"]["InternalServerError"];
     };
   };
-  getBudgets: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description 取得成功 */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          /**
-           * @example {
-           *       "monthly_budget": 150000,
-           *       "goal_text": "夏までに旅行費を貯める",
-           *       "goal_amount": 300000
-           *     }
-           */
-          "application/json": components["schemas"]["BudgetResponse"];
-        };
-      };
-      401: components["responses"]["Unauthorized"];
-      500: components["responses"]["InternalServerError"];
-    };
-  };
-  updateBudgets: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        /**
-         * @example {
-         *       "monthly_budget": 120000,
-         *       "goal_text": "夏までに旅行費を貯める",
-         *       "goal_amount": 300000
-         *     }
-         */
-        "application/json": components["schemas"]["BudgetRequest"];
-      };
-    };
-    responses: {
-      /** @description 更新成功 */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          /**
-           * @example {
-           *       "monthly_budget": 120000,
-           *       "goal_text": "夏までに旅行費を貯める",
-           *       "goal_amount": 300000
-           *     }
-           */
-          "application/json": components["schemas"]["BudgetResponse"];
-        };
-      };
-      /** @description リクエスト不正（monthly_budgetが0以下など） */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          /**
-           * @example {
-           *       "code": "BAD_REQUEST",
-           *       "message": "monthly_budgetは1以上の整数である必要があります"
-           *     }
-           */
-          "application/json": components["schemas"]["ErrorResponse"];
-        };
-      };
-      401: components["responses"]["Unauthorized"];
-      500: components["responses"]["InternalServerError"];
-    };
-  };
   getJournalEntries: {
     parameters: {
       query: {
@@ -3135,6 +3081,66 @@ export interface operations {
       500: components["responses"]["InternalServerError"];
     };
   };
+  confirmRecurringExpense: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @description 確定する金額（円） */
+          amount: number;
+          /** @description 対象年月（YYYY-MM）。仕訳の日付は billing_day をこの月に当てはめて決定する */
+          year_month: string;
+        };
+      };
+    };
+    responses: {
+      /** @description 仕訳作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["JournalEntryResponse"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 当月分は既に確定済み */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      500: components["responses"]["InternalServerError"];
+    };
+  };
   listSavingsGoals: {
     parameters: {
       query?: {
@@ -3556,6 +3562,84 @@ export interface operations {
         };
       };
       401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  listSurplusAllocations: {
+    parameters: {
+      query: {
+        /** @example 2026-06 */
+        year_month: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 取得成功 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SurplusAllocationListResponse"];
+        };
+      };
+      /** @description 入力値不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      500: components["responses"]["InternalServerError"];
+    };
+  };
+  createSurplusAllocation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SurplusAllocationRequest"];
+      };
+    };
+    responses: {
+      /** @description 作成成功 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SurplusAllocation"];
+        };
+      };
+      /** @description 入力値不正または振り分け金額が余剰を超過 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      /** @description 指定の savings_goal_id が存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
       500: components["responses"]["InternalServerError"];
     };
   };

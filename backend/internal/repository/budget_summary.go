@@ -16,6 +16,7 @@ type BudgetHistoryItem struct {
 
 type BudgetSummaryResult struct {
 	IncomeTotal    int32
+	BaseIncome     int32
 	RecurringTotal int32
 	SavingsTotal   int32
 	VariableBudget int32
@@ -34,6 +35,11 @@ func (r *Repository) GetBudgetSummary(ctx context.Context, user_id int64, year_m
 		return nil, fmt.Errorf("summing income by month: %w", err)
 	}
 
+	base_income, err := r.GetBaseIncome(ctx, user_id)
+	if err != nil {
+		return nil, fmt.Errorf("getting base income for budget summary: %w", err)
+	}
+
 	recurring_total, err := r.queries.SumRecurringFixed(ctx, int32(user_id))
 	if err != nil {
 		return nil, fmt.Errorf("summing recurring fixed: %w", err)
@@ -44,7 +50,15 @@ func (r *Repository) GetBudgetSummary(ctx context.Context, user_id int64, year_m
 		return nil, fmt.Errorf("summing savings monthly: %w", err)
 	}
 
-	variable_budget := income_total - recurring_total - savings_total
+	savings_allocated, err := r.queries.SumSavingsAllocatedByMonth(ctx, db.SumSavingsAllocatedByMonthParams{
+		UserID:  int32(user_id),
+		Column2: year_month,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("summing savings-destined surplus allocations: %w", err)
+	}
+
+	variable_budget := base_income - recurring_total - savings_total - savings_allocated
 
 	// Compute days remaining in the target month
 	parsed_month, err := time.Parse("2006-01", year_month)
@@ -79,19 +93,12 @@ func (r *Repository) GetBudgetSummary(ctx context.Context, user_id int64, year_m
 		daily_budget = variable_budget / int32(total_days)
 	}
 
-	// Build 3-month history: current month + 2 previous months
+	// Build 3-month history: current month + 2 previous months.
+	// History budget uses base_income (stable, not actual recorded income) so months are comparable.
 	history := make([]BudgetHistoryItem, 3)
 	for i := 2; i >= 0; i-- {
 		month_time := parsed_month.AddDate(0, -(2 - i), 0)
 		ym := month_time.Format("2006-01")
-
-		h_income, err := r.queries.SumIncomeByMonth(ctx, db.SumIncomeByMonthParams{
-			UserID:  int32(user_id),
-			Column2: ym,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("summing income for history month %s: %w", ym, err)
-		}
 
 		h_actual, err := r.queries.SumActualSpendByMonth(ctx, db.SumActualSpendByMonthParams{
 			UserID:  int32(user_id),
@@ -101,7 +108,15 @@ func (r *Repository) GetBudgetSummary(ctx context.Context, user_id int64, year_m
 			return nil, fmt.Errorf("summing actual spend for history month %s: %w", ym, err)
 		}
 
-		h_budget := h_income - recurring_total - savings_total
+		h_savings_allocated, err := r.queries.SumSavingsAllocatedByMonth(ctx, db.SumSavingsAllocatedByMonthParams{
+			UserID:  int32(user_id),
+			Column2: ym,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("summing savings allocations for history month %s: %w", ym, err)
+		}
+
+		h_budget := base_income - recurring_total - savings_total - h_savings_allocated
 		history[i] = BudgetHistoryItem{
 			YearMonth: ym,
 			Budget:    h_budget,
@@ -111,6 +126,7 @@ func (r *Repository) GetBudgetSummary(ctx context.Context, user_id int64, year_m
 
 	return &BudgetSummaryResult{
 		IncomeTotal:    income_total,
+		BaseIncome:     base_income,
 		RecurringTotal: recurring_total,
 		SavingsTotal:   savings_total,
 		VariableBudget: variable_budget,

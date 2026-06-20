@@ -3,6 +3,9 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
+import { DateField } from "../DateField";
+import { chartMaxY } from "../chartScale";
+import { smoothPath } from "../chartPath";
 
 type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
 type CategoryGroup = components["schemas"]["CategoryGroup"];
@@ -33,24 +36,6 @@ function formatDateJP(dateStr: string): string {
   const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
   const date = new Date(dateStr);
   return `${m}月${d}日（${weekdays[date.getDay()]}）`;
-}
-
-function smoothPath(points: [number, number][]): string {
-  if (points.length === 0) return "";
-  if (points.length === 1) return `M ${points[0][0]} ${points[0][1]}`;
-  let d = `M ${points[0][0]} ${points[0][1]}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i - 1] ?? points[i];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2] ?? p2;
-    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
-    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
-    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
-    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
-    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`;
-  }
-  return d;
 }
 
 interface DonutProps {
@@ -159,18 +144,21 @@ function AreaChart({
     padB = 40;
   const w = width - padL - padR;
   const h = height - padT - padB;
-  const maxY = Math.max(monthly_budget * 1.05, 1);
+  const actual_days = days.filter((d) => d.is_actual);
+  const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
+  const projected_end = daily_pace * days_in_month;
+  // Scale the y-axis to fit both the budget and the largest plotted total so the
+  // cumulative line never renders off-canvas (#106), including when no budget is
+  // set yet or when spending exceeds the budget.
+  const maxY = chartMaxY(monthly_budget, [...actual_days.map((d) => d.total), projected_end]);
 
   const xAt = (d: number) => padL + ((d - 1) / Math.max(days_in_month - 1, 1)) * w;
   const yAt = (v: number) => padT + h - (v / maxY) * h;
-
-  const actual_days = days.filter((d) => d.is_actual);
 
   const total_pts: [number, number][] = actual_days.map((d, i) => [xAt(i + 1), yAt(d.total)]);
   const food_pts: [number, number][] = actual_days.map((d, i) => [xAt(i + 1), yAt(d.food ?? 0)]);
   const other_pts: [number, number][] = actual_days.map((d, i) => [xAt(i + 1), yAt(d.other ?? 0)]);
 
-  const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
   const fc_pts: [number, number][] = [];
   for (let d = today_day; d <= days_in_month; d++) {
     fc_pts.push([xAt(d), yAt(Math.min(maxY, d === today_day ? spent_so_far : daily_pace * d))]);
@@ -460,7 +448,8 @@ function EntryForm({ onSuccess }: EntryFormProps) {
         setAmountStr("");
         setItem("");
         setIsExcluded(false);
-        setTransactionDate(todayJST());
+        // Keep the entered transaction_date (#118) so consecutive entries on the
+        // same past date don't require re-selecting it each time.
         onSuccess();
       } catch (err) {
         setErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
@@ -533,10 +522,10 @@ function EntryForm({ onSuccess }: EntryFormProps) {
       <div style={{ display: "flex", gap: 14, marginBottom: 16 }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 6, flex: 0.7 }}>
           <span style={{ fontSize: 12, color: T.inkSoft, fontWeight: 500 }}>日付</span>
-          <input
-            type="date"
+          <DateField
             value={transaction_date}
-            onChange={(e) => setTransactionDate(e.target.value)}
+            onChange={setTransactionDate}
+            ariaLabel="日付"
             style={{ ...input_base }}
           />
         </label>
@@ -788,7 +777,7 @@ export function WebHome({ refresh_token, onSuccess }: Props) {
     };
   }, [ym, refresh_token]);
 
-  const monthly_budget = cumulative?.monthly_budget ?? 0;
+  const monthly_budget = cumulative?.variable_budget ?? 0;
   const last_actual = cumulative?.days
     ? [...cumulative.days].reverse().find((d) => d.is_actual)
     : null;

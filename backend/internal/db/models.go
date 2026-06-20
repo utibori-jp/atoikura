@@ -163,6 +163,16 @@ type StatementType struct {
 	UpdatedAt         time.Time `json:"updated_at"`
 }
 
+type SurplusAllocation struct {
+	ID            int32     `json:"id"`
+	UserID        int32     `json:"user_id"`
+	YearMonth     string    `json:"year_month"`
+	Amount        int32     `json:"amount"`
+	Destination   string    `json:"destination"`
+	SavingsGoalID *int32    `json:"savings_goal_id"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
 type User struct {
 	ID           int32      `json:"id"`
 	Email        string     `json:"email"`

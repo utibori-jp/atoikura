@@ -45,6 +45,81 @@ Read additional documents based on the work area:
 - Do NOT manually run `uv tool install headroom-ai` or `headroom mcp install` — postStartCommand handles it.
 - If `headroom --help` fails after the container is fully started, ask the user to stop and restart the container to trigger postStartCommand again.
 
+### Docker (devcontainer)
+
+Configured in issue #90 via the `docker-outside-of-docker` devcontainer feature and `COMPOSE_PROJECT_NAME`. These take effect only after a devcontainer **REBUILD**. After rebuilding, verify with `docker ps`, `docker compose ps`, and `docker logs <backend-container>`.
+
+- **NEVER run a bare `docker compose down` or `docker compose stop`** (no service arguments) from inside the devcontainer. The devcontainer itself is the `dev` service of the same compose project — a bare down/stop kills the running container and the Claude Code session.
+- Manage app services explicitly by naming them:
+  ```bash
+  docker compose up -d backend frontend
+  docker compose stop backend frontend
+  ```
+- The following read-only commands are safe inside the container:
+  ```bash
+  docker ps
+  docker logs <container-name>
+  docker compose ps
+  ```
+- `COMPOSE_PROJECT_NAME=atoikura` is set in `containerEnv` so in-container compose commands target the existing project (the one VS Code started), preventing a duplicate `db` container from being created.
+
+### Container logs (devcontainer)
+
+Requires the #90 docker access to be active (devcontainer rebuild must have taken effect).
+
+There are two distinct log sources in this project:
+
+- **Dev-loop logs** (normal development): `make run` (Go backend) and `npm run dev` (Vite frontend) run natively in the devcontainer. Their output appears directly in the terminal where those commands are running — no Docker needed.
+- **Production-style compose-service logs**: the `backend` and `frontend` containers launched via `docker compose up` write logs that are only reachable via `docker compose logs` / `docker logs`.
+
+Use compose logs only when the production-style `backend`/`frontend` containers are running. For the normal dev loop, just read the terminal where `make run` / `npm run dev` is running.
+
+**Stream logs for both services (root Makefile target):**
+
+```bash
+make logs
+# wraps: docker compose logs -f --tail=100 backend frontend
+```
+
+**Filter to a single service:**
+
+```bash
+make logs SERVICES=backend
+# or directly:
+docker compose logs -f --tail=100 backend
+```
+
+### E2E tests (Playwright)
+
+Run the full happy-path E2E suite with a single command:
+
+```bash
+cd frontend && npm run test:e2e
+```
+
+The `webServer` config in `playwright.config.ts` automatically boots the Go backend (`make -C ../backend run` on `:8080`) and the Vite dev server (`npm run dev` on `:3000`) before running tests, and shuts them down after. No manual startup is needed.
+
+**Prerequisites before first run:**
+- The backend DB must be migrated so the signup endpoint works:
+  ```bash
+  make -C backend migrate-up
+  ```
+- The devcontainer image must be **rebuilt** after this change was introduced — Chromium is baked into the image at build time and is not installed at container-start time.
+
+**Headless-only:** Tests run headless inside the container (no display server). Do not attempt headed mode.
+
+**Reports and traces:**
+- `frontend/playwright-report/` — HTML report (open `index.html` in a browser). Generated after every run.
+- `frontend/test-results/` — Raw test results, including traces on first retry.
+- `frontend/blob-report/` — Intermediate blob artifacts (merge scenarios).
+
+Traces are recorded on the first retry of a failing test. To inspect a trace, open the HTML report and click the failing test, or use `npx playwright show-trace <path-to-trace.zip>`.
+
+**Interpreting failures:**
+1. Read the list reporter output in the terminal for a quick summary of what failed.
+2. Open `frontend/playwright-report/index.html` for the full HTML report with screenshots and step-by-step detail.
+3. If a trace was recorded, open it to replay the exact browser state at the point of failure.
+
 ---
 
 ## Conventions

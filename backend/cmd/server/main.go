@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/utibori-jp/atoikura/backend/internal/handler"
-	"github.com/utibori-jp/atoikura/backend/internal/job"
 	"github.com/utibori-jp/atoikura/backend/internal/repository"
 )
 
@@ -60,9 +59,9 @@ func run(parent_ctx context.Context) error {
 
 	repo := repository.New(db_pool)
 
-	poster := job.NewRecurringPoster(db_pool)
-	poster.Start()
-	defer poster.Stop()
+	// Recurring expenses and monthly savings are auto-posted lazily on the first
+	// dashboard read of each month (see Repository.EnsureMonthlyAutoPosting wired into
+	// GET /budget-summary). No scheduler or background job is required.
 
 	mux := http.NewServeMux()
 	registerRoutes(mux, repo, jwt_secret)
@@ -123,8 +122,6 @@ func registerRoutes(mux *http.ServeMux, repo *repository.Repository, jwt_secret 
 	mux.Handle("GET /journal-entries", handler.ListJournalEntriesHandler(repo))
 	mux.Handle("PUT /journal-entries/{id}", handler.UpdateJournalEntryHandler(repo))
 	mux.Handle("DELETE /journal-entries/{id}", handler.DeleteJournalEntryHandler(repo))
-	mux.Handle("GET /budgets", handler.GetBudgetsHandler(repo))
-	mux.Handle("PUT /budgets", handler.UpdateBudgetsHandler(repo))
 	mux.Handle("GET /expenses/daily-cumulative", handler.GetDailyCumulativeHandler(repo))
 	mux.Handle("GET /expenses/monthly-breakdown", handler.GetMonthlyBreakdownHandler(repo))
 	mux.Handle("GET /notes/monthly-reviews", handler.GetMonthlyReviewsHandler(repo))
@@ -136,6 +133,7 @@ func registerRoutes(mux *http.ServeMux, repo *repository.Repository, jwt_secret 
 	mux.Handle("GET /recurring-expenses/pending", handler.ListPendingRecurringHandler(repo))
 	mux.Handle("PUT /recurring-expenses/{id}", handler.UpdateRecurringExpenseHandler(repo))
 	mux.Handle("DELETE /recurring-expenses/{id}", handler.DeleteRecurringExpenseHandler(repo))
+	mux.Handle("POST /recurring-expenses/{id}/confirm", handler.ConfirmRecurringExpenseHandler(repo))
 	mux.Handle("GET /savings-goals", handler.ListSavingsGoalsHandler(repo))
 	mux.Handle("POST /savings-goals", handler.CreateSavingsGoalHandler(repo))
 	mux.Handle("PUT /savings-goals/{id}", handler.UpdateSavingsGoalHandler(repo))
@@ -148,4 +146,6 @@ func registerRoutes(mux *http.ServeMux, repo *repository.Repository, jwt_secret 
 	mux.Handle("GET /base-income", handler.GetBaseIncomeHandler(repo))
 	mux.Handle("PUT /base-income", handler.UpdateBaseIncomeHandler(repo))
 	mux.Handle("GET /budget-summary", handler.GetBudgetSummaryHandler(repo))
+	mux.Handle("GET /surplus-allocations", handler.ListSurplusAllocationsHandler(repo))
+	mux.Handle("POST /surplus-allocations", handler.CreateSurplusAllocationHandler(repo))
 }

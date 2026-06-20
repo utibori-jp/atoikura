@@ -22,6 +22,21 @@ export const token_store = {
   },
 };
 
+// Deletes all service-worker runtime caches. Per-user master data (category
+// groups, expense categories, statement types) is cached by the PWA, so on
+// logout we must purge it — otherwise the next account would see the previous
+// user's cached categories and fail backend validation on save (#114).
+export async function clearRuntimeCaches(): Promise<void> {
+  if (typeof caches === "undefined") return;
+  try {
+    const cache_keys = await caches.keys();
+    await Promise.all(cache_keys.map((key) => caches.delete(key)));
+  } catch {
+    // Cache eviction is best-effort; NetworkFirst revalidation already keeps
+    // per-user data fresh while online, so a failure here is non-fatal.
+  }
+}
+
 async function request<TResponse>(path: string, init?: RequestInit): Promise<TResponse> {
   const stored_token = token_store.load();
 
@@ -79,12 +94,6 @@ export const api = {
     request<components["schemas"]["JournalEntryListResponse"]>(
       `/journal-entries?year_month=${year_month}`
     ),
-  getBudgets: () => request<components["schemas"]["BudgetResponse"]>("/budgets"),
-  updateBudgets: (body: components["schemas"]["BudgetRequest"]) =>
-    request<components["schemas"]["BudgetResponse"]>("/budgets", {
-      method: "PUT",
-      body: JSON.stringify(body),
-    }),
   getDailyCumulative: (year_month?: string) => {
     const qs = year_month ? `?year_month=${year_month}` : "";
     return request<components["schemas"]["DailyCumulativeResponse"]>(
@@ -165,6 +174,11 @@ export const api = {
     request<components["schemas"]["PendingRecurringListResponse"]>(
       `/recurring-expenses/pending?year_month=${year_month}`
     ),
+  confirmRecurringExpense: (id: number, amount: number, year_month: string) =>
+    request<components["schemas"]["JournalEntryResponse"]>(`/recurring-expenses/${id}/confirm`, {
+      method: "POST",
+      body: JSON.stringify({ amount, year_month }),
+    }),
   listSavingsGoals: () =>
     request<components["schemas"]["SavingsGoalListResponse"]>("/savings-goals"),
   createSavingsGoal: (body: components["schemas"]["SavingsGoalRequest"]) =>
@@ -208,4 +222,13 @@ export const api = {
     request<components["schemas"]["BudgetSummaryResponse"]>(
       `/budget-summary?year_month=${year_month}`
     ),
+  listSurplusAllocations: (year_month: string) =>
+    request<components["schemas"]["SurplusAllocationListResponse"]>(
+      `/surplus-allocations?year_month=${year_month}`
+    ),
+  createSurplusAllocation: (body: components["schemas"]["SurplusAllocationRequest"]) =>
+    request<components["schemas"]["SurplusAllocation"]>("/surplus-allocations", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
