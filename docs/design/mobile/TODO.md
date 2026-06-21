@@ -125,7 +125,7 @@ export const mobileApi = {
 
 **File:** `frontend/src/components/mobile/MobileRecurring.tsx`
 
-**Design source:** `docs/atoikura-mobile-v2/src/mobile-recurring.jsx`
+**Design source:** `docs/design/mobile/src/mobile-recurring.jsx`
 → `MRecurringScreen` + `MRecurringSheetScreen`
 
 **Exports:**
@@ -155,7 +155,7 @@ interface MobileRecurringProps {
 
 **File:** `frontend/src/components/mobile/MobileSavings.tsx`
 
-**Design source:** `docs/atoikura-mobile-v2/src/mobile-savings.jsx`
+**Design source:** `docs/design/mobile/src/mobile-savings.jsx`
 → `MSavingsScreen` + `MSavingsSheetScreen`
 
 **Exports:**
@@ -188,7 +188,7 @@ interface MobileSavingsProps {
 
 **File:** `frontend/src/components/mobile/MobileIncome.tsx`
 
-**Design source:** `docs/atoikura-mobile-v2/src/mobile-income.jsx`
+**Design source:** `docs/design/mobile/src/mobile-income.jsx`
 → `MIncomeScreen` + 3 sheets
 
 **Exports:**
@@ -227,7 +227,7 @@ interface MobileIncomeProps {
 
 **File:** `frontend/src/components/mobile/MobileBudget.tsx`
 
-**Design source:** `docs/atoikura-mobile-v2/src/mobile-goals-v2.jsx`
+**Design source:** `docs/design/mobile/src/mobile-goals-v2.jsx`
 → `MBudgetScreen`
 
 **Exports:**

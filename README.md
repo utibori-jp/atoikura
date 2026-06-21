@@ -62,4 +62,6 @@ docker compose down
 - `docs/architecture.md` — tech stack and repository layout
 - `docs/atoikura.dbml` — database schema
 - `docs/atoikura-api.yaml` — OpenAPI spec
-- `docs/prompts/README.md` — implementation roadmap for Claude Code
+- `docs/conventions/` — backend & frontend coding conventions
+- `docs/design/` — high-fidelity UI design references (mobile & web)
+- `docs/deploy-migrations.md` — production migration runbook

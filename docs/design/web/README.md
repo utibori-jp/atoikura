@@ -1,5 +1,9 @@
 # Handoff: Atoikura Web Frontend
 
+> **Status: implemented.** This is the current design reference for the desktop
+> web UI (`frontend/src/components/web/`). See `../README.md` for how the design
+> folder is organized.
+
 ## Overview
 
 Atoikura is a personal expense-tracking app whose core value proposition is:  
@@ -333,7 +337,7 @@ Day cards (white, 24px radius): date square (50×50, 16px radius) + day total in
 
 ## API Endpoints Used
 
-See `uploads/spec.md` for full OpenAPI details. Key endpoints for the web screens:
+See `docs/spec.md` for full OpenAPI details. Key endpoints for the web screens:
 
 | Screen | Endpoints |
 |---|---|
@@ -381,7 +385,9 @@ const { data: dailyNotes }       = useQuery(GET_DAILY_NOTES, { month })
 | `src/dirA-budget.jsx` | `ABudgetScreen`, `ARecurringScreen`, `ASavingsScreen`, `AIncomeScreen` + budget data |
 | `src/dirA-others.jsx` | `AReviewScreen`, `AJournalScreen`, `AMasterScreen` |
 | `src/web-app.jsx` | Navigation shell (prototype-only, not for production) |
-| `uploads/spec.md` | Full product spec: DB schema, API list, business logic |
+
+Full product spec (DB schema, API list, business logic) lives in the canonical
+`docs/spec.md` — not duplicated here.
 
 ---
 
