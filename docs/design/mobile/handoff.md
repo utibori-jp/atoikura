@@ -34,7 +34,7 @@ master → MasterManagement（デスクトップ流用）
 ### 1. 新規画面を追加する（Issues #25 / #27 / #28）
 
 以下の 6 コンポーネントを `frontend/src/components/mobile/` に新規作成する。  
-**UIの仕様は `docs/atoikura-mobile-v2/src/` の JSX デザインファイルがピクセル単位のソースオブトゥルースです。**  
+**UIの仕様は `docs/design/mobile/src/` の JSX デザインファイルがピクセル単位のソースオブトゥルースです。**  
 レイアウト・色・余白・テキストはデザインファイルの値を忠実に再現してください。
 
 | 作成ファイル | デザインソース | 概要 |
@@ -79,10 +79,10 @@ master → MasterManagement（デスクトップ流用）
 
 ## デザインソースの読み方
 
-デザインファイルは `docs/atoikura-mobile-v2/src/` にある React JSX（Claude Design 出力）です。
+デザインファイルは `docs/design/mobile/src/` にある React JSX（Claude Design 出力）です。
 
 ```
-docs/atoikura-mobile-v2/src/
+docs/design/mobile/src/
   shared.jsx          — トークン定義、サンプルデータ、ユーティリティ関数
   mobile-home.jsx     — ホーム画面（v1 実装済み）
   mobile-others.jsx   — 振り返り・仕訳・マスタ（v1 実装済み）

@@ -1,4 +1,8 @@
-# Handoff: Atoikura — Mobile PWA (v2)
+# Handoff: Atoikura — Mobile PWA
+
+> **Status: implemented.** This is the current design reference for the mobile
+> PWA UI (`frontend/src/components/mobile/`). See `../README.md` for how the
+> design folder is organized.
 
 ## Overview
 **Atoikura（あといくら）** is a personal budget-tracking PWA. Its core promise: *"今月あといくら使えるか"* — how much variable-cost budget remains this month — is always visible. That figure = `variable_monthly_budget − cumulative_variable_spend`. Fixed costs, savings, and excluded entries do not reduce it.

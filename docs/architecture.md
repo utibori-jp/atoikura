@@ -55,12 +55,13 @@ atoikura/
 ├── deploy/
 │   └── k8s/                 # K3s manifests (empty until deploy phase)
 ├── docs/
-│   ├── spec.md
-│   ├── atoikura.dbml
-│   ├── atoikura-api.yaml
-│   ├── architecture.md
-│   ├── conventions/
-│   └── prompts/
+│   ├── spec.md                # product spec (source of truth)
+│   ├── atoikura.dbml          # DB schema
+│   ├── atoikura-api.yaml      # OpenAPI contracts
+│   ├── architecture.md        # this file
+│   ├── deploy-migrations.md   # production migration runbook
+│   ├── conventions/           # backend & frontend coding conventions
+│   └── design/                # high-fidelity UI design references (mobile & web)
 ├── docker-compose.yml
 ├── .gitignore
 ├── CLAUDE.md

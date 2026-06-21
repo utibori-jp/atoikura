@@ -12,12 +12,12 @@ Common to all tasks:
 - `docs/atoikura.dbml` — DB schema definitions
 - `docs/atoikura-api.yaml` — OpenAPI contracts
 - `docs/architecture.md` — Tech stack and directory structure
-- `docs/prompts/<current-step>.md` — Task definitions for the current step
 
 Read additional documents based on the work area:
 
-- For Backend work → `docs/conventions-backend.md`
-- For Frontend work → `docs/conventions-frontend.md`
+- For Backend work → `docs/conventions/conventions-backend.md`
+- For Frontend work → `docs/conventions/conventions-frontend.md`
+- For UI work → `docs/design/` — high-fidelity design references for the mobile and web screens (already implemented in `frontend/`)
 
 ---
 
