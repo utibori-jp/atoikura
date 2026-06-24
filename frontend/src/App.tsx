@@ -663,7 +663,13 @@ export default function App() {
       ) : (
         <NavBar
           active={active_tab}
-          onChange={setActiveTab}
+          onChange={(tab) => {
+            // Tapping a nav button always lands on a tab's top-level view, so
+            // reset the budget sub-screen to the hub (#134) — otherwise the
+            // header "予算" button leaves you stranded on income/recurring.
+            setBudgetSub("hub");
+            setActiveTab(tab);
+          }}
           listYearMonth={list_year_month}
           onListMonthChange={setListYearMonth}
           user={auth_state.user}
@@ -806,7 +812,9 @@ export default function App() {
         <MobileTabBar
           active={active_tab}
           onChange={(tab) => {
-            if (tab !== "budget") setBudgetSub("hub");
+            // Always return to the budget hub on a tab tap, including when the
+            // tapped tab is "予算" itself (#134).
+            setBudgetSub("hub");
             setActiveTab(tab);
           }}
           onPlusClick={() => {

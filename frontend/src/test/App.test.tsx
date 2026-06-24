@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import App from "../App";
 
 // recharts ResponsiveContainer uses ResizeObserver, which jsdom doesn't provide
@@ -133,5 +133,30 @@ describe("App — desktop layout (≥ 1024 px)", () => {
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
     expect(screen.getByRole("button", { name: /マスタ/ })).toBeInTheDocument();
+  });
+
+  it("returns to the budget hub when the header 予算 button is clicked from a sub-screen (#134)", async () => {
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+
+    const nav = document.querySelector("nav") as HTMLElement;
+
+    // Open the budget tab → land on the hub.
+    fireEvent.click(within(nav).getByRole("button", { name: /予算/ }));
+    await waitFor(() => expect(screen.getByText("今月の予算プラン")).toBeInTheDocument());
+
+    // Drill into the 収入 (income) sub-screen via the hub tile.
+    fireEvent.click(screen.getByText("毎月の見込み収入"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /収入を記録/ })).toBeInTheDocument()
+    );
+    expect(screen.queryByText("今月の予算プラン")).not.toBeInTheDocument();
+
+    // Clicking the header 予算 button must bring the hub back, not leave us
+    // stranded on the income sub-screen.
+    fireEvent.click(within(nav).getByRole("button", { name: /予算/ }));
+    await waitFor(() => expect(screen.getByText("今月の予算プラン")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /収入を記録/ })).not.toBeInTheDocument();
   });
 });
