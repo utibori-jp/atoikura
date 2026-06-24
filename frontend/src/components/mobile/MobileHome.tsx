@@ -3,7 +3,7 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "./groupEmoji";
-import { chartMaxY } from "../chartScale";
+import { chartMaxY, niceTicks } from "../chartScale";
 import { smoothPath } from "../chartPath";
 
 type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
@@ -137,7 +137,7 @@ function MMiniChart(props: MMiniChartProps) {
     ? `${total_path} L ${past_pts[past_pts.length - 1][0]} ${yAt(0)} L ${past_pts[0][0]} ${yAt(0)} Z`
     : "";
   const fc_path = smoothPath(fc_pts);
-  const yTicks = [0, Math.round(monthly_budget / 2), monthly_budget];
+  const yTicks = niceTicks(maxY);
   void forecast_end;
   return (
     <svg width={width} height={height} style={{ display: "block" }}>

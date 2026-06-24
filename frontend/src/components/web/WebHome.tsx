@@ -4,7 +4,7 @@ import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
 import { DateField } from "../DateField";
-import { chartMaxY } from "../chartScale";
+import { chartMaxY, niceTicks } from "../chartScale";
 import { smoothPath } from "../chartPath";
 
 type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
@@ -172,7 +172,7 @@ function AreaChart({
   const other_path = smoothPath(other_pts);
   const fc_path = smoothPath(fc_pts);
 
-  const y_ticks = [0, 20000, 40000, 60000, 80000].filter((t) => t <= maxY * 1.05);
+  const y_ticks = niceTicks(maxY);
   const x_ticks = [1, 5, 10, 15, 20, 25, days_in_month];
 
   const today_x = xAt(today_day);
