@@ -4,6 +4,14 @@ import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
 import { DateField } from "../DateField";
+import {
+  useEntityForm,
+  FormField,
+  AmountField,
+  SelectField,
+  FormError,
+  inputStyle,
+} from "../forms";
 
 type IncomeRecord = components["schemas"]["IncomeRecord"];
 type BaseIncomeSetting = components["schemas"]["BaseIncomeSetting"];
@@ -112,18 +120,6 @@ export function WebIncome({ onBack }: Props) {
   const [base_income, setBaseIncome] = useState<BaseIncomeSetting | null>(null);
   const [savings_goals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [surplus_allocations, setSurplusAllocations] = useState<SurplusAllocation[]>([]);
-  const [editing_base, setEditingBase] = useState(false);
-  const [base_draft, setBaseDraft] = useState("");
-
-  // income_form=null means the form is hidden
-  const [income_form, setIncomeForm] = useState<IncomeRecordFormState | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [form_error_msg, setFormErrorMsg] = useState("");
-
-  // alloc_form=null means allocation form is hidden
-  const [alloc_form, setAllocForm] = useState<AllocFormState | null>(null);
-  const [alloc_submitting, setAllocSubmitting] = useState(false);
-  const [alloc_error_msg, setAllocErrorMsg] = useState("");
 
   const available_months = [
     addMonths(current_ym, -2),
@@ -176,127 +172,81 @@ export function WebIncome({ onBack }: Props) {
 
   const days_with_income = [...new Set(records.map((r) => r.transaction_date))].sort().reverse();
 
-  const handle_base_save = async () => {
-    const amount = parseInt(base_draft, 10);
-    if (isNaN(amount) || amount < 1) return;
-    try {
-      const res = await api.updateBaseIncome(amount);
-      setBaseIncome(res);
-      setEditingBase(false);
-    } catch {
-      // ignore
-    }
-  };
-
   const handle_delete = async (id: number) => {
     if (!window.confirm("この収入記録を削除しますか？")) return;
     await api.deleteIncomeRecord(id).catch(() => {});
     setRecords((prev) => prev.filter((r) => r.id !== id));
   };
 
-  const open_create_form = () => {
-    // Default transaction date to the first day of the active month
-    const default_date = `${active_ym}-01`;
-    setIncomeForm(blank_income_form(default_date));
-    setFormErrorMsg("");
-  };
-
-  const open_edit_form = (record: IncomeRecord) => {
-    setIncomeForm(income_record_to_form(record));
-    setFormErrorMsg("");
-  };
-
-  const handle_income_submit = async () => {
-    if (!income_form) return;
-    setFormErrorMsg("");
-
-    if (!income_form.name.trim()) {
-      setFormErrorMsg("名前を入力してください");
-      return;
-    }
-    const parsed_amount = parseInt(income_form.amount_yen, 10);
-    if (isNaN(parsed_amount) || parsed_amount < 1) {
-      setFormErrorMsg("金額を正しく入力してください");
-      return;
-    }
-
-    if (!income_form.transaction_date) {
-      setFormErrorMsg("日付を入力してください");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
+  // Income record create / edit form.
+  const income_form = useEntityForm<IncomeRecordFormState, IncomeRecord>({
+    // Default transaction date to the first day of the active month.
+    blank: () => blank_income_form(`${active_ym}-01`),
+    fromEntity: income_record_to_form,
+    validate: (f) => {
+      if (!f.name.trim()) return "名前を入力してください";
+      const parsed_amount = parseInt(f.amount_yen, 10);
+      if (isNaN(parsed_amount) || parsed_amount < 1) return "金額を正しく入力してください";
+      if (!f.transaction_date) return "日付を入力してください";
+      return null;
+    },
+    onSubmit: async (f) => {
       const request_body: components["schemas"]["IncomeRecordRequest"] = {
-        name: income_form.name.trim(),
-        emoji: income_form.emoji.trim() || DEFAULT_INCOME_EMOJI,
-        amount: parsed_amount,
-        transaction_date: income_form.transaction_date,
-        income_type: income_form.income_type as "salary" | "side" | "bonus" | "oneoff",
-        note: income_form.note.trim() || undefined,
+        name: f.name.trim(),
+        emoji: f.emoji.trim() || DEFAULT_INCOME_EMOJI,
+        amount: parseInt(f.amount_yen, 10),
+        transaction_date: f.transaction_date,
+        income_type: f.income_type as "salary" | "side" | "bonus" | "oneoff",
+        note: f.note.trim() || undefined,
       };
-
-      if (income_form.id !== null) {
-        await api.updateIncomeRecord(income_form.id, request_body);
+      if (f.id !== null) {
+        await api.updateIncomeRecord(f.id, request_body);
       } else {
         await api.createIncomeRecord(request_body);
       }
-
       await refresh_records();
-      setIncomeForm(null);
-    } catch (err) {
-      setFormErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+  });
 
-  const handle_alloc_submit = async () => {
-    if (!alloc_form) return;
-    setAllocErrorMsg("");
-
-    const parsed_amount = parseInt(alloc_form.amount_yen, 10);
-    if (isNaN(parsed_amount) || parsed_amount <= 0 || parsed_amount > unallocated) {
-      setAllocErrorMsg("金額を正しく入力してください（余剰以内）");
-      return;
-    }
-    if (alloc_form.destination === "savings" && alloc_form.savings_goal_id === null) {
-      setAllocErrorMsg("貯金目標を選択してください");
-      return;
-    }
-
-    setAllocSubmitting(true);
-    try {
+  // Surplus allocation form (create-only).
+  const alloc_form = useEntityForm<AllocFormState, never>({
+    blank: () => blank_alloc_form(savings_goals),
+    fromEntity: () => blank_alloc_form(savings_goals),
+    validate: (f) => {
+      const parsed_amount = parseInt(f.amount_yen, 10);
+      if (isNaN(parsed_amount) || parsed_amount <= 0 || parsed_amount > unallocated)
+        return "金額を正しく入力してください（余剰以内）";
+      if (f.destination === "savings" && f.savings_goal_id === null)
+        return "貯金目標を選択してください";
+      return null;
+    },
+    onSubmit: async (f) => {
       await api.createSurplusAllocation({
         year_month: active_ym,
-        amount: parsed_amount,
-        destination: alloc_form.destination,
-        ...(alloc_form.destination === "savings" && alloc_form.savings_goal_id !== null
-          ? { savings_goal_id: alloc_form.savings_goal_id }
+        amount: parseInt(f.amount_yen, 10),
+        destination: f.destination,
+        ...(f.destination === "savings" && f.savings_goal_id !== null
+          ? { savings_goal_id: f.savings_goal_id }
           : {}),
       });
       await refresh_allocations();
       await refresh_savings_goals();
-      setAllocForm(null);
-    } catch (err) {
-      setAllocErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
-    } finally {
-      setAllocSubmitting(false);
-    }
-  };
+    },
+  });
 
-  const input_style: React.CSSProperties = {
-    width: "100%",
-    padding: "10px 12px",
-    border: `1.5px solid ${T.hair}`,
-    borderRadius: 12,
-    fontFamily: "inherit",
-    fontSize: 14,
-    color: T.ink,
-    background: T.bgSoft,
-    outline: "none",
-    boxSizing: "border-box",
-  };
+  // Base-income inline editor (single-value edit; opens pre-filled with the current base).
+  const base_form = useEntityForm<{ amount_yen: string }, BaseIncomeSetting>({
+    blank: () => ({ amount_yen: String(base_amount) }),
+    fromEntity: (b) => ({ amount_yen: String(b.amount) }),
+    validate: (f) => {
+      const amount = parseInt(f.amount_yen, 10);
+      return isNaN(amount) || amount < 1 ? "基準収入を正しく入力してください" : null;
+    },
+    onSubmit: async (f) => {
+      const res = await api.updateBaseIncome(parseInt(f.amount_yen, 10));
+      setBaseIncome(res);
+    },
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -334,7 +284,7 @@ export function WebIncome({ onBack }: Props) {
           </div>
         </div>
         <button
-          onClick={open_create_form}
+          onClick={income_form.openCreate}
           style={{
             border: "none",
             background: T.sage,
@@ -353,7 +303,7 @@ export function WebIncome({ onBack }: Props) {
       </div>
 
       {/* Inline create / edit form */}
-      {income_form && (
+      {income_form.form && (
         <div
           style={{
             padding: "18px 20px",
@@ -363,29 +313,26 @@ export function WebIncome({ onBack }: Props) {
           }}
         >
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
-            {income_form.id !== null ? "収入記録を編集" : "収入を記録"}
+            {income_form.isEdit ? "収入記録を編集" : "収入を記録"}
           </div>
 
           {/* Row 1: emoji + name */}
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: "0 0 80px" }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>絵文字</div>
-              <input
-                type="text"
-                value={income_form.emoji}
-                onChange={(e) => setIncomeForm((f) => f && { ...f, emoji: e.target.value })}
+              <FormField
+                label="絵文字"
+                value={income_form.form.emoji}
+                onChange={(v) => income_form.setField("emoji", v)}
                 placeholder="🏢"
-                style={{ ...input_style, textAlign: "center", fontSize: 20 }}
+                style={{ textAlign: "center", fontSize: 20 }}
               />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>名前</div>
-              <input
-                type="text"
-                value={income_form.name}
-                onChange={(e) => setIncomeForm((f) => f && { ...f, name: e.target.value })}
+              <FormField
+                label="名前"
+                value={income_form.form.name}
+                onChange={(v) => income_form.setField("name", v)}
                 placeholder="6月給与"
-                style={input_style}
               />
             </div>
           </div>
@@ -393,8 +340,8 @@ export function WebIncome({ onBack }: Props) {
           {/* Quick emoji picker */}
           <div style={{ marginBottom: 12 }}>
             <EmojiPicker
-              value={income_form.emoji}
-              onSelect={(emoji) => setIncomeForm((f) => f && { ...f, emoji })}
+              value={income_form.form.emoji}
+              onSelect={(emoji) => income_form.setField("emoji", emoji)}
               options={INCOME_EMOJI_OPTIONS}
               accent={T.sage}
               accentSoft={T.sageSoft}
@@ -404,29 +351,21 @@ export function WebIncome({ onBack }: Props) {
           {/* Row 2: amount + income type */}
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>金額（円）</div>
-              <input
-                type="number"
+              <AmountField
+                label="金額（円）"
                 min={1}
-                value={income_form.amount_yen}
-                onChange={(e) => setIncomeForm((f) => f && { ...f, amount_yen: e.target.value })}
+                value={income_form.form.amount_yen}
+                onChange={(v) => income_form.setField("amount_yen", v)}
                 placeholder="280000"
-                style={input_style}
               />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>収入種別</div>
-              <select
-                value={income_form.income_type}
-                onChange={(e) => setIncomeForm((f) => f && { ...f, income_type: e.target.value })}
-                style={{ ...input_style }}
-              >
-                {INCOME_TYPE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              <SelectField
+                label="収入種別"
+                value={income_form.form.income_type}
+                onChange={(v) => income_form.setField("income_type", v)}
+                options={INCOME_TYPE_OPTIONS}
+              />
             </div>
           </div>
 
@@ -435,34 +374,28 @@ export function WebIncome({ onBack }: Props) {
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>日付</div>
               <DateField
-                value={income_form.transaction_date}
-                onChange={(iso) => setIncomeForm((f) => f && { ...f, transaction_date: iso })}
+                value={income_form.form.transaction_date}
+                onChange={(iso) => income_form.setField("transaction_date", iso)}
                 ariaLabel="日付"
-                style={input_style}
+                style={inputStyle}
               />
             </div>
             <div style={{ flex: 2 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>メモ（任意）</div>
-              <input
-                type="text"
-                value={income_form.note}
-                onChange={(e) => setIncomeForm((f) => f && { ...f, note: e.target.value })}
+              <FormField
+                label="メモ（任意）"
+                value={income_form.form.note}
+                onChange={(v) => income_form.setField("note", v)}
                 placeholder="先月繰越分を含む"
-                style={input_style}
               />
             </div>
           </div>
 
-          {form_error_msg && (
-            <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>
-              {form_error_msg}
-            </div>
-          )}
+          <FormError message={income_form.error} />
 
           <div style={{ display: "flex", gap: 8 }}>
             <button
-              onClick={handle_income_submit}
-              disabled={submitting}
+              onClick={income_form.submit}
+              disabled={income_form.submitting}
               style={{
                 border: "none",
                 background: T.sage,
@@ -475,10 +408,10 @@ export function WebIncome({ onBack }: Props) {
                 boxShadow: `0 3px 0 ${T.sageDeep}`,
               }}
             >
-              {submitting ? "保存中…" : "保存"}
+              {income_form.submitting ? "保存中…" : "保存"}
             </button>
             <button
-              onClick={() => setIncomeForm(null)}
+              onClick={income_form.close}
               style={{
                 border: `1px solid ${T.hair}`,
                 background: "#fff",
@@ -537,12 +470,12 @@ export function WebIncome({ onBack }: Props) {
                 基準収入
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 6 }}>
-                {editing_base ? (
+                {base_form.form ? (
                   <div style={{ display: "flex", gap: 8, alignItems: "center", width: "100%" }}>
                     <input
                       type="number"
-                      value={base_draft}
-                      onChange={(e) => setBaseDraft(e.target.value)}
+                      value={base_form.form.amount_yen}
+                      onChange={(e) => base_form.setField("amount_yen", e.target.value)}
                       placeholder="金額を入力"
                       autoFocus
                       style={{
@@ -557,7 +490,7 @@ export function WebIncome({ onBack }: Props) {
                       }}
                     />
                     <button
-                      onClick={handle_base_save}
+                      onClick={base_form.submit}
                       style={{
                         border: "none",
                         background: T.coral,
@@ -572,7 +505,7 @@ export function WebIncome({ onBack }: Props) {
                       保存
                     </button>
                     <button
-                      onClick={() => setEditingBase(false)}
+                      onClick={base_form.close}
                       style={{
                         border: "none",
                         background: "transparent",
@@ -601,12 +534,9 @@ export function WebIncome({ onBack }: Props) {
               <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 3 }}>
                 毎月の見込み・予算の元
               </div>
-              {!editing_base && (
+              {!base_form.form && (
                 <button
-                  onClick={() => {
-                    setEditingBase(true);
-                    setBaseDraft(String(base_amount));
-                  }}
+                  onClick={base_form.openCreate}
                   style={{
                     marginTop: 10,
                     padding: "7px 14px",
@@ -683,10 +613,7 @@ export function WebIncome({ onBack }: Props) {
                 基準を超えた今月の上振れ
               </div>
               <button
-                onClick={() => {
-                  setAllocForm(blank_alloc_form(savings_goals));
-                  setAllocErrorMsg("");
-                }}
+                onClick={alloc_form.openCreate}
                 style={{
                   marginTop: 10,
                   padding: "9px 16px",
@@ -705,7 +632,7 @@ export function WebIncome({ onBack }: Props) {
               </button>
 
               {/* Inline allocation form */}
-              {alloc_form && (
+              {alloc_form.form && (
                 <div
                   style={{
                     marginTop: 14,
@@ -728,12 +655,10 @@ export function WebIncome({ onBack }: Props) {
                       type="number"
                       min={1}
                       max={unallocated}
-                      value={alloc_form.amount_yen}
-                      onChange={(e) =>
-                        setAllocForm((f) => f && { ...f, amount_yen: e.target.value })
-                      }
+                      value={alloc_form.form.amount_yen}
+                      onChange={(e) => alloc_form.setField("amount_yen", e.target.value)}
                       placeholder={String(unallocated)}
-                      style={input_style}
+                      style={inputStyle}
                     />
                     {/* Quick-fill chips */}
                     <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
@@ -745,15 +670,15 @@ export function WebIncome({ onBack }: Props) {
                         <button
                           key={chip.label}
                           type="button"
-                          onClick={() =>
-                            setAllocForm((f) => f && { ...f, amount_yen: String(chip.value) })
-                          }
+                          onClick={() => alloc_form.setField("amount_yen", String(chip.value))}
                           style={{
                             padding: "5px 10px",
                             borderRadius: 8,
-                            border: `1.5px solid ${String(chip.value) === alloc_form.amount_yen ? T.mustard : T.hair}`,
+                            border: `1.5px solid ${String(chip.value) === alloc_form.form!.amount_yen ? T.mustard : T.hair}`,
                             background:
-                              String(chip.value) === alloc_form.amount_yen ? T.mustardSoft : "#fff",
+                              String(chip.value) === alloc_form.form!.amount_yen
+                                ? T.mustardSoft
+                                : "#fff",
                             fontSize: 11,
                             fontWeight: 700,
                             cursor: "pointer",
@@ -775,12 +700,12 @@ export function WebIncome({ onBack }: Props) {
                     <div style={{ display: "flex", gap: 8 }}>
                       {(["savings", "budget"] as const).map((dest) => {
                         const labels = { savings: "貯金", budget: "今月の予算に追加" };
-                        const sel = alloc_form.destination === dest;
+                        const sel = alloc_form.form!.destination === dest;
                         return (
                           <button
                             key={dest}
                             type="button"
-                            onClick={() => setAllocForm((f) => f && { ...f, destination: dest })}
+                            onClick={() => alloc_form.setField("destination", dest)}
                             style={{
                               padding: "9px 14px",
                               borderRadius: 999,
@@ -801,23 +726,20 @@ export function WebIncome({ onBack }: Props) {
                   </div>
 
                   {/* Savings goal selector */}
-                  {alloc_form.destination === "savings" && (
+                  {alloc_form.form.destination === "savings" && (
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
                         貯金目標
                       </div>
                       <select
-                        value={alloc_form.savings_goal_id ?? ""}
+                        value={alloc_form.form.savings_goal_id ?? ""}
                         onChange={(e) =>
-                          setAllocForm(
-                            (f) =>
-                              f && {
-                                ...f,
-                                savings_goal_id: e.target.value ? Number(e.target.value) : null,
-                              }
+                          alloc_form.setField(
+                            "savings_goal_id",
+                            e.target.value ? Number(e.target.value) : null
                           )
                         }
-                        style={input_style}
+                        style={inputStyle}
                       >
                         <option value="">選択してください</option>
                         {savings_goals.map((g) => (
@@ -829,20 +751,16 @@ export function WebIncome({ onBack }: Props) {
                     </div>
                   )}
 
-                  {alloc_error_msg && (
-                    <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>
-                      {alloc_error_msg}
-                    </div>
-                  )}
+                  <FormError message={alloc_form.error} />
 
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
-                      onClick={handle_alloc_submit}
+                      onClick={alloc_form.submit}
                       disabled={
-                        alloc_submitting ||
-                        !alloc_form.amount_yen ||
-                        (alloc_form.destination === "savings" &&
-                          alloc_form.savings_goal_id === null)
+                        alloc_form.submitting ||
+                        !alloc_form.form.amount_yen ||
+                        (alloc_form.form.destination === "savings" &&
+                          alloc_form.form.savings_goal_id === null)
                       }
                       style={{
                         border: "none",
@@ -856,10 +774,10 @@ export function WebIncome({ onBack }: Props) {
                         boxShadow: "0 3px 0 #F0A92E",
                       }}
                     >
-                      {alloc_submitting ? "振り分け中…" : "振り分ける"}
+                      {alloc_form.submitting ? "振り分け中…" : "振り分ける"}
                     </button>
                     <button
-                      onClick={() => setAllocForm(null)}
+                      onClick={alloc_form.close}
                       style={{
                         border: `1px solid ${T.hair}`,
                         background: "#fff",
@@ -1057,7 +975,7 @@ export function WebIncome({ onBack }: Props) {
                           </div>
                           <div style={{ display: "flex", gap: 6, opacity: 0.45 }}>
                             <span
-                              onClick={() => open_edit_form(e)}
+                              onClick={() => income_form.openEdit(e)}
                               style={{
                                 padding: "4px 8px",
                                 borderRadius: 8,
