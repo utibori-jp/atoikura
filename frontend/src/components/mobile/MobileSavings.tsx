@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { T } from "../../theme";
 import { api } from "../../api/client";
 import type { components } from "../../api/types";
+import { useEntityForm, type UseEntityForm } from "../forms";
 
 type SavingsGoal = components["schemas"]["SavingsGoal"];
 
@@ -53,62 +54,15 @@ function goal_to_form(g: SavingsGoal): GoalFormState {
 }
 
 interface MobileSavingsSheetProps {
-  initial_form: GoalFormState;
-  on_close: () => void;
-  on_saved: () => Promise<void>;
+  goal_form: UseEntityForm<GoalFormState, SavingsGoal>;
 }
 
-export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileSavingsSheetProps) {
-  const [goal_form, setGoalForm] = useState<GoalFormState>(initial_form);
-  const [submitting, setSubmitting] = useState(false);
-  const [form_error_msg, setFormErrorMsg] = useState("");
+export function MobileSavingsSheet({ goal_form }: MobileSavingsSheetProps) {
+  const form = goal_form.form;
+  if (!form) return null;
 
-  const is_edit_mode = goal_form.goal_id !== null;
-
-  const handle_submit = async () => {
-    setFormErrorMsg("");
-
-    if (!goal_form.name.trim()) {
-      setFormErrorMsg("名前を入力してください");
-      return;
-    }
-    const parsed_monthly = parseInt(goal_form.monthly_amount_yen, 10);
-    if (isNaN(parsed_monthly) || parsed_monthly < 0) {
-      setFormErrorMsg("毎月の積立額を正しく入力してください");
-      return;
-    }
-
-    const parsed_target = parseInt(goal_form.target_amount_yen, 10);
-    if (isNaN(parsed_target) || parsed_target < 0) {
-      setFormErrorMsg("目標金額を正しく入力してください");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const request_body: components["schemas"]["SavingsGoalRequest"] = {
-        name: goal_form.name.trim(),
-        emoji: goal_form.emoji.trim() || EMOJI_OPTIONS[0],
-        monthly_amount: parsed_monthly,
-        target_amount: parsed_target,
-        deadline: goal_form.deadline.trim() || null,
-        memo: goal_form.memo.trim(),
-      };
-
-      if (is_edit_mode && goal_form.goal_id !== null) {
-        await api.updateSavingsGoal(goal_form.goal_id, request_body);
-      } else {
-        await api.createSavingsGoal(request_body);
-      }
-
-      await on_saved();
-      on_close();
-    } catch (err) {
-      setFormErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const is_edit_mode = goal_form.isEdit;
+  const on_close = goal_form.close;
 
   const input_style: React.CSSProperties = {
     width: "100%",
@@ -196,8 +150,8 @@ export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileS
           <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>目標名</div>
           <input
             type="text"
-            value={goal_form.name}
-            onChange={(e) => setGoalForm((f) => ({ ...f, name: e.target.value }))}
+            value={form.name}
+            onChange={(e) => goal_form.setField("name", e.target.value)}
             placeholder="例：新しいカメラ"
             style={input_style}
           />
@@ -222,13 +176,13 @@ export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileS
               <button
                 key={emoji_opt}
                 type="button"
-                onClick={() => setGoalForm((f) => ({ ...f, emoji: emoji_opt }))}
+                onClick={() => goal_form.setField("emoji", emoji_opt)}
                 style={{
                   width: 34,
                   height: 34,
                   borderRadius: 10,
-                  background: goal_form.emoji === emoji_opt ? T.mustardSoft : "#fff",
-                  border: `1.5px solid ${goal_form.emoji === emoji_opt ? T.mustard : T.hair}`,
+                  background: form.emoji === emoji_opt ? T.mustardSoft : "#fff",
+                  border: `1.5px solid ${form.emoji === emoji_opt ? T.mustard : T.hair}`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -269,8 +223,8 @@ export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileS
             <input
               type="number"
               min={0}
-              value={goal_form.monthly_amount_yen}
-              onChange={(e) => setGoalForm((f) => ({ ...f, monthly_amount_yen: e.target.value }))}
+              value={form.monthly_amount_yen}
+              onChange={(e) => goal_form.setField("monthly_amount_yen", e.target.value)}
               placeholder="20000"
               style={{
                 flex: 1,
@@ -294,8 +248,8 @@ export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileS
             <input
               type="number"
               min={0}
-              value={goal_form.target_amount_yen}
-              onChange={(e) => setGoalForm((f) => ({ ...f, target_amount_yen: e.target.value }))}
+              value={form.target_amount_yen}
+              onChange={(e) => goal_form.setField("target_amount_yen", e.target.value)}
               placeholder="250000"
               style={input_style}
             />
@@ -304,8 +258,8 @@ export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileS
             <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>目標日（任意）</div>
             <input
               type="text"
-              value={goal_form.deadline}
-              onChange={(e) => setGoalForm((f) => ({ ...f, deadline: e.target.value }))}
+              value={form.deadline}
+              onChange={(e) => goal_form.setField("deadline", e.target.value)}
               placeholder="YYYY/MM"
               style={input_style}
             />
@@ -316,8 +270,8 @@ export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileS
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>メモ（任意）</div>
           <textarea
-            value={goal_form.memo}
-            onChange={(e) => setGoalForm((f) => ({ ...f, memo: e.target.value }))}
+            value={form.memo}
+            onChange={(e) => goal_form.setField("memo", e.target.value)}
             placeholder="例：旅行記録用に。レンズ込みで揃えたい。"
             rows={3}
             style={{
@@ -328,14 +282,16 @@ export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileS
           />
         </div>
 
-        {form_error_msg && (
-          <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 12 }}>{form_error_msg}</div>
+        {goal_form.error && (
+          <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 12 }}>
+            {goal_form.error}
+          </div>
         )}
 
         <button
           type="button"
-          onClick={handle_submit}
-          disabled={submitting}
+          onClick={goal_form.submit}
+          disabled={goal_form.submitting}
           style={{
             width: "100%",
             border: "none",
@@ -347,11 +303,11 @@ export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileS
             fontWeight: 700,
             fontSize: 16,
             boxShadow: `0 6px 0 ${T.coralDeep}`,
-            cursor: submitting ? "not-allowed" : "pointer",
-            opacity: submitting ? 0.7 : 1,
+            cursor: goal_form.submitting ? "not-allowed" : "pointer",
+            opacity: goal_form.submitting ? 0.7 : 1,
           }}
         >
-          {submitting ? "保存中…" : "保存する"}
+          {goal_form.submitting ? "保存中…" : "保存する"}
         </button>
       </div>
     </div>
@@ -360,14 +316,42 @@ export function MobileSavingsSheet({ initial_form, on_close, on_saved }: MobileS
 
 export function MobileSavings({ onBack }: MobileSavingsProps) {
   const [savings_goals, setSavingsGoals] = useState<SavingsGoal[] | null>(null);
-  // sheet_form=null means the form is hidden; otherwise holds form initial state
-  const [sheet_form, setSheetForm] = useState<GoalFormState | null>(null);
   const ym = currentMonthJST();
 
   const refresh_goals = async () => {
     const res = await api.listSavingsGoals();
     setSavingsGoals(res.savings_goals);
   };
+
+  const goal_form = useEntityForm<GoalFormState, SavingsGoal>({
+    blank: blank_goal_form,
+    fromEntity: goal_to_form,
+    validate: (f) => {
+      if (!f.name.trim()) return "名前を入力してください";
+      const parsed_monthly = parseInt(f.monthly_amount_yen, 10);
+      if (isNaN(parsed_monthly) || parsed_monthly < 0)
+        return "毎月の積立額を正しく入力してください";
+      const parsed_target = parseInt(f.target_amount_yen, 10);
+      if (isNaN(parsed_target) || parsed_target < 0) return "目標金額を正しく入力してください";
+      return null;
+    },
+    onSubmit: async (f) => {
+      const request_body: components["schemas"]["SavingsGoalRequest"] = {
+        name: f.name.trim(),
+        emoji: f.emoji.trim() || EMOJI_OPTIONS[0],
+        monthly_amount: parseInt(f.monthly_amount_yen, 10),
+        target_amount: parseInt(f.target_amount_yen, 10),
+        deadline: f.deadline.trim() || null,
+        memo: f.memo.trim(),
+      };
+      if (f.goal_id !== null) {
+        await api.updateSavingsGoal(f.goal_id, request_body);
+      } else {
+        await api.createSavingsGoal(request_body);
+      }
+      await refresh_goals();
+    },
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -384,14 +368,6 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
 
   const is_loading = savings_goals === null;
   const savings_monthly_total = savings_goals?.reduce((sum, g) => sum + g.monthly_amount, 0) ?? 0;
-
-  const handle_open_create = () => {
-    setSheetForm(blank_goal_form());
-  };
-
-  const handle_open_edit = (g: SavingsGoal) => {
-    setSheetForm(goal_to_form(g));
-  };
 
   const handle_delete = async (goal_id: number) => {
     if (!window.confirm("この貯金目標を削除しますか？")) return;
@@ -592,7 +568,7 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                       <button
                         type="button"
-                        onClick={() => handle_open_edit(g)}
+                        onClick={() => goal_form.openEdit(g)}
                         style={{
                           width: 30,
                           height: 30,
@@ -749,7 +725,7 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
 
       <button
         type="button"
-        onClick={handle_open_create}
+        onClick={goal_form.openCreate}
         style={{
           width: "100%",
           marginTop: 16,
@@ -767,13 +743,7 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
         ＋ 貯金目標を追加
       </button>
 
-      {sheet_form && (
-        <MobileSavingsSheet
-          initial_form={sheet_form}
-          on_close={() => setSheetForm(null)}
-          on_saved={refresh_goals}
-        />
-      )}
+      {goal_form.form && <MobileSavingsSheet goal_form={goal_form} />}
     </div>
   );
 }
