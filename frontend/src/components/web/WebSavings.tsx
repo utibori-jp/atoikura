@@ -3,6 +3,7 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
+import { useEntityForm, FormField, AmountField, FormError, FormActions } from "../forms";
 
 type SavingsGoal = components["schemas"]["SavingsGoal"];
 
@@ -61,11 +62,6 @@ export function WebSavings({ onBack }: Props) {
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const ym = currentMonthJST();
 
-  // goal_form=null means the form is hidden
-  const [goal_form, setGoalForm] = useState<GoalFormState | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [form_error_msg, setFormErrorMsg] = useState("");
-
   const refresh_goals = async () => {
     const res = await api.listSavingsGoals();
     setGoals(res.savings_goals);
@@ -92,74 +88,35 @@ export function WebSavings({ onBack }: Props) {
     setGoals((prev) => prev.filter((g) => g.id !== id));
   };
 
-  const open_create_form = () => {
-    setGoalForm(blank_goal_form());
-    setFormErrorMsg("");
-  };
-
-  const open_edit_form = (g: SavingsGoal) => {
-    setGoalForm(goal_to_form(g));
-    setFormErrorMsg("");
-  };
-
-  const handle_goal_submit = async () => {
-    if (!goal_form) return;
-    setFormErrorMsg("");
-
-    if (!goal_form.name.trim()) {
-      setFormErrorMsg("名前を入力してください");
-      return;
-    }
-    const parsed_monthly = parseInt(goal_form.monthly_amount_yen, 10);
-    if (isNaN(parsed_monthly) || parsed_monthly < 0) {
-      setFormErrorMsg("毎月の積立額を正しく入力してください");
-      return;
-    }
-
-    const parsed_target = parseInt(goal_form.target_amount_yen, 10);
-    if (isNaN(parsed_target) || parsed_target < 0) {
-      setFormErrorMsg("目標金額を正しく入力してください");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
+  const goal_form = useEntityForm<GoalFormState, SavingsGoal>({
+    blank: blank_goal_form,
+    fromEntity: goal_to_form,
+    validate: (f) => {
+      if (!f.name.trim()) return "名前を入力してください";
+      const parsed_monthly = parseInt(f.monthly_amount_yen, 10);
+      if (isNaN(parsed_monthly) || parsed_monthly < 0)
+        return "毎月の積立額を正しく入力してください";
+      const parsed_target = parseInt(f.target_amount_yen, 10);
+      if (isNaN(parsed_target) || parsed_target < 0) return "目標金額を正しく入力してください";
+      return null;
+    },
+    onSubmit: async (f) => {
       const request_body: components["schemas"]["SavingsGoalRequest"] = {
-        name: goal_form.name.trim(),
-        emoji: goal_form.emoji.trim() || DEFAULT_SAVINGS_EMOJI,
-        monthly_amount: parsed_monthly,
-        target_amount: parsed_target,
-        deadline: goal_form.deadline.trim() || null,
-        memo: goal_form.memo.trim(),
+        name: f.name.trim(),
+        emoji: f.emoji.trim() || DEFAULT_SAVINGS_EMOJI,
+        monthly_amount: parseInt(f.monthly_amount_yen, 10),
+        target_amount: parseInt(f.target_amount_yen, 10),
+        deadline: f.deadline.trim() || null,
+        memo: f.memo.trim(),
       };
-
-      if (goal_form.id !== null) {
-        await api.updateSavingsGoal(goal_form.id, request_body);
+      if (f.id !== null) {
+        await api.updateSavingsGoal(f.id, request_body);
       } else {
         await api.createSavingsGoal(request_body);
       }
-
       await refresh_goals();
-      setGoalForm(null);
-    } catch (err) {
-      setFormErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const input_style: React.CSSProperties = {
-    width: "100%",
-    padding: "10px 12px",
-    border: `1.5px solid ${T.hair}`,
-    borderRadius: 12,
-    fontFamily: "inherit",
-    fontSize: 14,
-    color: T.ink,
-    background: T.bgSoft,
-    outline: "none",
-    boxSizing: "border-box",
-  };
+    },
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -197,7 +154,7 @@ export function WebSavings({ onBack }: Props) {
           </div>
         </div>
         <button
-          onClick={open_create_form}
+          onClick={goal_form.openCreate}
           style={{
             border: "none",
             background: T.coral,
@@ -216,7 +173,7 @@ export function WebSavings({ onBack }: Props) {
       </div>
 
       {/* Inline create / edit form */}
-      {goal_form && (
+      {goal_form.form && (
         <div
           style={{
             padding: "18px 20px",
@@ -226,29 +183,26 @@ export function WebSavings({ onBack }: Props) {
           }}
         >
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
-            {goal_form.id !== null ? "貯金目標を編集" : "貯金目標を追加"}
+            {goal_form.isEdit ? "貯金目標を編集" : "貯金目標を追加"}
           </div>
 
           {/* Row 1: emoji + name */}
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: "0 0 80px" }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>絵文字</div>
-              <input
-                type="text"
-                value={goal_form.emoji}
-                onChange={(e) => setGoalForm((f) => f && { ...f, emoji: e.target.value })}
+              <FormField
+                label="絵文字"
+                value={goal_form.form.emoji}
+                onChange={(v) => goal_form.setField("emoji", v)}
                 placeholder="📷"
-                style={{ ...input_style, textAlign: "center", fontSize: 20 }}
+                style={{ textAlign: "center", fontSize: 20 }}
               />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>名前</div>
-              <input
-                type="text"
-                value={goal_form.name}
-                onChange={(e) => setGoalForm((f) => f && { ...f, name: e.target.value })}
+              <FormField
+                label="名前"
+                value={goal_form.form.name}
+                onChange={(v) => goal_form.setField("name", v)}
                 placeholder="旅行積立"
-                style={input_style}
               />
             </div>
           </div>
@@ -256,8 +210,8 @@ export function WebSavings({ onBack }: Props) {
           {/* Quick emoji picker */}
           <div style={{ marginBottom: 12 }}>
             <EmojiPicker
-              value={goal_form.emoji}
-              onSelect={(emoji) => setGoalForm((f) => f && { ...f, emoji })}
+              value={goal_form.form.emoji}
+              onSelect={(emoji) => goal_form.setField("emoji", emoji)}
               options={SAVINGS_EMOJI_OPTIONS}
               accent={T.mustard}
               accentSoft={T.mustardSoft}
@@ -267,31 +221,19 @@ export function WebSavings({ onBack }: Props) {
           {/* Row 2: monthly amount + target amount */}
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
-                毎月の積立額（円）
-              </div>
-              <input
-                type="number"
-                min={0}
-                value={goal_form.monthly_amount_yen}
-                onChange={(e) =>
-                  setGoalForm((f) => f && { ...f, monthly_amount_yen: e.target.value })
-                }
+              <AmountField
+                label="毎月の積立額（円）"
+                value={goal_form.form.monthly_amount_yen}
+                onChange={(v) => goal_form.setField("monthly_amount_yen", v)}
                 placeholder="20000"
-                style={input_style}
               />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>目標金額（円）</div>
-              <input
-                type="number"
-                min={0}
-                value={goal_form.target_amount_yen}
-                onChange={(e) =>
-                  setGoalForm((f) => f && { ...f, target_amount_yen: e.target.value })
-                }
+              <AmountField
+                label="目標金額（円）"
+                value={goal_form.form.target_amount_yen}
+                onChange={(v) => goal_form.setField("target_amount_yen", v)}
                 placeholder="250000"
-                style={input_style}
               />
             </div>
           </div>
@@ -299,68 +241,30 @@ export function WebSavings({ onBack }: Props) {
           {/* Row 3: deadline + memo */}
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
-                期限（YYYY/MM、任意）
-              </div>
-              <input
-                type="text"
-                value={goal_form.deadline}
-                onChange={(e) => setGoalForm((f) => f && { ...f, deadline: e.target.value })}
+              <FormField
+                label="期限（YYYY/MM、任意）"
+                value={goal_form.form.deadline}
+                onChange={(v) => goal_form.setField("deadline", v)}
                 placeholder="2027/03"
-                style={input_style}
               />
             </div>
             <div style={{ flex: 2 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>メモ（任意）</div>
-              <input
-                type="text"
-                value={goal_form.memo}
-                onChange={(e) => setGoalForm((f) => f && { ...f, memo: e.target.value })}
+              <FormField
+                label="メモ（任意）"
+                value={goal_form.form.memo}
+                onChange={(v) => goal_form.setField("memo", v)}
                 placeholder="北海道旅行：新幹線とホテル代"
-                style={input_style}
               />
             </div>
           </div>
 
-          {form_error_msg && (
-            <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>
-              {form_error_msg}
-            </div>
-          )}
+          <FormError message={goal_form.error} />
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handle_goal_submit}
-              disabled={submitting}
-              style={{
-                border: "none",
-                background: T.coral,
-                color: "#fff",
-                padding: "9px 20px",
-                borderRadius: 999,
-                fontFamily: "inherit",
-                fontWeight: 700,
-                cursor: "pointer",
-                boxShadow: `0 3px 0 ${T.coralDeep}`,
-              }}
-            >
-              {submitting ? "保存中…" : "保存"}
-            </button>
-            <button
-              onClick={() => setGoalForm(null)}
-              style={{
-                border: `1px solid ${T.hair}`,
-                background: "#fff",
-                color: T.inkSoft,
-                padding: "9px 20px",
-                borderRadius: 999,
-                fontFamily: "inherit",
-                cursor: "pointer",
-              }}
-            >
-              キャンセル
-            </button>
-          </div>
+          <FormActions
+            onSubmit={goal_form.submit}
+            onCancel={goal_form.close}
+            submitting={goal_form.submitting}
+          />
         </div>
       )}
 
@@ -519,7 +423,7 @@ export function WebSavings({ onBack }: Props) {
                 </div>
                 <div style={{ display: "flex", gap: 4 }}>
                   <span
-                    onClick={() => open_edit_form(g)}
+                    onClick={() => goal_form.openEdit(g)}
                     style={{
                       width: 28,
                       height: 28,

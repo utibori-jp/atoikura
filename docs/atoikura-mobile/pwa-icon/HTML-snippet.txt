@@ -1,6 +1,0 @@
-<!-- Add inside <head> -->
-<link rel="manifest" href="/pwa-icons/manifest.json" />
-<meta name="theme-color" content="#FF8A5C" />
-<link rel="icon" type="image/png" sizes="32x32" href="/pwa-icons/favicon-32.png" />
-<link rel="icon" type="image/png" sizes="16x16" href="/pwa-icons/favicon-16.png" />
-<link rel="apple-touch-icon" sizes="180x180" href="/pwa-icons/apple-touch-icon-180.png" />

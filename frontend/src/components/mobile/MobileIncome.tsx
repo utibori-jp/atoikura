@@ -3,6 +3,7 @@ import { T } from "../../theme";
 import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { DateField } from "../DateField";
+import { useEntityForm } from "../forms";
 
 type IncomeRecord = components["schemas"]["IncomeRecord"];
 type BaseIncomeSetting = components["schemas"]["BaseIncomeSetting"];
@@ -80,52 +81,44 @@ interface IncomeSheetProps {
 }
 
 export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeSheetProps) {
-  const [form, setForm] = useState<IncomeFormState>(initial_form);
-  const [submitting, setSubmitting] = useState(false);
-  const [error_msg, setErrorMsg] = useState("");
-
-  const handle_submit = async () => {
-    setErrorMsg("");
-
-    if (!form.name.trim()) {
-      setErrorMsg("収入名を入力してください");
-      return;
-    }
-    const parsed_amount = parseInt(form.amount_yen, 10);
-    if (isNaN(parsed_amount) || parsed_amount < 1) {
-      setErrorMsg("金額を正しく入力してください");
-      return;
-    }
-    if (!form.transaction_date) {
-      setErrorMsg("日付を入力してください");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
+  // Standalone sheet (mounted = open): seed the shared form controller from the
+  // injected initial_form on mount, then drive it through useEntityForm (#138).
+  const income_form = useEntityForm<IncomeFormState, IncomeRecord>({
+    blank: () => initial_form,
+    fromEntity: income_record_to_form,
+    validate: (f) => {
+      if (!f.name.trim()) return "収入名を入力してください";
+      const parsed_amount = parseInt(f.amount_yen, 10);
+      if (isNaN(parsed_amount) || parsed_amount < 1) return "金額を正しく入力してください";
+      if (!f.transaction_date) return "日付を入力してください";
+      return null;
+    },
+    onSubmit: async (f) => {
       const request_body: components["schemas"]["IncomeRecordRequest"] = {
-        name: form.name.trim(),
-        emoji: form.emoji.trim() || EMOJI_OPTIONS[0],
-        amount: parsed_amount,
-        transaction_date: form.transaction_date,
-        income_type: form.income_type,
-        note: form.note.trim() || undefined,
+        name: f.name.trim(),
+        emoji: f.emoji.trim() || EMOJI_OPTIONS[0],
+        amount: parseInt(f.amount_yen, 10),
+        transaction_date: f.transaction_date,
+        income_type: f.income_type,
+        note: f.note.trim() || undefined,
       };
-
-      if (form.editing_id !== null) {
-        await api.updateIncomeRecord(form.editing_id, request_body);
+      if (f.editing_id !== null) {
+        await api.updateIncomeRecord(f.editing_id, request_body);
       } else {
         await api.createIncomeRecord(request_body);
       }
-
       onSaved();
       onClose();
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+  });
+
+  useEffect(() => {
+    income_form.openCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const form = income_form.form;
+  if (!form) return null;
 
   const input_style: React.CSSProperties = {
     width: "100%",
@@ -232,7 +225,7 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
             type="number"
             inputMode="numeric"
             value={form.amount_yen}
-            onChange={(e) => setForm((f) => ({ ...f, amount_yen: e.target.value }))}
+            onChange={(e) => income_form.setField("amount_yen", e.target.value)}
             placeholder="例: 280000"
             style={{
               flex: 1,
@@ -264,7 +257,7 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
             <input
               type="text"
               value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              onChange={(e) => income_form.setField("name", e.target.value)}
               placeholder="例：ライティング案件"
               style={{ ...input_style, padding: "0", border: "none", fontSize: 14 }}
             />
@@ -281,7 +274,7 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
             <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 3 }}>日付</div>
             <DateField
               value={form.transaction_date}
-              onChange={(iso) => setForm((f) => ({ ...f, transaction_date: iso }))}
+              onChange={(iso) => income_form.setField("transaction_date", iso)}
               ariaLabel="日付"
               style={{
                 ...input_style,
@@ -305,7 +298,7 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
             <button
               key={emoji_option}
               type="button"
-              onClick={() => setForm((f) => ({ ...f, emoji: emoji_option }))}
+              onClick={() => income_form.setField("emoji", emoji_option)}
               style={{
                 width: 38,
                 height: 38,
@@ -325,7 +318,7 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
           <input
             type="text"
             value={form.emoji}
-            onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))}
+            onChange={(e) => income_form.setField("emoji", e.target.value)}
             placeholder="🏢"
             style={{
               flex: 1,
@@ -354,7 +347,7 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
             <button
               key={k}
               type="button"
-              onClick={() => setForm((f) => ({ ...f, income_type: k }))}
+              onClick={() => income_form.setField("income_type", k)}
               style={{
                 padding: "9px 14px",
                 borderRadius: 999,
@@ -386,7 +379,7 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
           <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 3 }}>メモ（任意）</div>
           <textarea
             value={form.note}
-            onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+            onChange={(e) => income_form.setField("note", e.target.value)}
             placeholder="例：フリーランスnote"
             rows={2}
             style={{
@@ -403,7 +396,7 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
           />
         </div>
 
-        {error_msg && (
+        {income_form.error && (
           <div
             style={{
               marginBottom: 12,
@@ -415,29 +408,33 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
               fontWeight: 600,
             }}
           >
-            {error_msg}
+            {income_form.error}
           </div>
         )}
 
         <button
           type="button"
-          onClick={handle_submit}
-          disabled={submitting}
+          onClick={income_form.submit}
+          disabled={income_form.submitting}
           style={{
             width: "100%",
             border: "none",
-            background: submitting ? T.inkSoft : T.coral,
+            background: income_form.submitting ? T.inkSoft : T.coral,
             color: "#fff",
             padding: "16px",
             borderRadius: 18,
             fontFamily: "inherit",
             fontWeight: 700,
             fontSize: 16,
-            boxShadow: submitting ? "none" : `0 6px 0 ${T.coralDeep}`,
-            cursor: submitting ? "not-allowed" : "pointer",
+            boxShadow: income_form.submitting ? "none" : `0 6px 0 ${T.coralDeep}`,
+            cursor: income_form.submitting ? "not-allowed" : "pointer",
           }}
         >
-          {submitting ? "保存中…" : form.editing_id !== null ? "更新する" : "＋ 記録する"}
+          {income_form.submitting
+            ? "保存中…"
+            : form.editing_id !== null
+              ? "更新する"
+              : "＋ 記録する"}
         </button>
       </div>
     </div>
@@ -445,6 +442,12 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
 }
 
 // ── MobileAllocateSheet ──────────────────────────────────────────────────────
+
+interface AllocFormState {
+  amount_yen: string;
+  destination: "savings" | "budget";
+  savings_goal_id: number | null;
+}
 
 interface AllocateSheetProps {
   onClose: () => void;
@@ -461,51 +464,54 @@ export function MobileAllocateSheet({
   savings_goals,
   onAllocated,
 }: AllocateSheetProps) {
-  const [amount_yen, setAmountYen] = useState("");
-  const [destination, setDestination] = useState<"savings" | "budget">("savings");
-  const [selected_goal_id, setSelectedGoalId] = useState<number | null>(
-    savings_goals.length > 0 ? savings_goals[0].id : null
-  );
-  const [submitting, setSubmitting] = useState(false);
-  const [error_msg, setErrorMsg] = useState("");
-
-  const parsed_amount = parseInt(amount_yen, 10);
-  const amount_valid = !isNaN(parsed_amount) && parsed_amount > 0 && parsed_amount <= unallocated;
-  const submit_disabled =
-    submitting || !amount_valid || (destination === "savings" && selected_goal_id === null);
-
-  const handle_quick_fill = (value: number) => {
-    setAmountYen(String(value));
-  };
-
-  const handle_submit = async () => {
-    setErrorMsg("");
-    if (!amount_valid) {
-      setErrorMsg("金額を正しく入力してください");
-      return;
-    }
-    if (destination === "savings" && selected_goal_id === null) {
-      setErrorMsg("貯金目標を選択してください");
-      return;
-    }
-    setSubmitting(true);
-    try {
+  // Standalone sheet (mounted = open): create-only allocation form via useEntityForm (#138).
+  const alloc_form = useEntityForm<AllocFormState, never>({
+    blank: () => ({
+      amount_yen: "",
+      destination: "savings",
+      savings_goal_id: savings_goals.length > 0 ? savings_goals[0].id : null,
+    }),
+    fromEntity: () => ({
+      amount_yen: "",
+      destination: "savings",
+      savings_goal_id: savings_goals.length > 0 ? savings_goals[0].id : null,
+    }),
+    validate: (f) => {
+      const parsed = parseInt(f.amount_yen, 10);
+      if (isNaN(parsed) || parsed <= 0 || parsed > unallocated)
+        return "金額を正しく入力してください";
+      if (f.destination === "savings" && f.savings_goal_id === null)
+        return "貯金目標を選択してください";
+      return null;
+    },
+    onSubmit: async (f) => {
       await api.createSurplusAllocation({
         year_month: active_ym,
-        amount: parsed_amount,
-        destination,
-        ...(destination === "savings" && selected_goal_id !== null
-          ? { savings_goal_id: selected_goal_id }
+        amount: parseInt(f.amount_yen, 10),
+        destination: f.destination,
+        ...(f.destination === "savings" && f.savings_goal_id !== null
+          ? { savings_goal_id: f.savings_goal_id }
           : {}),
       });
       onAllocated();
       onClose();
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+  });
+
+  useEffect(() => {
+    alloc_form.openCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const form = alloc_form.form;
+  if (!form) return null;
+
+  const parsed_amount = parseInt(form.amount_yen, 10);
+  const amount_valid = !isNaN(parsed_amount) && parsed_amount > 0 && parsed_amount <= unallocated;
+  const submit_disabled =
+    alloc_form.submitting ||
+    !amount_valid ||
+    (form.destination === "savings" && form.savings_goal_id === null);
 
   return (
     <div
@@ -596,8 +602,8 @@ export function MobileAllocateSheet({
           <input
             type="number"
             inputMode="numeric"
-            value={amount_yen}
-            onChange={(e) => setAmountYen(e.target.value)}
+            value={form.amount_yen}
+            onChange={(e) => alloc_form.setField("amount_yen", e.target.value)}
             placeholder="振り分け額"
             style={{
               flex: 1,
@@ -643,14 +649,14 @@ export function MobileAllocateSheet({
             <button
               key={chip.label}
               type="button"
-              onClick={() => handle_quick_fill(chip.value)}
+              onClick={() => alloc_form.setField("amount_yen", String(chip.value))}
               style={{
                 flex: 1,
                 padding: "7px 0",
                 textAlign: "center",
                 borderRadius: 10,
-                border: `1.5px solid ${String(chip.value) === amount_yen ? T.mustard : T.hair}`,
-                background: String(chip.value) === amount_yen ? T.mustardSoft : "#fff",
+                border: `1.5px solid ${String(chip.value) === form.amount_yen ? T.mustard : T.hair}`,
+                background: String(chip.value) === form.amount_yen ? T.mustardSoft : "#fff",
                 color: T.ink,
                 fontSize: 11,
                 fontWeight: 700,
@@ -684,12 +690,12 @@ export function MobileAllocateSheet({
               },
             ] as const
           ).map((opt) => {
-            const selected = destination === opt.id;
+            const selected = form.destination === opt.id;
             return (
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => setDestination(opt.id)}
+                onClick={() => alloc_form.setField("destination", opt.id)}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -747,7 +753,7 @@ export function MobileAllocateSheet({
         </div>
 
         {/* Savings goal sub-selector */}
-        {destination === "savings" && savings_goals.length > 0 && (
+        {form.destination === "savings" && savings_goals.length > 0 && (
           <div
             style={{
               padding: "12px 14px 14px",
@@ -765,12 +771,12 @@ export function MobileAllocateSheet({
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {savings_goals.map((g) => {
-                const sel = selected_goal_id === g.id;
+                const sel = form.savings_goal_id === g.id;
                 return (
                   <button
                     key={g.id}
                     type="button"
-                    onClick={() => setSelectedGoalId(g.id)}
+                    onClick={() => alloc_form.setField("savings_goal_id", g.id)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -839,7 +845,7 @@ export function MobileAllocateSheet({
           </div>
         )}
 
-        {error_msg && (
+        {alloc_form.error && (
           <div
             style={{
               marginBottom: 12,
@@ -851,13 +857,13 @@ export function MobileAllocateSheet({
               fontWeight: 600,
             }}
           >
-            {error_msg}
+            {alloc_form.error}
           </div>
         )}
 
         <button
           type="button"
-          onClick={handle_submit}
+          onClick={alloc_form.submit}
           disabled={submit_disabled}
           style={{
             width: "100%",
@@ -873,7 +879,7 @@ export function MobileAllocateSheet({
             cursor: submit_disabled ? "not-allowed" : "pointer",
           }}
         >
-          {submitting ? "振り分け中…" : "＋ 振り分ける"}
+          {alloc_form.submitting ? "振り分け中…" : "＋ 振り分ける"}
         </button>
       </div>
     </div>
@@ -887,34 +893,34 @@ interface EditBaseSheetProps {
 }
 
 export function MobileEditBaseSheet({ onClose, base_amount, onSaved }: EditBaseSheetProps) {
-  const [draft_amount, setDraftAmount] = useState(String(base_amount));
-  const [submitting, setSubmitting] = useState(false);
-  const [error_msg, setErrorMsg] = useState("");
+  // Standalone sheet (mounted = open): single-value editor driven by useEntityForm (#138).
+  const base_form = useEntityForm<{ amount_yen: string }, BaseIncomeSetting>({
+    blank: () => ({ amount_yen: String(base_amount) }),
+    fromEntity: (b) => ({ amount_yen: String(b.amount) }),
+    validate: (f) => {
+      const parsed_amount = parseInt(f.amount_yen, 10);
+      return isNaN(parsed_amount) || parsed_amount < 1 ? "金額を正しく入力してください" : null;
+    },
+    onSubmit: async (f) => {
+      const res = await api.updateBaseIncome(parseInt(f.amount_yen, 10));
+      onSaved(res.amount);
+      onClose();
+    },
+  });
+
+  useEffect(() => {
+    base_form.openCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const form = base_form.form;
+  if (!form) return null;
 
   const PRESETS = [
     { label: "先月", value: base_amount },
     { label: "3ヶ月平均", value: 291000 },
     { label: "半年平均", value: 286500 },
   ];
-
-  const handle_save = async () => {
-    setErrorMsg("");
-    const parsed_amount = parseInt(draft_amount, 10);
-    if (isNaN(parsed_amount) || parsed_amount < 1) {
-      setErrorMsg("金額を正しく入力してください");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const res = await api.updateBaseIncome(parsed_amount);
-      onSaved(res.amount);
-      onClose();
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   return (
     <div
@@ -1005,8 +1011,8 @@ export function MobileEditBaseSheet({ onClose, base_amount, onSaved }: EditBaseS
           <input
             type="number"
             inputMode="numeric"
-            value={draft_amount}
-            onChange={(e) => setDraftAmount(e.target.value)}
+            value={form.amount_yen}
+            onChange={(e) => base_form.setField("amount_yen", e.target.value)}
             style={{
               flex: 1,
               border: "none",
@@ -1054,13 +1060,13 @@ export function MobileEditBaseSheet({ onClose, base_amount, onSaved }: EditBaseS
             <button
               key={p.label}
               type="button"
-              onClick={() => setDraftAmount(String(p.value))}
+              onClick={() => base_form.setField("amount_yen", String(p.value))}
               style={{
                 flex: 1,
                 padding: "9px 8px",
                 borderRadius: 12,
-                border: `1.5px solid ${String(p.value) === draft_amount ? T.sage : T.hair}`,
-                background: String(p.value) === draft_amount ? T.sageSoft : "#fff",
+                border: `1.5px solid ${String(p.value) === form.amount_yen ? T.sage : T.hair}`,
+                background: String(p.value) === form.amount_yen ? T.sageSoft : "#fff",
                 textAlign: "center",
                 cursor: "pointer",
                 fontFamily: "inherit",
@@ -1082,7 +1088,7 @@ export function MobileEditBaseSheet({ onClose, base_amount, onSaved }: EditBaseS
           ))}
         </div>
 
-        {error_msg && (
+        {base_form.error && (
           <div
             style={{
               marginBottom: 12,
@@ -1094,29 +1100,29 @@ export function MobileEditBaseSheet({ onClose, base_amount, onSaved }: EditBaseS
               fontWeight: 600,
             }}
           >
-            {error_msg}
+            {base_form.error}
           </div>
         )}
 
         <button
           type="button"
-          onClick={handle_save}
-          disabled={submitting}
+          onClick={base_form.submit}
+          disabled={base_form.submitting}
           style={{
             width: "100%",
             border: "none",
-            background: submitting ? T.inkSoft : T.coral,
+            background: base_form.submitting ? T.inkSoft : T.coral,
             color: "#fff",
             padding: "16px",
             borderRadius: 18,
             fontFamily: "inherit",
             fontWeight: 700,
             fontSize: 16,
-            boxShadow: submitting ? "none" : `0 6px 0 ${T.coralDeep}`,
-            cursor: submitting ? "not-allowed" : "pointer",
+            boxShadow: base_form.submitting ? "none" : `0 6px 0 ${T.coralDeep}`,
+            cursor: base_form.submitting ? "not-allowed" : "pointer",
           }}
         >
-          {submitting ? "保存中…" : "保存する"}
+          {base_form.submitting ? "保存中…" : "保存する"}
         </button>
       </div>
     </div>

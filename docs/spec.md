@@ -211,7 +211,7 @@ amount ≤ max(0, income_total(ym) − base_income) − already_allocated_total(
 
 ## 5. エンドポイント一覧
 
-詳細なリクエスト/レスポンス定義はOpenAPI仕様書（`kakebo-openapi.yaml`）を参照。
+詳細なリクエスト/レスポンス定義はOpenAPI仕様書（`atoikura-api.yaml`）を参照。
 
 | # | メソッド | パス | 概要 | 状態 |
 |---|---|---|---|---|
@@ -244,7 +244,7 @@ amount ≤ max(0, income_total(ym) − base_income) − already_allocated_total(
 
 ## 6. DBスキーマ概要
 
-詳細なスキーマ定義はDBMLファイル（`kakebo.dbml`）を参照。
+詳細なスキーマ定義はDBMLファイル（`atoikura.dbml`）を参照。
 
 | テーブル | 用途 | 削除方式 |
 |---|---|---|
