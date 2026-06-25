@@ -27,6 +27,10 @@ type BudgetSubScreen = "hub" | "income" | "recurring" | "savings";
 type UserProfile = components["schemas"]["UserResponse"];
 type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
 
+// A point in the in-app navigation, mirrored onto the browser history stack so
+// the native Back button walks screens instead of leaving the SPA (#165).
+type NavLocation = { tab: Tab; sub: BudgetSubScreen };
+
 function useMobile(): boolean {
   const [is_mobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 1023px)").matches);
   useEffect(() => {
@@ -530,6 +534,40 @@ export default function App() {
   const [edit_entry, setEditEntry] = useState<JournalEntryResponse | null>(null);
   const is_mobile = useMobile();
 
+  // ── In-app history (#165) ──────────────────────────────────────────────────
+  // Screen navigation is React state, not URL routes, so without History API
+  // integration the browser Back button leaves the SPA entirely. Every screen
+  // transition goes through `navigate`, which mirrors the new location onto the
+  // history stack; `popstate` restores it. Back then walks budget sub-screen →
+  // budget hub → home before the browser finally exits the app.
+  const navigate = (patch: Partial<NavLocation>) => {
+    const next: NavLocation = {
+      tab: patch.tab ?? active_tab,
+      sub: patch.sub ?? budget_sub,
+    };
+    if (next.tab === active_tab && next.sub === budget_sub) return;
+    setActiveTab(next.tab);
+    setBudgetSub(next.sub);
+    window.history.pushState({ nav: next }, "");
+  };
+
+  // Seed the first history entry once the user is authenticated so the initial
+  // popstate has a location to restore and Back from home exits cleanly.
+  useEffect(() => {
+    if (auth_state.status !== "authenticated") return;
+    window.history.replaceState({ nav: { tab: "home", sub: "hub" } satisfies NavLocation }, "");
+  }, [auth_state.status]);
+
+  useEffect(() => {
+    const handle_popstate = (event: PopStateEvent) => {
+      const nav = (event.state as { nav?: NavLocation } | null)?.nav;
+      setActiveTab(nav?.tab ?? "home");
+      setBudgetSub(nav?.sub ?? "hub");
+    };
+    window.addEventListener("popstate", handle_popstate);
+    return () => window.removeEventListener("popstate", handle_popstate);
+  }, []);
+
   useEffect(() => {
     if (auth_state.status !== "checking") return;
     let cancelled = false;
@@ -594,17 +632,14 @@ export default function App() {
       }}
     >
       {is_mobile ? (
-        <MobileHeader user={auth_state.user} onAvatarClick={() => setActiveTab("account")} />
+        <MobileHeader user={auth_state.user} onAvatarClick={() => navigate({ tab: "account" })} />
       ) : (
         <NavBar
           active={active_tab}
-          onChange={(tab) => {
-            // Tapping a nav button always lands on a tab's top-level view, so
-            // reset the budget sub-screen to the hub (#134) — otherwise the
-            // header "予算" button leaves you stranded on income/recurring.
-            setBudgetSub("hub");
-            setActiveTab(tab);
-          }}
+          // Tapping a nav button always lands on a tab's top-level view, so
+          // reset the budget sub-screen to the hub (#134) — otherwise the
+          // header "予算" button leaves you stranded on income/recurring.
+          onChange={(tab) => navigate({ tab, sub: "hub" })}
           listYearMonth={list_year_month}
           onListMonthChange={setListYearMonth}
           user={auth_state.user}
@@ -688,7 +723,10 @@ export default function App() {
 
         {active_tab === "home" &&
           (is_mobile ? (
-            <MobileHome refresh_token={refresh_token} onShowList={() => setActiveTab("list")} />
+            <MobileHome
+              refresh_token={refresh_token}
+              onShowList={() => navigate({ tab: "list" })}
+            />
           ) : (
             <WebHome
               refresh_token={refresh_token}
@@ -724,18 +762,20 @@ export default function App() {
           (() => {
             if (is_mobile) {
               if (budget_sub === "income")
-                return <MobileIncome onBack={() => setBudgetSub("hub")} />;
+                return <MobileIncome onBack={() => navigate({ sub: "hub" })} />;
               if (budget_sub === "recurring")
-                return <MobileRecurring onBack={() => setBudgetSub("hub")} />;
+                return <MobileRecurring onBack={() => navigate({ sub: "hub" })} />;
               if (budget_sub === "savings")
-                return <MobileSavings onBack={() => setBudgetSub("hub")} />;
-              return <MobileBudget onNavigate={(s) => setBudgetSub(s)} />;
+                return <MobileSavings onBack={() => navigate({ sub: "hub" })} />;
+              return <MobileBudget onNavigate={(s) => navigate({ sub: s })} />;
             }
-            if (budget_sub === "income") return <WebIncome onBack={() => setBudgetSub("hub")} />;
+            if (budget_sub === "income")
+              return <WebIncome onBack={() => navigate({ sub: "hub" })} />;
             if (budget_sub === "recurring")
-              return <WebRecurring onBack={() => setBudgetSub("hub")} />;
-            if (budget_sub === "savings") return <WebSavings onBack={() => setBudgetSub("hub")} />;
-            return <WebBudget onNavigate={(s) => setBudgetSub(s)} />;
+              return <WebRecurring onBack={() => navigate({ sub: "hub" })} />;
+            if (budget_sub === "savings")
+              return <WebSavings onBack={() => navigate({ sub: "hub" })} />;
+            return <WebBudget onNavigate={(s) => navigate({ sub: s })} />;
           })()}
 
         {active_tab === "master" && <WebMaster />}
@@ -746,12 +786,9 @@ export default function App() {
       {is_mobile && (
         <MobileTabBar
           active={active_tab}
-          onChange={(tab) => {
-            // Always return to the budget hub on a tab tap, including when the
-            // tapped tab is "予算" itself (#134).
-            setBudgetSub("hub");
-            setActiveTab(tab);
-          }}
+          // Always return to the budget hub on a tab tap, including when the
+          // tapped tab is "予算" itself (#134).
+          onChange={(tab) => navigate({ tab, sub: "hub" })}
           onPlusClick={() => {
             setEditEntry(null);
             setShowEntrySheet(true);
