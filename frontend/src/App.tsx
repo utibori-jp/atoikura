@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ReviewScreen } from "./components/ReviewScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { UserInfo } from "./components/UserInfo";
+import { Modal } from "./components/Modal";
 import { MobileHome } from "./components/mobile/MobileHome";
 import { MobileJournal } from "./components/mobile/MobileJournal";
 import { MobileEntryForm } from "./components/mobile/MobileEntryForm";
@@ -487,94 +488,28 @@ interface EntrySheetProps {
   onClose: () => void;
   onSuccess: () => void;
   edit_entry?: JournalEntryResponse | null;
+  is_mobile?: boolean;
 }
 
-function EntrySheet({ onClose, onSuccess, edit_entry }: EntrySheetProps) {
+function EntrySheet({ onClose, onSuccess, edit_entry, is_mobile = false }: EntrySheetProps) {
   const is_edit = !!edit_entry;
   const handle_success = () => {
     onSuccess();
     if (is_edit) onClose();
   };
 
+  // On web this is a compact, width-constrained centered card; on mobile the
+  // shared Modal renders its bottom-sheet variant, preserving the original
+  // sheet UX while no longer filling the whole screen on desktop (#133).
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 200,
-        background: "rgba(42,37,32,0.45)",
-      }}
-      onClick={onClose}
+    <Modal
+      title={is_edit ? "支出を編集" : "支出を記録"}
+      onClose={onClose}
+      is_mobile={is_mobile}
+      maxWidth={460}
     >
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: T.card,
-          borderTopLeftRadius: 32,
-          borderTopRightRadius: 32,
-          padding: "12px 20px",
-          paddingBottom: "max(env(safe-area-inset-bottom, 0px), 28px)",
-          boxShadow: "0 -20px 50px -20px rgba(0,0,0,0.3)",
-          maxHeight: "90dvh",
-          overflowY: "auto",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          style={{
-            width: 42,
-            height: 5,
-            borderRadius: 999,
-            background: T.hair,
-            margin: "0 auto 14px",
-          }}
-        />
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 16,
-          }}
-        >
-          <span
-            style={{
-              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
-              fontSize: 19,
-              fontWeight: 900,
-              color: T.ink,
-            }}
-          >
-            {is_edit ? "支出を編集" : "支出を記録"}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              width: 30,
-              height: 30,
-              minWidth: 44,
-              minHeight: 44,
-              borderRadius: 999,
-              background: T.bgSoft,
-              border: "none",
-              cursor: "pointer",
-              color: T.inkSoft,
-              fontSize: 15,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            ✕
-          </button>
-        </div>
-        <MobileEntryForm onSuccess={handle_success} edit_entry={edit_entry} />
-      </div>
-    </div>
+      <MobileEntryForm onSuccess={handle_success} edit_entry={edit_entry} />
+    </Modal>
   );
 }
 
@@ -833,6 +768,7 @@ export default function App() {
           }}
           onSuccess={() => setRefreshToken((t) => t + 1)}
           edit_entry={edit_entry}
+          is_mobile={is_mobile}
         />
       )}
     </div>

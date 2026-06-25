@@ -62,23 +62,21 @@ describe("App — mobile layout (≤ 1023 px)", () => {
     fireEvent.click(screen.getByRole("button", { name: "＋" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "✕" })).toBeInTheDocument();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
   });
 
-  it("closes EntrySheet when ✕ is clicked", async () => {
+  it("closes EntrySheet when the close button is clicked", async () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "＋" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "✕" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: "✕" }));
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "✕" })).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
   it("shows month navigation when journal tab is active", async () => {
