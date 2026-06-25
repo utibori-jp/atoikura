@@ -3,6 +3,7 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
+import { Modal } from "../Modal";
 
 type CategoryGroup = components["schemas"]["CategoryGroup"];
 type ExpenseCategory = components["schemas"]["ExpenseCategory"];
@@ -280,18 +281,11 @@ export function WebMaster() {
           </div>
 
           {group_form && (
-            <div
-              style={{
-                marginBottom: 18,
-                padding: "18px 20px",
-                borderRadius: 20,
-                background: T.bgSoft,
-                border: `1.5px solid ${T.hair}`,
-              }}
+            <Modal
+              title={group_form.id ? "大分類を編集" : "大分類を追加"}
+              onClose={() => setGroupForm(null)}
+              maxWidth={520}
             >
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
-                {group_form.id ? "大分類を編集" : "大分類を追加"}
-              </div>
               <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                 <div style={{ flex: "0 0 80px" }}>
                   <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>絵文字</div>
@@ -369,7 +363,7 @@ export function WebMaster() {
                   キャンセル
                 </button>
               </div>
-            </div>
+            </Modal>
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -495,41 +489,16 @@ export function WebMaster() {
             >
               生活区分（大分類ごと）
             </div>
-            <button
-              onClick={() => {
-                setCatForm({ id: null, name: "", category_code: "", group_id: "" });
-                setErrorMsg("");
-              }}
-              style={{
-                border: "none",
-                background: T.coral,
-                color: "#fff",
-                padding: "10px 18px",
-                borderRadius: 999,
-                fontFamily: "inherit",
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: "pointer",
-                boxShadow: `0 4px 0 ${T.coralDeep}`,
-              }}
-            >
-              ＋ 生活区分を追加
-            </button>
+            {/* The redundant top-right "＋ 生活区分を追加" button was removed (#130);
+                the per-group "＋ 追加" buttons are the single, in-context add entry. */}
           </div>
 
           {cat_form && (
-            <div
-              style={{
-                marginBottom: 18,
-                padding: "18px 20px",
-                borderRadius: 20,
-                background: T.bgSoft,
-                border: `1.5px solid ${T.hair}`,
-              }}
+            <Modal
+              title={cat_form.id ? "生活区分を編集" : "生活区分を追加"}
+              onClose={() => setCatForm(null)}
+              maxWidth={520}
             >
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
-                {cat_form.id ? "生活区分を編集" : "生活区分を追加"}
-              </div>
               <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>名前</div>
@@ -607,7 +576,7 @@ export function WebMaster() {
                   キャンセル
                 </button>
               </div>
-            </div>
+            </Modal>
           )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
