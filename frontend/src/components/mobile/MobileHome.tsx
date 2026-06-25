@@ -39,13 +39,16 @@ function daysInMonth(ym: string): number {
 interface MRingProps {
   size: number;
   pct: number;
+  danger?: boolean;
 }
 
-function MRing({ size, pct }: MRingProps) {
+function MRing({ size, pct, danger = false }: MRingProps) {
   const stroke = 18;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const spent = Math.max(0, Math.min(1, (100 - pct) / 100));
+  // Over budget: render a full, solid-red ring. Otherwise fill to the spent
+  // fraction with the usual mustard→coral gradient (#125).
+  const spent = danger ? 0 : Math.max(0, Math.min(1, (100 - pct) / 100));
   return (
     <svg
       width={size}
@@ -72,7 +75,7 @@ function MRing({ size, pct }: MRingProps) {
         cy={size / 2}
         r={r}
         fill="none"
-        stroke="url(#mRingGrad)"
+        stroke={danger ? T.danger : "url(#mRingGrad)"}
         strokeWidth={stroke}
         strokeLinecap="round"
         strokeDasharray={c}
@@ -323,6 +326,11 @@ export function MobileHome({ refresh_token, onShowList }: Props) {
   const spent_so_far = last_actual?.total ?? 0;
   const remaining = Math.max(0, monthly_budget - spent_so_far);
   const remaining_pct = monthly_budget > 0 ? Math.round((remaining / monthly_budget) * 100) : 0;
+  // Over-budget is distinct from "no budget set" and "exactly on budget":
+  // surface the overspend explicitly instead of clamping to a bare ¥0 (#125).
+  const over_budget = monthly_budget > 0 && spent_so_far > monthly_budget;
+  const overspend = Math.max(0, spent_so_far - monthly_budget);
+  const used_pct = monthly_budget > 0 ? Math.round((spent_so_far / monthly_budget) * 100) : 0;
   const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
   const projected_end = Math.round(daily_pace * days_total);
   const daily_left = days_left > 0 ? Math.round(remaining / days_left) : 0;
@@ -351,7 +359,7 @@ export function MobileHome({ refresh_token, onShowList }: Props) {
             marginTop: 8,
           }}
         >
-          <MRing size={200} pct={remaining_pct} />
+          <MRing size={200} pct={remaining_pct} danger={over_budget} />
           <div
             style={{
               position: "absolute",
@@ -362,33 +370,79 @@ export function MobileHome({ refresh_token, onShowList }: Props) {
               justifyContent: "center",
             }}
           >
-            <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-              <span
-                style={{
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: 700,
-                  fontSize: 42,
-                  letterSpacing: "-0.03em",
-                  lineHeight: 1,
-                  color: T.ink,
-                }}
-              >
-                {yenSlim(remaining)}
-              </span>
-              <span
-                style={{
-                  fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
-                  fontWeight: 700,
-                  fontSize: 16,
-                }}
-              >
-                円
-              </span>
-            </div>
-            <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 6 }}>
-              残り <strong style={{ color: T.coralDeep }}>{remaining_pct}%</strong> · あと
-              {days_left}日
-            </div>
+            {over_budget ? (
+              <>
+                <div
+                  style={{
+                    fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    color: T.danger,
+                    marginBottom: 4,
+                  }}
+                >
+                  予算オーバー
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+                  <span
+                    style={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontWeight: 700,
+                      fontSize: 38,
+                      letterSpacing: "-0.03em",
+                      lineHeight: 1,
+                      color: T.danger,
+                    }}
+                  >
+                    −{yenSlim(overspend)}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                      fontWeight: 700,
+                      fontSize: 16,
+                      color: T.danger,
+                    }}
+                  >
+                    円
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 6 }}>
+                  <strong style={{ color: T.danger }}>{used_pct}%</strong> 使用 · あと
+                  {days_left}日
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+                  <span
+                    style={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontWeight: 700,
+                      fontSize: 42,
+                      letterSpacing: "-0.03em",
+                      lineHeight: 1,
+                      color: T.ink,
+                    }}
+                  >
+                    {yenSlim(remaining)}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                      fontWeight: 700,
+                      fontSize: 16,
+                    }}
+                  >
+                    円
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 6 }}>
+                  残り <strong style={{ color: T.coralDeep }}>{remaining_pct}%</strong> · あと
+                  {days_left}日
+                </div>
+              </>
+            )}
           </div>
         </div>
         {monthly_budget > 0 && (
