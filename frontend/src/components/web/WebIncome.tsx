@@ -4,6 +4,7 @@ import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
 import { DateField } from "../DateField";
+import { Modal } from "../Modal";
 import {
   useEntityForm,
   FormField,
@@ -302,20 +303,13 @@ export function WebIncome({ onBack }: Props) {
         </button>
       </div>
 
-      {/* Inline create / edit form */}
+      {/* Create / edit form as a centered modal popup (#132) */}
       {income_form.form && (
-        <div
-          style={{
-            padding: "18px 20px",
-            borderRadius: 20,
-            background: T.bgSoft,
-            border: `1.5px solid ${T.hair}`,
-          }}
+        <Modal
+          title={income_form.isEdit ? "収入記録を編集" : "収入を記録"}
+          onClose={income_form.close}
+          maxWidth={520}
         >
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
-            {income_form.isEdit ? "収入記録を編集" : "収入を記録"}
-          </div>
-
           {/* Row 1: emoji + name */}
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: "0 0 80px" }}>
@@ -425,7 +419,7 @@ export function WebIncome({ onBack }: Props) {
               キャンセル
             </button>
           </div>
-        </div>
+        </Modal>
       )}
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
@@ -470,66 +464,17 @@ export function WebIncome({ onBack }: Props) {
                 基準収入
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 6 }}>
-                {base_form.form ? (
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", width: "100%" }}>
-                    <input
-                      type="number"
-                      value={base_form.form.amount_yen}
-                      onChange={(e) => base_form.setField("amount_yen", e.target.value)}
-                      placeholder="金額を入力"
-                      autoFocus
-                      style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        border: `1.5px solid ${T.coral}`,
-                        borderRadius: 10,
-                        fontFamily: "'DM Sans', sans-serif",
-                        fontSize: 18,
-                        fontWeight: 700,
-                        outline: "none",
-                      }}
-                    />
-                    <button
-                      onClick={base_form.submit}
-                      style={{
-                        border: "none",
-                        background: T.coral,
-                        color: "#fff",
-                        padding: "8px 14px",
-                        borderRadius: 10,
-                        fontFamily: "inherit",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
-                    >
-                      保存
-                    </button>
-                    <button
-                      onClick={base_form.close}
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        color: T.inkSoft,
-                        fontFamily: "inherit",
-                        cursor: "pointer",
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
-                  <span
-                    style={{
-                      fontFamily: "'DM Sans', sans-serif",
-                      fontWeight: 800,
-                      fontSize: 32,
-                      letterSpacing: "-0.02em",
-                      color: T.ink,
-                    }}
-                  >
-                    {yen(base_amount)}
-                  </span>
-                )}
+                <span
+                  style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 800,
+                    fontSize: 32,
+                    letterSpacing: "-0.02em",
+                    color: T.ink,
+                  }}
+                >
+                  {yen(base_amount)}
+                </span>
               </div>
               <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 3 }}>
                 毎月の見込み・予算の元
@@ -552,6 +497,53 @@ export function WebIncome({ onBack }: Props) {
                 >
                   ✎ 基準収入を編集
                 </button>
+              )}
+
+              {/* Base income edit as a centered modal popup (#132) */}
+              {base_form.form && (
+                <Modal title="基準収入を編集" onClose={base_form.close} maxWidth={360}>
+                  <AmountField
+                    label="金額（円）"
+                    min={1}
+                    value={base_form.form.amount_yen}
+                    onChange={(v) => base_form.setField("amount_yen", v)}
+                    placeholder="280000"
+                  />
+                  <FormError message={base_form.error} />
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <button
+                      onClick={base_form.submit}
+                      disabled={base_form.submitting}
+                      style={{
+                        border: "none",
+                        background: T.sage,
+                        color: "#fff",
+                        padding: "9px 20px",
+                        borderRadius: 999,
+                        fontFamily: "inherit",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        boxShadow: `0 3px 0 ${T.sageDeep}`,
+                      }}
+                    >
+                      {base_form.submitting ? "保存中…" : "保存"}
+                    </button>
+                    <button
+                      onClick={base_form.close}
+                      style={{
+                        border: `1px solid ${T.hair}`,
+                        background: "#fff",
+                        color: T.inkSoft,
+                        padding: "9px 20px",
+                        borderRadius: 999,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                      }}
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                </Modal>
               )}
             </div>
 
@@ -631,21 +623,9 @@ export function WebIncome({ onBack }: Props) {
                 振り分ける →
               </button>
 
-              {/* Inline allocation form */}
+              {/* Allocation form as a centered modal popup (#132) */}
               {alloc_form.form && (
-                <div
-                  style={{
-                    marginTop: 14,
-                    padding: "14px 16px",
-                    borderRadius: 16,
-                    background: T.bgSoft,
-                    border: `1.5px solid ${T.hair}`,
-                  }}
-                >
-                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
-                    余剰を振り分ける
-                  </div>
-
+                <Modal title="余剰を振り分ける" onClose={alloc_form.close} maxWidth={420}>
                   {/* Amount */}
                   <div style={{ marginBottom: 10 }}>
                     <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
@@ -791,7 +771,7 @@ export function WebIncome({ onBack }: Props) {
                       キャンセル
                     </button>
                   </div>
-                </div>
+                </Modal>
               )}
             </div>
           </div>
