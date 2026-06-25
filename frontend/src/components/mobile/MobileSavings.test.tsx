@@ -1,8 +1,15 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { http, HttpResponse } from "msw";
 import { server } from "../../test/server";
 import { MobileSavings } from "./MobileSavings";
+import { DialogProvider } from "../dialogs";
 import type { components } from "../../api/types";
+
+// MobileSavings consumes the confirm dialog via context (#166).
+function renderWithDialogs(ui: ReactElement) {
+  return render(<DialogProvider>{ui}</DialogProvider>);
+}
 
 const API_BASE = "http://localhost:8080";
 
@@ -44,7 +51,7 @@ describe("MobileSavings — create form", () => {
   it("opens the create sheet when ＋ 貯金目標を追加 is clicked", async () => {
     server.use(http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([]))));
 
-    render(<MobileSavings onBack={() => {}} />);
+    renderWithDialogs(<MobileSavings onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
@@ -68,7 +75,7 @@ describe("MobileSavings — create form", () => {
       })
     );
 
-    render(<MobileSavings onBack={() => {}} />);
+    renderWithDialogs(<MobileSavings onBack={() => {}} />);
     await waitForReady();
 
     // Open create sheet
@@ -95,7 +102,7 @@ describe("MobileSavings — create form", () => {
   it("shows validation error when name is empty", async () => {
     server.use(http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([]))));
 
-    render(<MobileSavings onBack={() => {}} />);
+    renderWithDialogs(<MobileSavings onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
@@ -109,7 +116,7 @@ describe("MobileSavings — create form", () => {
   it("closes the sheet when ✕ is clicked", async () => {
     server.use(http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([]))));
 
-    render(<MobileSavings onBack={() => {}} />);
+    renderWithDialogs(<MobileSavings onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
@@ -128,7 +135,7 @@ describe("MobileSavings — edit form", () => {
       http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([existing_goal])))
     );
 
-    render(<MobileSavings onBack={() => {}} />);
+    renderWithDialogs(<MobileSavings onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("旅行積立")).toBeInTheDocument();
@@ -158,7 +165,7 @@ describe("MobileSavings — edit form", () => {
       })
     );
 
-    render(<MobileSavings onBack={() => {}} />);
+    renderWithDialogs(<MobileSavings onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("旅行積立")).toBeInTheDocument();
@@ -200,24 +207,21 @@ describe("MobileSavings — delete", () => {
       })
     );
 
-    // Mock window.confirm to return true
-    const original_confirm = window.confirm;
-    window.confirm = () => true;
-
-    render(<MobileSavings onBack={() => {}} />);
+    renderWithDialogs(<MobileSavings onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("旅行積立")).toBeInTheDocument();
     });
 
+    // The 🗑 trigger opens the in-app confirm Modal (#166); confirm inside it.
     fireEvent.click(screen.getByRole("button", { name: "削除" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "削除" }));
 
     await waitFor(() => {
       expect(delete_called).toBe(true);
       expect(screen.queryByText("旅行積立")).not.toBeInTheDocument();
     });
-
-    window.confirm = original_confirm;
   });
 
   it("does not delete when confirmation is cancelled", async () => {
@@ -232,23 +236,20 @@ describe("MobileSavings — delete", () => {
       })
     );
 
-    // Mock window.confirm to return false (cancel)
-    const original_confirm = window.confirm;
-    window.confirm = () => false;
-
-    render(<MobileSavings onBack={() => {}} />);
+    renderWithDialogs(<MobileSavings onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("旅行積立")).toBeInTheDocument();
     });
 
+    // Open the confirm Modal, then cancel it.
     fireEvent.click(screen.getByRole("button", { name: "削除" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
 
     // Goal card should still be visible since delete was cancelled
     expect(delete_called).toBe(false);
     expect(screen.getByText("旅行積立")).toBeInTheDocument();
-
-    window.confirm = original_confirm;
   });
 });
 
@@ -269,7 +270,7 @@ describe("MobileSavings — post-monthly", () => {
       })
     );
 
-    render(<MobileSavings onBack={() => {}} />);
+    renderWithDialogs(<MobileSavings onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("旅行積立")).toBeInTheDocument();
@@ -294,7 +295,7 @@ describe("MobileSavings — post-monthly", () => {
       http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([posted_goal])))
     );
 
-    render(<MobileSavings onBack={() => {}} />);
+    renderWithDialogs(<MobileSavings onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("旅行積立")).toBeInTheDocument();

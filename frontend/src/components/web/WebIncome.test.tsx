@@ -1,8 +1,15 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { http, HttpResponse } from "msw";
 import { server } from "../../test/server";
 import { WebIncome } from "./WebIncome";
+import { DialogProvider } from "../dialogs";
 import type { components } from "../../api/types";
+
+// WebIncome consumes the confirm dialog via context (#166).
+function renderWithDialogs(ui: ReactElement) {
+  return render(<DialogProvider>{ui}</DialogProvider>);
+}
 
 const API_BASE = "http://localhost:8080";
 
@@ -56,7 +63,7 @@ describe("WebIncome — create form", () => {
   it("opens the create form when ＋ 収入を記録 is clicked", async () => {
     useDefaultHandlers();
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
@@ -91,7 +98,7 @@ describe("WebIncome — create form", () => {
       })
     );
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     // Open create form
@@ -118,7 +125,7 @@ describe("WebIncome — create form", () => {
   it("shows validation error when name is empty", async () => {
     useDefaultHandlers();
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
@@ -140,7 +147,7 @@ describe("WebIncome — create form", () => {
       })
     );
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
@@ -165,7 +172,7 @@ describe("WebIncome — create form", () => {
       })
     );
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
@@ -183,7 +190,7 @@ describe("WebIncome — create form", () => {
   it("shows validation error when amount is zero or invalid", async () => {
     useDefaultHandlers();
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
@@ -199,7 +206,7 @@ describe("WebIncome — create form", () => {
   it("closes the form when キャンセル is clicked", async () => {
     useDefaultHandlers();
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
@@ -221,7 +228,7 @@ describe("WebIncome — edit form", () => {
       http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome))
     );
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
 
     // Wait for record to render
     await waitFor(() => {
@@ -256,7 +263,7 @@ describe("WebIncome — edit form", () => {
       })
     );
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("6月給与")).toBeInTheDocument();
@@ -322,7 +329,7 @@ describe("WebIncome — surplus allocation", () => {
   it("shows 未振分 badge when there is unallocated surplus", async () => {
     setup_allocation_handlers(330000, 280000, []);
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     expect(screen.getByText("未振分")).toBeInTheDocument();
@@ -340,7 +347,7 @@ describe("WebIncome — surplus allocation", () => {
       },
     ]);
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     expect(screen.queryByText("未振分")).not.toBeInTheDocument();
@@ -349,7 +356,7 @@ describe("WebIncome — surplus allocation", () => {
   it("opens allocation form when 振り分ける → is clicked", async () => {
     setup_allocation_handlers(330000, 280000, []);
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: "振り分ける →" }));
@@ -402,7 +409,7 @@ describe("WebIncome — surplus allocation", () => {
       })
     );
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: "振り分ける →" }));
@@ -457,7 +464,7 @@ describe("WebIncome — surplus allocation", () => {
       })
     );
 
-    render(<WebIncome onBack={() => {}} />);
+    renderWithDialogs(<WebIncome onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: "振り分ける →" }));

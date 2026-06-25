@@ -1,8 +1,15 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { http, HttpResponse } from "msw";
 import { server } from "../../test/server";
 import { WebRecurring } from "./WebRecurring";
+import { DialogProvider } from "../dialogs";
 import type { components } from "../../api/types";
+
+// WebRecurring consumes the confirm dialog via context (#166).
+function renderWithDialogs(ui: ReactElement) {
+  return render(<DialogProvider>{ui}</DialogProvider>);
+}
 
 const API_BASE = "http://localhost:8080";
 
@@ -144,7 +151,7 @@ describe("WebRecurring — category filter (fixed-cost only)", () => {
       http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeFixedOnlyGroups()))
     );
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
     await waitForReady();
 
     // Open the create form to reveal the category select
@@ -163,7 +170,7 @@ describe("WebRecurring — create form", () => {
   it("opens the create form when ＋ 定期支出を追加 (header button) is clicked", async () => {
     useDefaultHandlers();
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
     await waitForReady();
 
     // Use the header button (role=button, name contains 定期支出を追加)
@@ -178,7 +185,7 @@ describe("WebRecurring — create form", () => {
   it("opens the create form when the bottom dashed button is clicked", async () => {
     useDefaultHandlers();
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
     await waitForReady();
 
     const add_buttons = screen.getAllByRole("button", { name: /定期支出を追加/ });
@@ -211,7 +218,7 @@ describe("WebRecurring — create form", () => {
       })
     );
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
     await waitForReady();
 
     // Open create form
@@ -243,7 +250,7 @@ describe("WebRecurring — create form", () => {
   it("shows validation error when name is empty", async () => {
     useDefaultHandlers();
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
     await waitForReady();
 
     const add_buttons = screen.getAllByRole("button", { name: /定期支出を追加/ });
@@ -270,7 +277,7 @@ describe("WebRecurring — create form", () => {
       })
     );
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
     await waitForReady();
 
     const add_buttons = screen.getAllByRole("button", { name: /定期支出を追加/ });
@@ -301,7 +308,7 @@ describe("WebRecurring — create form", () => {
       })
     );
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
     await waitForReady();
 
     const add_buttons = screen.getAllByRole("button", { name: /定期支出を追加/ });
@@ -321,7 +328,7 @@ describe("WebRecurring — create form", () => {
   it("shows validation error when billing_day is out of range", async () => {
     useDefaultHandlers();
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
     await waitForReady();
 
     const add_buttons = screen.getAllByRole("button", { name: /定期支出を追加/ });
@@ -338,7 +345,7 @@ describe("WebRecurring — create form", () => {
   it("closes the form when キャンセル is clicked", async () => {
     useDefaultHandlers();
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
     await waitForReady();
 
     const add_buttons = screen.getAllByRole("button", { name: /定期支出を追加/ });
@@ -365,7 +372,7 @@ describe("WebRecurring — edit form", () => {
       http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups()))
     );
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
 
     // Wait for item card to render
     await waitFor(() => {
@@ -404,7 +411,7 @@ describe("WebRecurring — edit form", () => {
       })
     );
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("家賃")).toBeInTheDocument();

@@ -1,8 +1,15 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { http, HttpResponse } from "msw";
 import { server } from "../../test/server";
 import { MobileRecurring } from "./MobileRecurring";
+import { DialogProvider } from "../dialogs";
 import type { components } from "../../api/types";
+
+// MobileRecurring consumes the confirm dialog via context (#166).
+function renderWithDialogs(ui: ReactElement) {
+  return render(<DialogProvider>{ui}</DialogProvider>);
+}
 
 const API_BASE = "http://localhost:8080";
 
@@ -159,7 +166,7 @@ describe("MobileRecurring — category filter (fixed-cost only)", () => {
       http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeFixedOnlyGroups()))
     );
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
     await waitForReady();
 
     // Open the bottom sheet to reveal the category select
@@ -177,7 +184,7 @@ describe("MobileRecurring — create form", () => {
   it("opens the bottom-sheet when ＋ 定期支出を追加 is clicked", async () => {
     useDefaultHandlers();
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
@@ -206,7 +213,7 @@ describe("MobileRecurring — create form", () => {
       })
     );
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
     await waitForReady();
 
     // Open create sheet
@@ -236,7 +243,7 @@ describe("MobileRecurring — create form", () => {
   it("shows validation error when name is empty", async () => {
     useDefaultHandlers();
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
@@ -262,7 +269,7 @@ describe("MobileRecurring — create form", () => {
       })
     );
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
@@ -292,7 +299,7 @@ describe("MobileRecurring — create form", () => {
       })
     );
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
@@ -311,7 +318,7 @@ describe("MobileRecurring — create form", () => {
   it("shows validation error when billing_day is out of range", async () => {
     useDefaultHandlers();
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
@@ -327,7 +334,7 @@ describe("MobileRecurring — create form", () => {
   it("closes the sheet when ✕ is clicked", async () => {
     useDefaultHandlers();
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
@@ -344,7 +351,7 @@ describe("MobileRecurring — edit form", () => {
 
     useDefaultHandlers(makeRecurringList([existing_recurring]));
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
 
     // Wait for the item to render
     await waitFor(() => {
@@ -384,7 +391,7 @@ describe("MobileRecurring — edit form", () => {
       })
     );
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("家賃")).toBeInTheDocument();
@@ -433,16 +440,16 @@ describe("MobileRecurring — delete", () => {
       })
     );
 
-    // Mock window.confirm to return true
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("家賃")).toBeInTheDocument();
     });
 
+    // The 🗑 trigger opens the in-app confirm Modal (#166); confirm inside it.
     fireEvent.click(screen.getByRole("button", { name: "削除" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "削除" }));
 
     await waitFor(() => {
       expect(delete_called).toBe(true);
@@ -450,11 +457,9 @@ describe("MobileRecurring — delete", () => {
 
     // Item should be removed from DOM
     expect(screen.queryByText("家賃")).not.toBeInTheDocument();
-
-    vi.restoreAllMocks();
   });
 
-  it("does NOT delete when window.confirm is cancelled", async () => {
+  it("does NOT delete when the confirm Modal is cancelled", async () => {
     const existing_recurring = makeRecurring();
     let delete_called = false;
 
@@ -473,23 +478,22 @@ describe("MobileRecurring — delete", () => {
       })
     );
 
-    vi.spyOn(window, "confirm").mockReturnValue(false);
-
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("家賃")).toBeInTheDocument();
     });
 
+    // Open the confirm Modal, then cancel it.
     fireEvent.click(screen.getByRole("button", { name: "削除" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
 
     // Give time for any async operation
     await new Promise((r) => setTimeout(r, 50));
 
     expect(delete_called).toBe(false);
     expect(screen.getByText("家賃")).toBeInTheDocument();
-
-    vi.restoreAllMocks();
   });
 });
 
@@ -499,7 +503,7 @@ describe("MobileRecurring — confirm pending", () => {
 
     useDefaultHandlers(makeRecurringList([]), makePendingList([pending_item]));
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("電気代")).toBeInTheDocument();
@@ -544,7 +548,7 @@ describe("MobileRecurring — confirm pending", () => {
       })
     );
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("電気代")).toBeInTheDocument();
@@ -588,7 +592,7 @@ describe("MobileRecurring — confirm pending", () => {
       })
     );
 
-    render(<MobileRecurring onBack={() => {}} />);
+    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText("電気代")).toBeInTheDocument();

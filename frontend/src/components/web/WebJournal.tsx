@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
+import { useConfirm } from "../dialogContext";
 import { emojiForGroup } from "../mobile/groupEmoji";
 
 type DailyJournalEntries = components["schemas"]["DailyJournalEntries"];
@@ -96,6 +97,7 @@ function DailyNoteField({
 }
 
 export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }: Props) {
+  const confirm = useConfirm();
   const [entries, setEntries] = useState<DailyJournalEntries[] | null>(null);
   const [daily_notes, setDailyNotes] = useState<Record<string, string>>({});
   const [error_msg, setErrorMsg] = useState("");
@@ -129,7 +131,13 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
   }, [year_month, refresh_token]);
 
   const handle_delete = async (id: number) => {
-    if (!window.confirm("この仕訳を削除しますか？")) return;
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この仕訳を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     setDeletingId(id);
     try {
       await api.deleteJournalEntry(id);

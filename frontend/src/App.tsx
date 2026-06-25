@@ -3,6 +3,7 @@ import { ReviewScreen } from "./components/ReviewScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { UserInfo } from "./components/UserInfo";
 import { Modal } from "./components/Modal";
+import { DialogProvider } from "./components/dialogs";
 import { MobileHome } from "./components/mobile/MobileHome";
 import { MobileJournal } from "./components/mobile/MobileJournal";
 import { MobileEntryForm } from "./components/mobile/MobileEntryForm";
@@ -518,7 +519,7 @@ type AuthState =
   | { status: "anonymous" }
   | { status: "authenticated"; user: UserProfile };
 
-export default function App() {
+function AppContent({ is_mobile }: { is_mobile: boolean }) {
   const [auth_state, setAuthState] = useState<AuthState>(() =>
     token_store.load() ? { status: "checking" } : { status: "anonymous" }
   );
@@ -528,7 +529,6 @@ export default function App() {
   const [list_year_month, setListYearMonth] = useState(currentMonthJST());
   const [show_entry_sheet, setShowEntrySheet] = useState(false);
   const [edit_entry, setEditEntry] = useState<JournalEntryResponse | null>(null);
-  const is_mobile = useMobile();
 
   useEffect(() => {
     if (auth_state.status !== "checking") return;
@@ -772,5 +772,17 @@ export default function App() {
         />
       )}
     </div>
+  );
+}
+
+export default function App() {
+  // One DialogProvider at the root renders the in-app confirm/alert Modal (#166);
+  // `is_mobile` is resolved once here and threaded through both the dialogs and
+  // the screen tree so the sheet/centered-card variant stays consistent.
+  const is_mobile = useMobile();
+  return (
+    <DialogProvider is_mobile={is_mobile}>
+      <AppContent is_mobile={is_mobile} />
+    </DialogProvider>
   );
 }

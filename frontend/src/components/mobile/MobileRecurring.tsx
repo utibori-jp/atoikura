@@ -3,6 +3,7 @@ import { T } from "../../theme";
 import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { EmojiPicker } from "../EmojiPicker";
+import { useConfirm } from "../dialogContext";
 import { useEntityForm, type UseEntityForm } from "../forms";
 
 type RecurringExpense = components["schemas"]["RecurringExpense"];
@@ -309,6 +310,7 @@ function RecurringSheet({ recurring_form, expense_categories }: RecurringSheetPr
 }
 
 export function MobileRecurring({ onBack }: MobileRecurringProps) {
+  const confirm = useConfirm();
   const [recurring, setRecurring] = useState<RecurringExpense[] | null>(null);
   const [pending, setPending] = useState<PendingRecurring[] | null>(null);
   const [expense_categories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
@@ -394,7 +396,13 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
   });
 
   const handle_delete = async (id: number) => {
-    if (!window.confirm("この定期支出を削除しますか？")) return;
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この定期支出を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     await api.deleteRecurringExpense(id).catch(() => {});
     setRecurring((prev) => (prev ? prev.filter((r) => r.id !== id) : prev));
   };

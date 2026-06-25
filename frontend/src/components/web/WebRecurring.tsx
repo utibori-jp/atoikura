@@ -4,6 +4,7 @@ import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
 import { Modal } from "../Modal";
+import { useConfirm } from "../dialogContext";
 import {
   useEntityForm,
   FormField,
@@ -72,6 +73,7 @@ function recurring_to_form(r: RecurringExpense): RecurringFormState {
 }
 
 export function WebRecurring({ onBack }: Props) {
+  const confirm = useConfirm();
   const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
   const [pending, setPending] = useState<PendingRecurring[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
@@ -151,7 +153,13 @@ export function WebRecurring({ onBack }: Props) {
   };
 
   const handle_delete = async (id: number) => {
-    if (!window.confirm("この定期支出を削除しますか？")) return;
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この定期支出を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     await api.deleteRecurringExpense(id).catch(() => {});
     setRecurring((prev) => prev.filter((r) => r.id !== id));
   };
