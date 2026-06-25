@@ -3,6 +3,7 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
+import { Modal } from "../Modal";
 import {
   useEntityForm,
   FormField,
@@ -248,20 +249,13 @@ export function WebRecurring({ onBack }: Props) {
         </button>
       </div>
 
-      {/* Inline create / edit form */}
+      {/* Create / edit form as a centered modal popup (#131) */}
       {recurring_form.form && (
-        <div
-          style={{
-            padding: "18px 20px",
-            borderRadius: 20,
-            background: T.bgSoft,
-            border: `1.5px solid ${T.hair}`,
-          }}
+        <Modal
+          title={recurring_form.isEdit ? "定期支出を編集" : "定期支出を追加"}
+          onClose={recurring_form.close}
+          maxWidth={520}
         >
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
-            {recurring_form.isEdit ? "定期支出を編集" : "定期支出を追加"}
-          </div>
-
           {/* Row 1: emoji + name */}
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: "0 0 80px" }}>
@@ -351,7 +345,7 @@ export function WebRecurring({ onBack }: Props) {
             onCancel={recurring_form.close}
             submitting={recurring_form.submitting}
           />
-        </div>
+        </Modal>
       )}
 
       {pending.length > 0 && (
