@@ -389,7 +389,7 @@ describe("WebRecurring — pending layout", () => {
       http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups()))
     );
 
-    render(<WebRecurring onBack={() => {}} />);
+    renderWithDialogs(<WebRecurring onBack={() => {}} />);
     await waitForReady();
 
     const pending_container = await screen.findByTestId("pending-cards");
