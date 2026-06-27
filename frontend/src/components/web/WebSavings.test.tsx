@@ -1,8 +1,15 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { http, HttpResponse } from "msw";
 import { server } from "../../test/server";
 import { WebSavings } from "./WebSavings";
+import { DialogProvider } from "../dialogs";
 import type { components } from "../../api/types";
+
+// WebSavings consumes the confirm dialog via context (#166).
+function renderWithDialogs(ui: ReactElement) {
+  return render(<DialogProvider>{ui}</DialogProvider>);
+}
 
 const API_BASE = "http://localhost:8080";
 
@@ -44,7 +51,7 @@ describe("WebSavings — create form", () => {
   it("opens the create form when ＋ 貯金目標を追加 is clicked", async () => {
     server.use(http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([]))));
 
-    render(<WebSavings onBack={() => {}} />);
+    renderWithDialogs(<WebSavings onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
@@ -72,7 +79,7 @@ describe("WebSavings — create form", () => {
       })
     );
 
-    render(<WebSavings onBack={() => {}} />);
+    renderWithDialogs(<WebSavings onBack={() => {}} />);
     await waitForReady();
 
     // Open create form
@@ -108,7 +115,7 @@ describe("WebSavings — create form", () => {
       })
     );
 
-    render(<WebSavings onBack={() => {}} />);
+    renderWithDialogs(<WebSavings onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
@@ -132,7 +139,7 @@ describe("WebSavings — create form", () => {
       })
     );
 
-    render(<WebSavings onBack={() => {}} />);
+    renderWithDialogs(<WebSavings onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
@@ -150,7 +157,7 @@ describe("WebSavings — create form", () => {
   it("shows validation error when name is empty", async () => {
     server.use(http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([]))));
 
-    render(<WebSavings onBack={() => {}} />);
+    renderWithDialogs(<WebSavings onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
@@ -164,7 +171,7 @@ describe("WebSavings — create form", () => {
   it("closes the form when キャンセル is clicked", async () => {
     server.use(http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([]))));
 
-    render(<WebSavings onBack={() => {}} />);
+    renderWithDialogs(<WebSavings onBack={() => {}} />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
@@ -183,7 +190,7 @@ describe("WebSavings — edit form", () => {
       http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([existing_goal])))
     );
 
-    render(<WebSavings onBack={() => {}} />);
+    renderWithDialogs(<WebSavings onBack={() => {}} />);
 
     // Wait for goal card to render
     await waitFor(() => {
@@ -216,7 +223,7 @@ describe("WebSavings — edit form", () => {
       })
     );
 
-    render(<WebSavings onBack={() => {}} />);
+    renderWithDialogs(<WebSavings onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getAllByText("旅行積立").length).toBeGreaterThan(0);

@@ -5,6 +5,7 @@ import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
 import { DateField } from "../DateField";
 import { Modal } from "../Modal";
+import { useConfirm } from "../dialogContext";
 import {
   useEntityForm,
   FormField,
@@ -115,6 +116,7 @@ function blank_alloc_form(savings_goals: SavingsGoal[]): AllocFormState {
 }
 
 export function WebIncome({ onBack }: Props) {
+  const confirm = useConfirm();
   const current_ym = currentMonthJST();
   const [active_ym, setActiveYm] = useState(current_ym);
   const [records, setRecords] = useState<IncomeRecord[]>([]);
@@ -174,7 +176,13 @@ export function WebIncome({ onBack }: Props) {
   const days_with_income = [...new Set(records.map((r) => r.transaction_date))].sort().reverse();
 
   const handle_delete = async (id: number) => {
-    if (!window.confirm("この収入記録を削除しますか？")) return;
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この収入記録を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     await api.deleteIncomeRecord(id).catch(() => {});
     setRecords((prev) => prev.filter((r) => r.id !== id));
   };

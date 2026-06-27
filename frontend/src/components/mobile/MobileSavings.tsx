@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { T } from "../../theme";
 import { api } from "../../api/client";
 import type { components } from "../../api/types";
+import { useConfirm } from "../dialogContext";
 import { useEntityForm, type UseEntityForm } from "../forms";
 
 type SavingsGoal = components["schemas"]["SavingsGoal"];
@@ -316,6 +317,7 @@ export function MobileSavingsSheet({ goal_form }: MobileSavingsSheetProps) {
 
 export function MobileSavings({ onBack }: MobileSavingsProps) {
   const [savings_goals, setSavingsGoals] = useState<SavingsGoal[] | null>(null);
+  const confirm = useConfirm();
   const ym = currentMonthJST();
 
   const refresh_goals = async () => {
@@ -370,7 +372,13 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
   const savings_monthly_total = savings_goals?.reduce((sum, g) => sum + g.monthly_amount, 0) ?? 0;
 
   const handle_delete = async (goal_id: number) => {
-    if (!window.confirm("この貯金目標を削除しますか？")) return;
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この貯金目標を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     await api.deleteSavingsGoal(goal_id).catch(() => {});
     setSavingsGoals((prev) => (prev ? prev.filter((g) => g.id !== goal_id) : prev));
   };

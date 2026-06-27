@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
+import { useAlert, useConfirm } from "../dialogContext";
 import { emojiForGroup } from "./groupEmoji";
 
 type DailyJournalEntries = components["schemas"]["DailyJournalEntries"];
@@ -32,6 +33,8 @@ function formatDateParts(date_str: string): { day: number; month: number; weekda
 }
 
 export function MobileJournal({ year_month, refresh_token, onEditEntry }: Props) {
+  const confirm = useConfirm();
+  const alert = useAlert();
   const [entries, setEntries] = useState<DailyJournalEntries[] | null>(null);
   const [error_message, setErrorMessage] = useState("");
   const [daily_notes_map, setDailyNotesMap] = useState<Record<string, string>>({});
@@ -66,13 +69,19 @@ export function MobileJournal({ year_month, refresh_token, onEditEntry }: Props)
   }, [year_month, refresh_token, local_refresh]);
 
   const handle_delete = async (id: number) => {
-    if (!window.confirm("この仕訳を削除しますか？")) return;
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この仕訳を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     setDeletingId(id);
     try {
       await api.deleteJournalEntry(id);
       setLocalRefresh((n) => n + 1);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "削除に失敗しました");
+      await alert(err instanceof Error ? err.message : "削除に失敗しました");
     } finally {
       setDeletingId(null);
     }
@@ -90,7 +99,7 @@ export function MobileJournal({ year_month, refresh_token, onEditEntry }: Props)
       });
       setEditingNoteDate(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "コメントの保存に失敗しました");
+      await alert(err instanceof Error ? err.message : "コメントの保存に失敗しました");
     } finally {
       setSavingNoteDate(null);
     }

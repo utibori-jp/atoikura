@@ -4,6 +4,7 @@ import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
 import { Modal } from "../Modal";
+import { useAlert, useConfirm } from "../dialogContext";
 
 type CategoryGroup = components["schemas"]["CategoryGroup"];
 type ExpenseCategory = components["schemas"]["ExpenseCategory"];
@@ -29,6 +30,8 @@ interface CategoryFormState {
 }
 
 export function WebMaster() {
+  const confirm = useConfirm();
+  const alert = useAlert();
   const [active_tab, setActiveTab] = useState<ActiveTab>("groups");
   const [groups, setGroups] = useState<CategoryGroup[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
@@ -107,12 +110,18 @@ export function WebMaster() {
   };
 
   const handle_group_delete = async (id: number) => {
-    if (!window.confirm("この大分類を削除しますか？")) return;
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この大分類を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await api.deleteCategoryGroup(id);
       await refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "削除に失敗しました");
+      await alert(err instanceof Error ? err.message : "削除に失敗しました");
     }
   };
 
@@ -153,12 +162,18 @@ export function WebMaster() {
   };
 
   const handle_cat_delete = async (id: number) => {
-    if (!window.confirm("この生活区分を削除しますか？")) return;
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この生活区分を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await api.deleteExpenseCategory(id);
       await refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "削除に失敗しました");
+      await alert(err instanceof Error ? err.message : "削除に失敗しました");
     }
   };
 

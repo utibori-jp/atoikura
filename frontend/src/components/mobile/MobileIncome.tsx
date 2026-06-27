@@ -3,6 +3,7 @@ import { T } from "../../theme";
 import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { DateField } from "../DateField";
+import { useConfirm } from "../dialogContext";
 import { useEntityForm } from "../forms";
 
 type IncomeRecord = components["schemas"]["IncomeRecord"];
@@ -1132,6 +1133,7 @@ export function MobileEditBaseSheet({ onClose, base_amount, onSaved }: EditBaseS
 // ── Main screen ──────────────────────────────────────────────────────────
 
 export function MobileIncome({ onBack }: MobileIncomeProps) {
+  const confirm = useConfirm();
   const [incomes, setIncomes] = useState<IncomeRecord[] | null>(null);
   const [base_income, setBaseIncome] = useState<BaseIncomeSetting | null>(null);
   const [savings_goals, setSavingsGoals] = useState<SavingsGoal[]>([]);
@@ -1193,7 +1195,13 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
   };
 
   const handle_delete = async (record_id: number) => {
-    if (!window.confirm("この収入記録を削除しますか？")) return;
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この収入記録を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     await api.deleteIncomeRecord(record_id).catch(() => {});
     setIncomes((prev) => (prev ? prev.filter((r) => r.id !== record_id) : prev));
   };

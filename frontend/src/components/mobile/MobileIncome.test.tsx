@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { http, HttpResponse } from "msw";
 import { server } from "../../test/server";
 import {
@@ -7,14 +8,19 @@ import {
   MobileEditBaseSheet,
   MobileAllocateSheet,
 } from "./MobileIncome";
+import { DialogProvider } from "../dialogs";
 import type { components } from "../../api/types";
+
+// MobileIncome consumes the confirm dialog via context (#166), so its renders
+// must be wrapped in a DialogProvider.
+function renderIncome(ui: ReactElement) {
+  return render(<DialogProvider>{ui}</DialogProvider>);
+}
 
 const TOKEN_KEY = "atoikura.jwt_token";
 
 beforeEach(() => {
   sessionStorage.setItem(TOKEN_KEY, "test-token");
-  // jsdom does not implement window.confirm; stub it to return true by default
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -57,7 +63,7 @@ describe("MobileIncome", () => {
     setup_income_list_handler([]);
     setup_base_income_handler(sample_base_income);
 
-    render(<MobileIncome onBack={vi.fn()} />);
+    renderIncome(<MobileIncome onBack={vi.fn()} />);
 
     // Loading text appears first
     expect(screen.getByText("読み込み中…")).toBeInTheDocument();
@@ -71,7 +77,7 @@ describe("MobileIncome", () => {
     setup_income_list_handler([sample_income]);
     setup_base_income_handler(sample_base_income);
 
-    render(<MobileIncome onBack={vi.fn()} />);
+    renderIncome(<MobileIncome onBack={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("6月給与")).toBeInTheDocument());
     // Income type badge should be visible
@@ -82,7 +88,7 @@ describe("MobileIncome", () => {
     setup_income_list_handler([]);
     setup_base_income_handler(sample_base_income);
 
-    render(<MobileIncome onBack={vi.fn()} />);
+    renderIncome(<MobileIncome onBack={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("＋ 収入を記録")).toBeInTheDocument());
 
@@ -95,7 +101,7 @@ describe("MobileIncome", () => {
     setup_income_list_handler([sample_income]);
     setup_base_income_handler(sample_base_income);
 
-    render(<MobileIncome onBack={vi.fn()} />);
+    renderIncome(<MobileIncome onBack={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("6月給与")).toBeInTheDocument());
 
@@ -123,15 +129,17 @@ describe("MobileIncome", () => {
       })
     );
 
-    render(<MobileIncome onBack={vi.fn()} />);
+    renderIncome(<MobileIncome onBack={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("6月給与")).toBeInTheDocument());
 
-    // Click the delete (🗑) button
+    // The 🗑 trigger opens the in-app confirm Modal (#166); confirm inside it.
     const delete_buttons = screen.getAllByRole("button", { name: "🗑" });
     fireEvent.click(delete_buttons[0]);
 
-    expect(window.confirm).toHaveBeenCalledWith("この収入記録を削除しますか？");
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("この収入記録を削除しますか？")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "削除" }));
 
     await waitFor(() => expect(screen.queryByText("6月給与")).not.toBeInTheDocument());
   });
@@ -139,14 +147,17 @@ describe("MobileIncome", () => {
   it("does not delete when confirm dialog is cancelled", async () => {
     setup_income_list_handler([sample_income]);
     setup_base_income_handler(sample_base_income);
-    vi.spyOn(window, "confirm").mockReturnValue(false);
 
-    render(<MobileIncome onBack={vi.fn()} />);
+    renderIncome(<MobileIncome onBack={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("6月給与")).toBeInTheDocument());
 
     const delete_buttons = screen.getAllByRole("button", { name: "🗑" });
     fireEvent.click(delete_buttons[0]);
+
+    // Cancel the confirm Modal.
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
 
     // Income record should still be visible
     expect(screen.getByText("6月給与")).toBeInTheDocument();
@@ -156,7 +167,7 @@ describe("MobileIncome", () => {
     setup_income_list_handler([]);
     setup_base_income_handler(sample_base_income);
 
-    render(<MobileIncome onBack={vi.fn()} />);
+    renderIncome(<MobileIncome onBack={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("基準収入")).toBeInTheDocument());
 
@@ -174,7 +185,7 @@ describe("MobileIncome", () => {
     setup_base_income_handler(sample_base_income);
 
     const on_back = vi.fn();
-    render(<MobileIncome onBack={on_back} />);
+    renderIncome(<MobileIncome onBack={on_back} />);
 
     fireEvent.click(screen.getByText("‹ 予算"));
 
@@ -399,7 +410,7 @@ describe("MobileIncome — surplus allocation", () => {
   it("shows 未振分 badge when there is unallocated surplus", async () => {
     setup_income_handlers(50000, []);
 
-    render(<MobileIncome onBack={vi.fn()} />);
+    renderIncome(<MobileIncome onBack={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("未振分")).toBeInTheDocument());
   });
@@ -416,7 +427,7 @@ describe("MobileIncome — surplus allocation", () => {
       },
     ]);
 
-    render(<MobileIncome onBack={vi.fn()} />);
+    renderIncome(<MobileIncome onBack={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("基準収入")).toBeInTheDocument());
     expect(screen.queryByText("未振分")).not.toBeInTheDocument();
@@ -425,7 +436,7 @@ describe("MobileIncome — surplus allocation", () => {
   it("opens allocate sheet when 振り分ける → is clicked", async () => {
     setup_income_handlers(50000, []);
 
-    render(<MobileIncome onBack={vi.fn()} />);
+    renderIncome(<MobileIncome onBack={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("振り分ける →")).toBeInTheDocument());
 
@@ -479,7 +490,7 @@ describe("MobileIncome — surplus allocation", () => {
       })
     );
 
-    render(<MobileIncome onBack={vi.fn()} />);
+    renderIncome(<MobileIncome onBack={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("未振分")).toBeInTheDocument());
 

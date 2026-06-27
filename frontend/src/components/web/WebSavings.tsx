@@ -3,6 +3,7 @@ import { api } from "../../api/client";
 import type { components } from "../../api/types";
 import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
+import { useConfirm } from "../dialogContext";
 import { useEntityForm, FormField, AmountField, FormError, FormActions } from "../forms";
 
 type SavingsGoal = components["schemas"]["SavingsGoal"];
@@ -60,6 +61,7 @@ function goal_to_form(g: SavingsGoal): GoalFormState {
 
 export function WebSavings({ onBack }: Props) {
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
+  const confirm = useConfirm();
   const ym = currentMonthJST();
 
   const refresh_goals = async () => {
@@ -83,7 +85,13 @@ export function WebSavings({ onBack }: Props) {
   const monthly_total = goals.reduce((s, g) => s + g.monthly_amount, 0);
 
   const handle_delete = async (id: number) => {
-    if (!window.confirm("この貯金目標を削除しますか？")) return;
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この貯金目標を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     await api.deleteSavingsGoal(id).catch(() => {});
     setGoals((prev) => prev.filter((g) => g.id !== id));
   };

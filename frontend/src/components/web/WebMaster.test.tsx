@@ -1,8 +1,15 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { http, HttpResponse } from "msw";
 import { server } from "../../test/server";
 import { WebMaster } from "./WebMaster";
+import { DialogProvider } from "../dialogs";
 import type { components } from "../../api/types";
+
+// WebMaster consumes the confirm/alert dialogs via context (#166).
+function renderWithDialogs(ui: ReactElement) {
+  return render(<DialogProvider>{ui}</DialogProvider>);
+}
 
 const API_BASE = "http://localhost:8080";
 
@@ -57,7 +64,7 @@ async function waitForReady() {
 describe("WebMaster — forms as modals (#130)", () => {
   it("no longer renders the redundant top-right ＋ 生活区分を追加 button", async () => {
     useDefaultHandlers();
-    render(<WebMaster />);
+    renderWithDialogs(<WebMaster />);
     await waitForReady();
 
     // Switch to the 生活区分 tab where the removed button used to live.
@@ -72,7 +79,7 @@ describe("WebMaster — forms as modals (#130)", () => {
 
   it("opens the 大分類 create form as a dialog from ＋ 大分類を追加", async () => {
     useDefaultHandlers();
-    render(<WebMaster />);
+    renderWithDialogs(<WebMaster />);
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /大分類を追加/ }));
@@ -86,7 +93,7 @@ describe("WebMaster — forms as modals (#130)", () => {
 
   it("opens the 生活区分 create form as a dialog from a per-group ＋ 追加", async () => {
     useDefaultHandlers();
-    render(<WebMaster />);
+    renderWithDialogs(<WebMaster />);
     await waitForReady();
 
     // The per-group ＋ 追加 button lives on the 生活区分 tab.
