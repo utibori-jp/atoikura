@@ -378,12 +378,14 @@ export function WebRecurring({ onBack }: Props) {
               {parseInt(ym.split("-")[1])}月分
             </span>
           </div>
-          <div style={{ display: "flex", gap: 16 }}>
+          <div
+            data-testid="pending-cards"
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
+          >
             {pending.map((p) => (
               <div
                 key={p.id}
                 style={{
-                  flex: 1,
                   background: T.card,
                   borderRadius: 24,
                   padding: "20px 22px",
