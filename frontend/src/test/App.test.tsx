@@ -157,4 +157,54 @@ describe("App — desktop layout (≥ 1024 px)", () => {
     await waitFor(() => expect(screen.getByText("今月の予算プラン")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: /収入を記録/ })).not.toBeInTheDocument();
   });
+
+  it("pushes a history entry for each in-app screen transition (#165)", async () => {
+    const push_spy = vi.spyOn(window.history, "pushState");
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+    const nav = document.querySelector("nav") as HTMLElement;
+
+    // Tab change pushes a history entry carrying the new location.
+    fireEvent.click(within(nav).getByRole("button", { name: /予算/ }));
+    await waitFor(() => expect(screen.getByText("今月の予算プラン")).toBeInTheDocument());
+    expect(push_spy).toHaveBeenCalledWith({ nav: { tab: "budget", sub: "hub" } }, "");
+
+    // Drilling into a sub-screen pushes another entry.
+    fireEvent.click(screen.getByText("毎月の見込み収入"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /収入を記録/ })).toBeInTheDocument()
+    );
+    expect(push_spy).toHaveBeenCalledWith({ nav: { tab: "budget", sub: "income" } }, "");
+
+    push_spy.mockRestore();
+  });
+
+  it("browser Back (popstate) returns to the previous in-app screen (#165)", async () => {
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+    const nav = document.querySelector("nav") as HTMLElement;
+
+    // Navigate home → budget hub → income sub-screen.
+    fireEvent.click(within(nav).getByRole("button", { name: /予算/ }));
+    await waitFor(() => expect(screen.getByText("今月の予算プラン")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("毎月の見込み収入"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /収入を記録/ })).toBeInTheDocument()
+    );
+
+    // Back restores the budget hub (the previous location), not an app exit.
+    window.dispatchEvent(
+      new PopStateEvent("popstate", { state: { nav: { tab: "budget", sub: "hub" } } })
+    );
+    await waitFor(() => expect(screen.getByText("今月の予算プラン")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /収入を記録/ })).not.toBeInTheDocument();
+
+    // Back again restores home.
+    window.dispatchEvent(
+      new PopStateEvent("popstate", { state: { nav: { tab: "home", sub: "hub" } } })
+    );
+    await waitFor(() => expect(screen.queryByText("今月の予算プラン")).not.toBeInTheDocument());
+  });
 });
