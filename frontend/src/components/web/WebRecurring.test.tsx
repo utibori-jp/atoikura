@@ -38,6 +38,20 @@ function makePendingList(
   return { pending: items };
 }
 
+function makePending(
+  overrides: Partial<components["schemas"]["PendingRecurring"]> = {}
+): components["schemas"]["PendingRecurring"] {
+  return {
+    id: 1,
+    name: "電気代",
+    emoji: "💡",
+    billing_day: 10,
+    last_amount: 7480,
+    group_name: "固定費",
+    ...overrides,
+  };
+}
+
 function makeCategoryList(): components["schemas"]["ExpenseCategoryListResponse"] {
   return {
     expense_categories: [
@@ -347,6 +361,33 @@ describe("WebRecurring — create form", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
     expect(screen.queryByText("定期支出を追加")).not.toBeInTheDocument();
+  });
+});
+
+describe("WebRecurring — pending layout", () => {
+  it("lays the 確認待ち cards out in a 2-column grid (not a single squeezed row)", async () => {
+    server.use(
+      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(makeRecurringList([]))),
+      http.get(`${API_BASE}/recurring-expenses/pending`, () =>
+        HttpResponse.json(
+          makePendingList([
+            makePending({ id: 1, name: "電気代" }),
+            makePending({ id: 2, name: "ガス代" }),
+            makePending({ id: 3, name: "水道代" }),
+            makePending({ id: 4, name: "通信費" }),
+          ])
+        )
+      ),
+      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
+      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups()))
+    );
+
+    render(<WebRecurring onBack={() => {}} />);
+    await waitForReady();
+
+    const pending_container = await screen.findByTestId("pending-cards");
+    expect(pending_container).toHaveStyle({ display: "grid" });
+    expect(pending_container).toHaveStyle({ gridTemplateColumns: "1fr 1fr" });
   });
 });
 
