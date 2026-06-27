@@ -44,14 +44,29 @@ interface DonutProps {
   remaining: number;
   remaining_pct: number;
   days_left: number;
+  over_budget: boolean;
+  overspend: number;
+  used_pct: number;
 }
 
-function DonutChart({ size, spent_pct, remaining, remaining_pct, days_left }: DonutProps) {
+function DonutChart({
+  size,
+  spent_pct,
+  remaining,
+  remaining_pct,
+  days_left,
+  over_budget,
+  overspend,
+  used_pct,
+}: DonutProps) {
   const r = 96;
   const cx = size / 2;
   const cy = size / 2;
   const circ = 2 * Math.PI * r;
-  const spent_arc = (circ * spent_pct) / 100;
+  // When over budget the ring is full and solid-red; otherwise it fills to the
+  // spent fraction with the usual mustard→coral gradient (#125).
+  const arc_pct = over_budget ? 100 : spent_pct;
+  const spent_arc = (circ * arc_pct) / 100;
 
   return (
     <div style={{ position: "relative", width: size, height: size }}>
@@ -63,13 +78,13 @@ function DonutChart({ size, spent_pct, remaining, remaining_pct, days_left }: Do
           </linearGradient>
         </defs>
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="#FFE8DD" strokeWidth="26" />
-        {spent_pct > 0 && (
+        {arc_pct > 0 && (
           <circle
             cx={cx}
             cy={cy}
             r={r}
             fill="none"
-            stroke="url(#webDonutGrad)"
+            stroke={over_budget ? T.danger : "url(#webDonutGrad)"}
             strokeWidth="26"
             strokeDasharray={`${spent_arc} ${circ}`}
             strokeLinecap="round"
@@ -87,33 +102,79 @@ function DonutChart({ size, spent_pct, remaining, remaining_pct, days_left }: Do
           justifyContent: "center",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-          <span
-            style={{
-              fontFamily: "'DM Sans', sans-serif",
-              fontWeight: 700,
-              fontSize: 38,
-              letterSpacing: "-0.03em",
-              color: T.ink,
-              lineHeight: 1,
-            }}
-          >
-            {yenSlim(remaining)}
-          </span>
-          <span
-            style={{
-              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
-              fontWeight: 700,
-              fontSize: 17,
-              color: T.ink,
-            }}
-          >
-            円
-          </span>
-        </div>
-        <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 6 }}>
-          残り <strong style={{ color: T.coralDeep }}>{remaining_pct}%</strong> · あと{days_left}日
-        </div>
+        {over_budget ? (
+          <>
+            <div
+              style={{
+                fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                fontSize: 13,
+                fontWeight: 700,
+                color: T.danger,
+                marginBottom: 4,
+              }}
+            >
+              予算オーバー
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+              <span
+                style={{
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 36,
+                  letterSpacing: "-0.03em",
+                  color: T.danger,
+                  lineHeight: 1,
+                }}
+              >
+                −{yenSlim(overspend)}
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 17,
+                  color: T.danger,
+                }}
+              >
+                円
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 6 }}>
+              <strong style={{ color: T.danger }}>{used_pct}%</strong> 使用 · あと{days_left}日
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+              <span
+                style={{
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 38,
+                  letterSpacing: "-0.03em",
+                  color: T.ink,
+                  lineHeight: 1,
+                }}
+              >
+                {yenSlim(remaining)}
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 17,
+                  color: T.ink,
+                }}
+              >
+                円
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 6 }}>
+              残り <strong style={{ color: T.coralDeep }}>{remaining_pct}%</strong> · あと
+              {days_left}日
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -785,6 +846,11 @@ export function WebHome({ refresh_token, onSuccess }: Props) {
   const remaining = Math.max(0, monthly_budget - spent_so_far);
   const remaining_pct = monthly_budget > 0 ? Math.round((remaining / monthly_budget) * 100) : 0;
   const spent_pct = 100 - remaining_pct;
+  // Over-budget is distinct from "no budget set" and from "exactly on budget":
+  // surface the overspend explicitly instead of clamping to a bare ¥0 (#125).
+  const over_budget = monthly_budget > 0 && spent_so_far > monthly_budget;
+  const overspend = Math.max(0, spent_so_far - monthly_budget);
+  const used_pct = monthly_budget > 0 ? Math.round((spent_so_far / monthly_budget) * 100) : 0;
   const days_left = Math.max(0, days_total - today_day);
   const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
   const projected_end = Math.round(daily_pace * days_total);
@@ -848,6 +914,9 @@ export function WebHome({ refresh_token, onSuccess }: Props) {
             remaining={remaining}
             remaining_pct={remaining_pct}
             days_left={days_left}
+            over_budget={over_budget}
+            overspend={overspend}
+            used_pct={used_pct}
           />
         </div>
 
