@@ -6,18 +6,12 @@ Guidelines for Claude Code when working in this repository.
 
 ## Must Read Before Starting
 
-Common to all tasks:
+The tool-agnostic onboarding list (which docs to read, in what order, for which
+work area) lives in **[`AGENTS.md`](AGENTS.md)** — the single source of truth so
+the guidance doesn't drift between files. Read it first.
 
-- `docs/spec.md` — Specifications / V1 constraints (Source of Truth)
-- `docs/atoikura.dbml` — DB schema definitions
-- `docs/atoikura-api.yaml` — OpenAPI contracts
-- `docs/architecture.md` — Tech stack and directory structure
-
-Read additional documents based on the work area:
-
-- For Backend work → `docs/conventions/conventions-backend.md`
-- For Frontend work → `docs/conventions/conventions-frontend.md`
-- For UI work → `docs/design/` — high-fidelity design references for the mobile and web screens (already implemented in `frontend/`)
+The sections below add **Claude Code-specific** environment guidance (devcontainer
+firewall, Docker-in-Docker, container logs, E2E) on top of `AGENTS.md`.
 
 ---
 

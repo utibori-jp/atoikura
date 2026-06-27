@@ -7,6 +7,8 @@ cumulative spending — no income tracking, no complexity, just your number.
 
 The UI is in Japanese (the target users are native Japanese speakers); the codebase, docs, and tooling are in English.
 
+> **For AI agents:** start with [`AGENTS.md`](AGENTS.md) — the canonical "read these first" entry point.
+
 ---
 
 ## Requirements
