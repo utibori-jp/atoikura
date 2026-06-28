@@ -5,6 +5,8 @@
 atoikura tracks the gap between your monthly variable-expense budget and
 cumulative spending — no income tracking, no complexity, just your number.
 
+**🚀 [Try the live demo](https://utibori-jp.github.io/atoikura/)** — runs entirely in your browser on mocked data (read-only, no backend, no sign-up).
+
 The UI is in Japanese (the target users are native Japanese speakers); the codebase, docs, and tooling are in English.
 
 > **For AI agents:** start with [`AGENTS.md`](AGENTS.md) — the canonical "read these first" entry point.
