@@ -1,0 +1,508 @@
+openapi: 3.1.0
+
+info:
+  title: atoikura sync API
+  version: 0.1.0-draft
+  description: |
+    Sync API for the local-first architecture (issue #198).
+    Semantics: docs/local-first/sync-protocol.md. Data model and encryption: docs/local-first/design.md.
+
+    The user and household permissions are always derived from the bearer token.
+    `owner_id` is never accepted in a request body, and `household_id` is verified
+    against the token user's active memberships.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+paths:
+  /sync/scopes:
+    get:
+      summary: List the scopes the caller can pull
+      operationId: listSyncScopes
+      responses:
+        "200":
+          description: Scopes visible to the caller
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScopesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /sync/push:
+    post:
+      summary: Push a batch of record changes
+      description: |
+        Changes are validated and applied independently, and the result is reported
+        per change. Superseded fields (older HLC, or a tombstoned record) are not
+        an error. Request-level errors apply nothing.
+      operationId: pushChanges
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushRequest"
+      responses:
+        "200":
+          description: Results, one per change and in request order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: Body larger than 2 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sync/pull:
+    get:
+      summary: Pull changes after a cursor for one scope
+      operationId: pullChanges
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [personal, household]
+        - name: household_id
+          in: query
+          description: Required when scope=household. The caller must be an active member, otherwise 404.
+          schema:
+            type: string
+            format: uuid
+        - name: since
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 500
+      responses:
+        "200":
+          description: Records changed after `since`, ordered by seq
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /auth/prelogin:
+    post:
+      summary: Get the KDF parameters for an email (implemented in Step 5)
+      description: |
+        Returns the salt and KDF parameters used to derive the master key on the
+        client. Unknown emails get a deterministic fake salt, so the endpoint
+        cannot be used to enumerate accounts.
+      operationId: prelogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: KDF parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KdfParams"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /keys/me:
+    get:
+      summary: Get the caller's wrapped key bundle (implemented in Step 5)
+      operationId: getMyKeyBundle
+      responses:
+        "200":
+          description: Key bundle (all secrets wrapped client-side)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeyBundle"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      summary: Store or replace the caller's wrapped key bundle (signup, password change)
+      description: |
+        `public_key` cannot be changed after it is first set, because it is the
+        identity that household members wrap keys for.
+      operationId: putMyKeyBundle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KeyBundle"
+      responses:
+        "204":
+          description: Stored
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /households/{household_id}/key-envelopes:
+    parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Get the household key envelopes addressed to the caller (implemented in Step 8)
+      operationId: listMyHouseholdKeyEnvelopes
+      responses:
+        "200":
+          description: One envelope per epoch the caller has received
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [envelopes]
+                properties:
+                  envelopes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/HouseholdKeyEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      summary: Wrap household keys for members (join, or rotation after removal) (implemented in Step 8)
+      description: |
+        The caller must be an active member. Each recipient must be an active member
+        of this household. A new epoch must be exactly the current epoch + 1.
+      operationId: postHouseholdKeyEnvelopes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [envelopes]
+              properties:
+                envelopes:
+                  type: array
+                  maxItems: 50
+                  items:
+                    $ref: "#/components/schemas/HouseholdKeyEnvelope"
+      responses:
+        "204":
+          description: Stored
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Sent in the `Authorization` header (not a cookie). Lifetime and refresh are decided in Step 5.
+
+  responses:
+    BadRequest:
+      description: Malformed request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing, invalid or expired token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not found, or not visible to the caller (existence is not revealed)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    Hlc:
+      type: string
+      description: "Hybrid logical clock: <unix_ms 13 digits>-<counter 4 hex>-<device_id>. Ordered lexicographically."
+      pattern: "^[0-9]{13}-[0-9a-f]{4}-[0-9A-Za-z_-]{1,32}$"
+      maxLength: 51
+
+    Collection:
+      type: string
+      enum:
+        - category_groups
+        - expense_categories
+        - journal_entries
+        - recurring_expenses
+        - savings_goals
+        - savings_postings
+        - income_records
+        - base_income_settings
+        - budgets
+        - surplus_allocations
+        - daily_notes
+        - monthly_review_notes
+        - member_monthly_summaries
+        - household_budgets
+        - household_savings_goals
+        - household_savings_contributions
+
+    FieldValue:
+      type: object
+      required: [value, hlc]
+      properties:
+        value:
+          type: string
+          description: base64url(nonce || ciphertext || tag), AES-256-GCM. The server never decrypts it.
+          maxLength: 8192
+        hlc:
+          $ref: "#/components/schemas/Hlc"
+
+    Change:
+      type: object
+      required: [collection, id, key_epoch, fields]
+      properties:
+        collection:
+          $ref: "#/components/schemas/Collection"
+        id:
+          type: string
+          format: uuid
+        household_id:
+          type: [string, "null"]
+          format: uuid
+          description: Required for household collections and must be null otherwise. Verified against the token user's memberships. Immutable after creation.
+        key_epoch:
+          type: integer
+          minimum: 0
+        fields:
+          type: object
+          description: Field name to value. Names must be on the collection's allowlist.
+          additionalProperties:
+            $ref: "#/components/schemas/FieldValue"
+        deleted_hlc:
+          description: Present to tombstone the record. Delete wins permanently.
+          $ref: "#/components/schemas/Hlc"
+
+    PushRequest:
+      type: object
+      required: [changes]
+      properties:
+        changes:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/Change"
+
+    PushResult:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [applied, rejected]
+        seq:
+          type: integer
+          format: int64
+          description: Present when anything was stored.
+        superseded:
+          type: array
+          description: Fields not stored because a newer value exists or the record is deleted.
+          items:
+            type: string
+        reason:
+          type: string
+          description: Present when rejected.
+          enum: [UNKNOWN_COLLECTION, UNKNOWN_FIELD, TOO_LARGE, CLOCK_SKEW, FORBIDDEN, IMMUTABLE]
+
+    PushResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/PushResult"
+
+    PulledRecord:
+      type: object
+      required: [collection, id, owner_id, key_epoch, deleted, seq, fields]
+      properties:
+        collection:
+          $ref: "#/components/schemas/Collection"
+        id:
+          type: string
+          format: uuid
+        owner_id:
+          type: integer
+          format: int64
+        household_id:
+          type: [string, "null"]
+          format: uuid
+        key_epoch:
+          type: integer
+        deleted:
+          type: boolean
+        deleted_hlc:
+          oneOf:
+            - $ref: "#/components/schemas/Hlc"
+            - type: "null"
+        seq:
+          type: integer
+          format: int64
+        fields:
+          type: object
+          description: Only the fields whose seq is greater than `since`.
+          additionalProperties:
+            $ref: "#/components/schemas/FieldValue"
+
+    PullResponse:
+      type: object
+      required: [records, next_since, has_more]
+      properties:
+        records:
+          type: array
+          items:
+            $ref: "#/components/schemas/PulledRecord"
+        next_since:
+          type: integer
+          format: int64
+        has_more:
+          type: boolean
+
+    ScopesResponse:
+      type: object
+      required: [personal, households]
+      properties:
+        personal:
+          type: object
+          required: [owner_id]
+          properties:
+            owner_id:
+              type: integer
+              format: int64
+        households:
+          type: array
+          items:
+            type: object
+            required: [household_id, current_key_epoch, key_state]
+            properties:
+              household_id:
+                type: string
+                format: uuid
+              current_key_epoch:
+                type: integer
+              key_state:
+                type: string
+                enum: [ready, pending]
+                description: "`pending`: no member has wrapped the current epoch's key for the caller yet."
+
+    KdfParams:
+      type: object
+      required: [algorithm, salt]
+      properties:
+        algorithm:
+          type: string
+          enum: [argon2id, pbkdf2-sha256]
+        salt:
+          type: string
+          description: base64url
+        iterations:
+          type: integer
+        memory_kib:
+          type: integer
+        parallelism:
+          type: integer
+
+    KeyBundle:
+      type: object
+      required: [kdf, wrapped_udk_by_password, wrapped_udk_by_recovery, public_key, wrapped_private_key]
+      properties:
+        kdf:
+          $ref: "#/components/schemas/KdfParams"
+        wrapped_udk_by_password:
+          type: string
+          maxLength: 1024
+        wrapped_udk_by_recovery:
+          type: string
+          maxLength: 1024
+        public_key:
+          type: string
+          description: ECDH P-256 public key, JWK serialized and base64url-encoded
+          maxLength: 1024
+        wrapped_private_key:
+          type: string
+          description: Private key wrapped with the UDK
+          maxLength: 2048
+
+    HouseholdKeyEnvelope:
+      type: object
+      required: [epoch, recipient_user_id, envelope]
+      properties:
+        epoch:
+          type: integer
+          minimum: 0
+        recipient_user_id:
+          type: integer
+          format: int64
+        sender_user_id:
+          type: integer
+          format: int64
+          readOnly: true
+          description: Set by the server from the token.
+        envelope:
+          type: string
+          description: HK (for this epoch) and HIK, wrapped to the recipient's public key (ephemeral ECDH + HKDF + AES-GCM)
+          maxLength: 2048
