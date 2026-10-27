@@ -6,7 +6,7 @@ Read this document when working on the backend. Use this in conjunction with the
 
 ## Language & Libraries
 
-- Go 1.22+
+- Go 1.27+
 - Standard library first. Do not use external frameworks unless there is an explicit reason.
 - HTTP routing: Use the standard `net/http` ServeMux only.
 

@@ -9,7 +9,7 @@ To be used by both Claude Code and human developers.
 
 | Layer | Technology |
 |---|---|
-| Backend language | Go 1.22+ |
+| Backend language | Go 1.27+ |
 | HTTP routing | Standard library `net/http` (Go 1.22+ ServeMux). No frameworks. |
 | DB access | `sqlc` (handwritten SQL → type-safe Go code generation) |
 | Migration | `golang-migrate` |

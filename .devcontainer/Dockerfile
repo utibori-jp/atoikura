@@ -1,7 +1,7 @@
 # Devcontainer for atoikura.
 # Adapted from Anthropic's reference Claude Code devcontainer
 # (https://github.com/anthropics/claude-code/tree/main/.devcontainer),
-# stripped of zsh/powerlevel10k/fzf and extended with Go 1.25, sqlc,
+# stripped of zsh/powerlevel10k/fzf and extended with Go 1.27, sqlc,
 # and postgresql-client for this project's stack.
 
 FROM node:24
@@ -10,7 +10,7 @@ ARG TZ=Asia/Tokyo
 ENV TZ="$TZ"
 
 ARG CLAUDE_CODE_VERSION=latest
-ARG GO_VERSION=1.25.0
+ARG GO_VERSION=1.27.3
 ARG SQLC_VERSION=v1.27.0
 ARG GIT_DELTA_VERSION=0.18.2
 
@@ -35,7 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       postgresql-client \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Go 1.25 from the official tarball (apt's golang-go lags releases).
+# Go 1.27 from the official tarball (apt's golang-go lags releases).
 RUN ARCH="$(dpkg --print-architecture)" \
   && case "$ARCH" in \
        amd64) GO_ARCH=amd64 ;; \
