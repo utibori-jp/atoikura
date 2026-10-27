@@ -1,0 +1,315 @@
+openapi: 3.1.0
+
+info:
+  title: atoikura sync API
+  version: 0.1.0-draft
+  description: |
+    Sync API for the hybrid local-first architecture (issue #198).
+    Semantics: docs/local-first/sync-protocol.md. Data model: docs/local-first/design.md.
+
+    The caller's user and ledger are always derived from the bearer token.
+    `owner_id` and `ledger_id` are never accepted in a request body.
+    Online-only collections are written through REST commands (contracts defined in Step 5),
+    and every device reads them through pull.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+paths:
+  /sync/push:
+    post:
+      summary: Push a batch of offline-writable changes
+      description: |
+        Only `journal_entries`, `daily_notes` and `monthly_review_notes` are accepted.
+        Changes are validated and applied independently, and the result is reported per
+        change. Superseded fields (older HLC, or a tombstoned record) are not an error.
+        Request-level errors apply nothing.
+      operationId: pushChanges
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushRequest"
+      responses:
+        "200":
+          description: Results, one per change and in request order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: Body larger than 1 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sync/pull:
+    get:
+      summary: Pull every visible change after a cursor
+      description: |
+        Returns the rows of the caller's current ledger that are visible to the caller,
+        with `since < seq ≤ watermark`, ordered by seq. If `ledger_id` differs from the one
+        the device has stored, the device resets its cursor to 0 and pulls again.
+      operationId: pullChanges
+      parameters:
+        - name: since
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 500
+      responses:
+        "200":
+          description: Changed rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Sent in the `Authorization` header (not a cookie). Lifetime and refresh are decided in Step 5.
+
+  responses:
+    BadRequest:
+      description: Malformed request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing, invalid or expired token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    Hlc:
+      type: string
+      description: "Hybrid logical clock: <unix_ms 13 digits>-<counter 4 hex>-<device_id>. Ordered lexicographically."
+      pattern: "^[0-9]{13}-[0-9a-f]{4}-[0-9A-Za-z_-]{1,32}$"
+      maxLength: 51
+
+    PushableCollection:
+      type: string
+      enum: [journal_entries, daily_notes, monthly_review_notes]
+
+    PulledCollection:
+      type: string
+      enum:
+        - ledgers
+        - ledger_members
+        - category_groups
+        - expense_categories
+        - income_records
+        - base_incomes
+        - recurring_expenses
+        - savings_goals
+        - savings_postings
+        - budgets
+        - allowances
+        - surplus_allocations
+        - allowance_totals
+        - journal_entries
+        - daily_notes
+        - monthly_review_notes
+
+    FieldValue:
+      type: object
+      required: [value, hlc]
+      properties:
+        value:
+          description: Plain JSON value. It is validated by the server against the field's rules.
+        hlc:
+          $ref: "#/components/schemas/Hlc"
+
+    JournalEntryFields:
+      type: object
+      description: Allowed fields for `journal_entries` (field names → FieldValue).
+      additionalProperties: false
+      properties:
+        wallet:
+          $ref: "#/components/schemas/FieldValue"
+        transaction_date:
+          $ref: "#/components/schemas/FieldValue"
+        item:
+          $ref: "#/components/schemas/FieldValue"
+        amount:
+          $ref: "#/components/schemas/FieldValue"
+        is_excluded:
+          $ref: "#/components/schemas/FieldValue"
+        category_id:
+          $ref: "#/components/schemas/FieldValue"
+        note:
+          $ref: "#/components/schemas/FieldValue"
+
+    DailyNoteFields:
+      type: object
+      additionalProperties: false
+      properties:
+        date:
+          $ref: "#/components/schemas/FieldValue"
+        note:
+          $ref: "#/components/schemas/FieldValue"
+
+    MonthlyReviewNoteFields:
+      type: object
+      additionalProperties: false
+      properties:
+        year_month:
+          $ref: "#/components/schemas/FieldValue"
+        category_id:
+          $ref: "#/components/schemas/FieldValue"
+        note:
+          $ref: "#/components/schemas/FieldValue"
+
+    Change:
+      type: object
+      required: [collection, id, fields]
+      additionalProperties: false
+      properties:
+        collection:
+          $ref: "#/components/schemas/PushableCollection"
+        id:
+          type: string
+          format: uuid
+        fields:
+          description: The field set must match `collection`. Unknown fields reject the change (UNKNOWN_FIELD).
+          oneOf:
+            - $ref: "#/components/schemas/JournalEntryFields"
+            - $ref: "#/components/schemas/DailyNoteFields"
+            - $ref: "#/components/schemas/MonthlyReviewNoteFields"
+        deleted_hlc:
+          description: Present to tombstone the record. Delete wins permanently.
+          $ref: "#/components/schemas/Hlc"
+
+    PushRequest:
+      type: object
+      required: [changes]
+      properties:
+        changes:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/Change"
+
+    PushResult:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [applied, rejected]
+        seq:
+          type: integer
+          format: int64
+          description: Present when anything was stored.
+        superseded:
+          type: array
+          description: Fields not stored because a newer value exists or the record is deleted.
+          items:
+            type: string
+        merged_into:
+          type: string
+          format: uuid
+          description: Present when a new note was merged into an existing note with the same natural key. The client re-keys its local row.
+        reason:
+          type: string
+          description: Present when rejected.
+          enum: [UNKNOWN_COLLECTION, UNKNOWN_FIELD, TOO_LARGE, CLOCK_SKEW, FORBIDDEN, INVALID, IMMUTABLE]
+        message:
+          type: string
+          description: A Japanese message that can be shown to the user, when rejected.
+
+    PushResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/PushResult"
+
+    PulledRow:
+      type: object
+      required: [collection, id, seq, deleted, data]
+      properties:
+        collection:
+          $ref: "#/components/schemas/PulledCollection"
+        id:
+          type: string
+          description: UUID; for `allowance_totals`, the composite key "<member_id>:<year_month>"
+        owner_id:
+          type: integer
+          format: int64
+        seq:
+          type: integer
+          format: int64
+        deleted:
+          type: boolean
+        data:
+          type: object
+          description: The full row (every column of the collection except the envelope). Omitted values are null.
+          additionalProperties: true
+        field_hlc:
+          type: object
+          description: Offline-writable collections only.
+          additionalProperties:
+            $ref: "#/components/schemas/Hlc"
+
+    PullResponse:
+      type: object
+      required: [ledger_id, rows, next_since, has_more]
+      properties:
+        ledger_id:
+          type: string
+          format: uuid
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/PulledRow"
+        next_since:
+          type: integer
+          format: int64
+        has_more:
+          type: boolean

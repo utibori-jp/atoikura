@@ -26,6 +26,7 @@ Then, based on the work area:
 - **UI / design** → `docs/design/` — high-fidelity design references for the
   mobile and web screens (already implemented under `frontend/`)
 - **Deploy / migrations** → `docs/deploy-migrations.md`
+- **Local-first refactor** (milestone `local-first-refactor`) → `docs/local-first/design.md`, `docs/local-first/sync-protocol.md`, `docs/local-first/sync-api.yaml`
 
 ---
 

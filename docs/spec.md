@@ -266,3 +266,18 @@ amount ≤ max(0, income_total(ym) − base_income) − already_allocated_total(
 - 口座管理・収入管理・投資管理を追加（`accounts` テーブル等は既にDBスキーマに定義済み）
 - 認証はJWT Bearer認証（HS256）で実装済み。Ver2での拡張時はリフレッシュトークンの追加を検討する
 - バックエンドは `statement_types.type_code` で分岐しているため、IDのズレを気にせず環境を跨いだデプロイが可能
+
+---
+
+## 8. ローカルファースト化（進行中）
+
+マイルストーン `local-first-refactor`（#198〜#209）で、端末上のDBを正とする構成へ移行中。
+設計は [`docs/local-first/design.md`](local-first/design.md)、同期プロトコルは [`docs/local-first/sync-protocol.md`](local-first/sync-protocol.md) を参照。
+
+移行が完了すると、本仕様書の以下の決定事項は置き換わる（Step 7b まで現行APIはそのまま動作する）：
+
+- 4-1 PK（integer連番）→ UUID
+- 4-1 仕訳・daily_notesの物理削除 → 論理削除（tombstone）
+- 仕訳・メモはオフラインで書けるようになる。それ以外（マスタ、収入、固定費、予算、貯金、余剰振り分け）はオンラインでのみ更新でき、オフラインでは閲覧のみ
+- 4-5 月次自動記録のadvisory lock → `(recurring_expense_id, year_month)` の一意制約
+- データの単位がユーザーから「家計（ledger）」に変わる。家庭では家計＋お小遣いの構成になる
