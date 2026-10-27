@@ -74,11 +74,20 @@ ledger_members (ledger_id, user_id, role: owner | member, joined_at, left_at)
   exists, and the formulas reduce to today's behavior.
 - **Ledger "あといくら"**: the shared living budget minus the variable spending
   (`food` + `other`, not excluded) in the ledger wallet.
-- **Personal "あといくら"** (household mode): the member's allowance minus
-  their non-excluded allowance spending, including allowance recurring
-  postings.
+- **Personal "あといくら"** (household mode): the allowance balance, which
+  **carries over** from month to month:
+  ```
+  balance(m) = balance(m-1) + allowance(m) − allowance spending(m)
+  ```
+  - `allowance(m)` is the allowance amount in effect for month `m`, read from
+    the allowance history.
+  - Allowance spending is all non-excluded entries in the allowance wallet,
+    including allowance recurring postings.
+  - The balance starts at 0 in the month the member joins. Unused allowance
+    carries over, and so does overspending (a negative balance reduces the
+    next month).
 - **What other members see** of an allowance: its amount (a household setting)
-  and its total spent per month. The server computes these totals; the details
+  and its total spent per month, and therefore also its balance. The server computes these totals; the details
   are never sent to other members.
 
 ### 3.1 Collections
@@ -107,7 +116,7 @@ Common columns on every synced table:
 | `recurring_expenses` | `wallet`, `name`, `emoji`, `billing_day`, `amount`, `type`, `category_id` | ledger wallet: members; allowance wallet: **owner only** | ledger wallet: any member; allowance wallet: owner | Personal fixed costs use the allowance wallet (D8). |
 | `savings_goals` / `savings_postings` | as today, plus postings | members | any member | Online, so today's server logic (including manual postings) carries over. `accumulated` is derived from the postings. |
 | `budgets` | `monthly_budget`, `goal_text`, `goal_amount` | members | any member | One row per ledger |
-| `allowances` | `member_id`, `amount` | members | household owner or member, via settings (Q4) | Household mode only |
+| `allowances` | `member_id`, `effective_from` (YYYY-MM), `amount` | members | any member, via the household settings (Q4) | Household mode only. A **history**: one row per change, unique per `(member_id, effective_from)`. The carry-over needs the amount in effect for every past month. |
 | `surplus_allocations` | as today | members | any member | Append-only. The upper bound stays a server-side **error**, as today. |
 
 **Offline-writable** (pushed by devices):
@@ -231,13 +240,15 @@ until their removal is approved.
 
 ---
 
-## 8. Open questions for review
+## 8. Resolved questions
 
-| # | Question | Recommendation |
+Answered by the owner in the review of PR #210.
+
+| # | Question | Decision |
 |---|---|---|
-| Q1 | Should daily and monthly review notes stay private, or should a household be able to write shared review notes for the shared ledger? | Private for now. Shared review notes can be a later feature. |
-| Q2 | When a user joins a household, what happens to their personal-ledger data? | Keep it as a read-only **archived personal ledger** that only they can see. Nothing is merged. Decide in Step 8. |
-| Q3 | Base income in a household: a per-member amount, summed? | Yes (`base_incomes` per member). |
-| Q4 | Who can change allowances: any member, or only the household owner? | Any member. The change is shown to everyone. |
-| Q5 | Does unused allowance carry over to the next month? | No in V1. Each month starts fresh. |
+| Q1 | Should daily and monthly review notes stay private? | Yes, private. Shared review notes for the shared ledger may come later. |
+| Q2 | What happens to personal-ledger data when a user joins a household? | It is kept as a read-only **archived personal ledger** that only the user can see. Nothing is merged. Details in Step 8. |
+| Q3 | Base income in a household? | A per-member amount (`base_incomes`), summed. |
+| Q4 | Who can change allowances? | Any member. The change is visible to everyone. |
+| Q5 | Does unused allowance carry over? | **Yes.** The balance carries over, and so does overspending (§3). |
 | Q6 | Which allowance spending counts against the allowance? | Everything not excluded, including allowance recurring postings. |
