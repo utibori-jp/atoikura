@@ -276,8 +276,8 @@ amount ≤ max(0, income_total(ym) − base_income) − already_allocated_total(
 
 移行が完了すると、本仕様書の以下の決定事項は置き換わる（Step 7b まで現行APIはそのまま動作する）：
 
-- 4-1 PK（integer連番）→ クライアント生成のUUID
-- 4-1 仕訳・daily_notesの物理削除 → すべて論理削除（tombstone）
-- 4-5 月次自動記録（サーバー側の遅延記録）→ 端末側で記録し、決定的IDでサーバー上の重複を防ぐ
-- 4-6 余剰振り分けの上限バリデーション（400エラー）→ 警告表示
-- `savings_goals.accumulated_amount` の保持 → 記録から端末上で再計算
+- 4-1 PK（integer連番）→ UUID
+- 4-1 仕訳・daily_notesの物理削除 → 論理削除（tombstone）
+- 仕訳・メモはオフラインで書けるようになる。それ以外（マスタ、収入、固定費、予算、貯金、余剰振り分け）はオンラインでのみ更新でき、オフラインでは閲覧のみ
+- 4-5 月次自動記録のadvisory lock → `(recurring_expense_id, year_month)` の一意制約
+- データの単位がユーザーから「家計（ledger）」に変わる。家庭では家計＋お小遣いの構成になる
