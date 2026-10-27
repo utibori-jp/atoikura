@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/utibori-jp/atoikura/backend/internal/db"
+	"github.com/utibori-jp/atoikura/backend/internal/service"
 )
 
 type BudgetHistoryItem struct {
@@ -58,39 +59,22 @@ func (r *Repository) GetBudgetSummary(ctx context.Context, user_id int64, year_m
 		return nil, fmt.Errorf("summing savings-destined surplus allocations: %w", err)
 	}
 
-	variable_budget := base_income - recurring_total - savings_total - savings_allocated
+	variable_budget := service.VariableBudget(base_income, recurring_total, savings_total, savings_allocated)
 
-	// Compute days remaining in the target month
 	parsed_month, err := time.Parse("2006-01", year_month)
 	if err != nil {
 		return nil, fmt.Errorf("parsing year_month: %w", err)
 	}
-	// First day of next month
-	first_of_next := parsed_month.AddDate(0, 1, 0)
-	// Last day of this month
-	last_day_of_month := first_of_next.AddDate(0, 0, -1)
-	total_days := last_day_of_month.Day()
 
-	now_jst := time.Now().In(jstLocation())
-	var days_remaining int32
-	// Only compute remaining days if the target month is the current month
-	current_ym := now_jst.Format("2006-01")
-	if year_month == current_ym {
-		days_remaining = int32(last_day_of_month.Day() - now_jst.Day() + 1)
-		if days_remaining < 0 {
-			days_remaining = 0
-		}
-	} else if year_month > current_ym {
-		// Future month: all days remaining
-		days_remaining = int32(total_days)
-	} else {
-		// Past month: 0 days remaining
-		days_remaining = 0
+	today_jst := time.Now().In(jstLocation()).Format("2006-01-02")
+	days_remaining, err := service.DaysRemaining(year_month, today_jst)
+	if err != nil {
+		return nil, fmt.Errorf("computing days remaining: %w", err)
 	}
 
-	var daily_budget int32
-	if total_days > 0 {
-		daily_budget = variable_budget / int32(total_days)
+	daily_budget, err := service.DailyBudget(variable_budget, year_month)
+	if err != nil {
+		return nil, fmt.Errorf("computing daily budget: %w", err)
 	}
 
 	// Build 3-month history: current month + 2 previous months.
@@ -116,7 +100,7 @@ func (r *Repository) GetBudgetSummary(ctx context.Context, user_id int64, year_m
 			return nil, fmt.Errorf("summing savings allocations for history month %s: %w", ym, err)
 		}
 
-		h_budget := base_income - recurring_total - savings_total - h_savings_allocated
+		h_budget := service.VariableBudget(base_income, recurring_total, savings_total, h_savings_allocated)
 		history[i] = BudgetHistoryItem{
 			YearMonth: ym,
 			Budget:    h_budget,
