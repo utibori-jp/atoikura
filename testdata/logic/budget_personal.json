@@ -1,0 +1,30 @@
+{
+  "description": "Personal-mode budget formulas (variable budget, daily budget, days remaining). Consumed by backend/internal/service (Go) and frontend/src/logic/budget.ts (Vitest).",
+  "cases": [
+    {
+      "name": "current month, near the end",
+      "input": { "base_income": 300000, "recurring_total": 96000, "savings_total": 45000, "savings_allocated": 0, "year_month": "2026-10", "today_jst": "2026-10-27" },
+      "expected": { "variable_budget": 159000, "daily_budget": 5129, "days_remaining": 5 }
+    },
+    {
+      "name": "past 30-day month with a savings allocation",
+      "input": { "base_income": 300000, "recurring_total": 96000, "savings_total": 45000, "savings_allocated": 10000, "year_month": "2026-09", "today_jst": "2026-10-27" },
+      "expected": { "variable_budget": 149000, "daily_budget": 4966, "days_remaining": 0 }
+    },
+    {
+      "name": "future month with a negative budget truncates toward zero",
+      "input": { "base_income": 50000, "recurring_total": 60000, "savings_total": 0, "savings_allocated": 0, "year_month": "2026-11", "today_jst": "2026-10-27" },
+      "expected": { "variable_budget": -10000, "daily_budget": -333, "days_remaining": 30 }
+    },
+    {
+      "name": "leap February, today is the last day",
+      "input": { "base_income": 290000, "recurring_total": 0, "savings_total": 0, "savings_allocated": 0, "year_month": "2028-02", "today_jst": "2028-02-29" },
+      "expected": { "variable_budget": 290000, "daily_budget": 10000, "days_remaining": 1 }
+    },
+    {
+      "name": "current month, today is the first day",
+      "input": { "base_income": 200000, "recurring_total": 50000, "savings_total": 20000, "savings_allocated": 5000, "year_month": "2026-10", "today_jst": "2026-10-01" },
+      "expected": { "variable_budget": 125000, "daily_budget": 4032, "days_remaining": 31 }
+    }
+  ]
+}

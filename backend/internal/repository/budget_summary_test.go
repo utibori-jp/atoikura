@@ -207,3 +207,47 @@ func TestBudgetSummary_WithSavingsGoal_FullFormula(t *testing.T) {
 		t.Errorf("income_total after second income record = %d, want 600000", summary2.IncomeTotal)
 	}
 }
+
+// addJournalEntryOfType inserts a journal entry in a fresh category whose group has
+// the given statement type_code.
+func addJournalEntryOfType(t *testing.T, user_id int64, type_code string, transaction_date string, amount int32, is_excluded bool) {
+	t.Helper()
+	_, err := testPool.Exec(context.Background(),
+		`WITH new_group AS (
+		   INSERT INTO category_groups (user_id, group_name, statement_type_id)
+		   VALUES ($1, 'テスト' || $2 || gen_random_uuid()::text, (SELECT id FROM statement_types WHERE type_code = $2))
+		   RETURNING id
+		 ), new_category AS (
+		   INSERT INTO expense_categories (user_id, group_id, category_name)
+		   SELECT $1, id, 'テストカテゴリ' FROM new_group
+		   RETURNING id
+		 )
+		 INSERT INTO journal_entries (user_id, category_id, transaction_date, amount, is_excluded)
+		 SELECT $1, id, $3::date, $4, $5 FROM new_category`,
+		user_id, type_code, transaction_date, amount, is_excluded,
+	)
+	if err != nil {
+		t.Fatalf("addJournalEntryOfType: %v", err)
+	}
+}
+
+// TestBudgetSummary_HistoryActualCountsVariableSpendingOnly verifies that the history
+// actual counts only non-excluded food/other spending. Fixed costs are already
+// subtracted from the budget, so counting them again would double-count them.
+func TestBudgetSummary_HistoryActualCountsVariableSpendingOnly(t *testing.T) {
+	ctx := context.Background()
+	u := createTestUser(t, "bs_history_variable_only@test.example")
+
+	addJournalEntryOfType(t, u.UserID, "food", "2026-03-05", 1200, false)
+	addJournalEntryOfType(t, u.UserID, "other", "2026-03-06", 800, false)
+	addJournalEntryOfType(t, u.UserID, "fixed", "2026-03-27", 90000, false)
+	addJournalEntryOfType(t, u.UserID, "food", "2026-03-10", 5000, true)
+
+	summary, err := testRepo.GetBudgetSummary(ctx, u.UserID, "2026-03")
+	if err != nil {
+		t.Fatalf("GetBudgetSummary: %v", err)
+	}
+	if got := summary.History[2].Actual; got != 2000 {
+		t.Errorf("history[2].actual = %d, want 2000 (food + other, fixed and excluded left out)", got)
+	}
+}

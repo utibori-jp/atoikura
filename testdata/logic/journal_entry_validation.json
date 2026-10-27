@@ -1,0 +1,20 @@
+{
+  "description": "Journal entry validation shared by the server (POST /journal-entries today, push validation in Step 5) and the client (frontend/src/logic/validation.ts). Rules are checked in order and the first failure wins. String values of the form {\"repeat\": s, \"count\": n} expand to s repeated n times. \"category\" says whether a category reference is present; each side fills in its own ID type. Category existence and wallet rules are not covered here because the legacy server and the local-first client deliberately differ on them.",
+  "cases": [
+    { "name": "minimal valid entry", "input": { "transaction_date": "2026-10-27", "amount": 1200, "category": "present", "is_excluded": false }, "expected": { "valid": true } },
+    { "name": "valid with item and note", "input": { "transaction_date": "2026-10-27", "item": "ランチ", "amount": 980, "category": "present", "is_excluded": true, "note": "同僚と" }, "expected": { "valid": true } },
+    { "name": "item of 100 astral characters is valid (counted by code point)", "input": { "transaction_date": "2026-10-27", "item": { "repeat": "🍙", "count": 100 }, "amount": 1, "category": "present", "is_excluded": false }, "expected": { "valid": true } },
+    { "name": "item of 101 characters is rejected", "input": { "transaction_date": "2026-10-27", "item": { "repeat": "🍙", "count": 101 }, "amount": 1, "category": "present", "is_excluded": false }, "expected": { "valid": false, "message": "itemは100文字以内で入力してください" } },
+    { "name": "note of 500 characters is valid", "input": { "transaction_date": "2026-10-27", "amount": 1, "category": "present", "is_excluded": false, "note": { "repeat": "あ", "count": 500 } }, "expected": { "valid": true } },
+    { "name": "note of 501 characters is rejected", "input": { "transaction_date": "2026-10-27", "amount": 1, "category": "present", "is_excluded": false, "note": { "repeat": "あ", "count": 501 } }, "expected": { "valid": false, "message": "noteは500文字以内で入力してください" } },
+    { "name": "impossible calendar date", "input": { "transaction_date": "2026-02-30", "amount": 1, "category": "present", "is_excluded": false }, "expected": { "valid": false, "message": "transaction_dateはYYYY-MM-DD形式で指定してください" } },
+    { "name": "slash-separated date", "input": { "transaction_date": "2026/10/27", "amount": 1, "category": "present", "is_excluded": false }, "expected": { "valid": false, "message": "transaction_dateはYYYY-MM-DD形式で指定してください" } },
+    { "name": "missing date", "input": { "amount": 1, "category": "present", "is_excluded": false }, "expected": { "valid": false, "message": "transaction_dateはYYYY-MM-DD形式で指定してください" } },
+    { "name": "date error wins over amount error", "input": { "transaction_date": "bad", "amount": 0, "category": "present", "is_excluded": false }, "expected": { "valid": false, "message": "transaction_dateはYYYY-MM-DD形式で指定してください" } },
+    { "name": "zero amount", "input": { "transaction_date": "2026-10-27", "amount": 0, "category": "present", "is_excluded": false }, "expected": { "valid": false, "message": "amountは正の整数である必要があります" } },
+    { "name": "negative amount", "input": { "transaction_date": "2026-10-27", "amount": -5, "category": "present", "is_excluded": false }, "expected": { "valid": false, "message": "amountは正の整数である必要があります" } },
+    { "name": "missing amount", "input": { "transaction_date": "2026-10-27", "category": "present", "is_excluded": false }, "expected": { "valid": false, "message": "amountは正の整数である必要があります" } },
+    { "name": "missing category", "input": { "transaction_date": "2026-10-27", "amount": 1, "category": "missing", "is_excluded": false }, "expected": { "valid": false, "message": "category_idは必須です" } },
+    { "name": "missing is_excluded", "input": { "transaction_date": "2026-10-27", "amount": 1, "category": "present" }, "expected": { "valid": false, "message": "is_excludedは必須です" } }
+  ]
+}
