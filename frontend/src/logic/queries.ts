@@ -134,15 +134,13 @@ export function listMonthlyBreakdown(
     );
 }
 
-// Sum of non-excluded spending in the month. variable_only limits it to food/other
-// (what "あといくら" counts); otherwise every statement type counts
-// (SumActualSpendByMonth, used for the budget history).
-export function sumSpending(
+// Variable spending (food/other, not excluded) in the month: what "あといくら"
+// counts, and the actual of the budget history (SumActualSpendByMonth).
+export function sumVariableSpending(
   sql_db: SqlDatabase,
   ledger_id: string,
   spending_scope: SpendingScope,
-  year_month: string,
-  variable_only: boolean
+  year_month: string
 ): number {
   const [month_start, next_month_start] = monthBounds(year_month);
   const scope_filter = scopeFilter(spending_scope);
@@ -153,9 +151,9 @@ export function sumSpending(
      JOIN category_groups cg ON cg.id = ec.group_id
      WHERE je.ledger_id = ? AND je.deleted = 0 AND je.is_excluded = 0
        AND je.transaction_date >= ? AND je.transaction_date < ?
-       AND (? = 0 OR cg.statement_type_code IN ('food', 'other'))
+       AND cg.statement_type_code IN ('food', 'other')
        AND ${scope_filter.sql}`,
-    [ledger_id, month_start, next_month_start, variable_only ? 1 : 0, ...scope_filter.bind]
+    [ledger_id, month_start, next_month_start, ...scope_filter.bind]
   );
   return sumAsNumber(sum_row?.total);
 }
@@ -267,7 +265,7 @@ export function computeLedgerSummary(
      WHERE ledger_id = ? AND deleted = 0 AND transaction_date >= ? AND transaction_date < ?`,
     [ledger_id, month_start, next_month_start]
   );
-  const variable_spending = sumSpending(sql_db, ledger_id, ledger_scope, year_month, true);
+  const variable_spending = sumVariableSpending(sql_db, ledger_id, ledger_scope, year_month);
 
   const history: BudgetHistoryItem[] = [-2, -1, 0].map((month_offset) => {
     const history_month = addMonths(year_month, month_offset);
@@ -275,7 +273,7 @@ export function computeLedgerSummary(
       year_month: history_month,
       budget: computeLedgerBudget(loadLedgerBudgetInput(sql_db, ledger_id, history_month))
         .shared_living_budget,
-      actual: sumSpending(sql_db, ledger_id, ledger_scope, history_month, false),
+      actual: sumVariableSpending(sql_db, ledger_id, ledger_scope, history_month),
     };
   });
 

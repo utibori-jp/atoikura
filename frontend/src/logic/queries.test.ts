@@ -13,7 +13,7 @@ import {
   listMonthlyBreakdown,
   listOwnAllowanceSpending,
   listPostedRecurringIds,
-  sumSpending,
+  sumVariableSpending,
 } from "./queries";
 
 const LEDGER_ID = "ledger-1";
@@ -281,10 +281,9 @@ describe("listMonthlyBreakdown", () => {
   });
 });
 
-describe("sumSpending", () => {
-  it("counts variable spending or all non-excluded spending", () => {
-    expect(sumSpending(test_db, LEDGER_ID, { wallet: "ledger" }, "2026-10", true)).toBe(3500);
-    expect(sumSpending(test_db, LEDGER_ID, { wallet: "ledger" }, "2026-10", false)).toBe(93500);
+describe("sumVariableSpending", () => {
+  it("counts only non-excluded food/other spending", () => {
+    expect(sumVariableSpending(test_db, LEDGER_ID, { wallet: "ledger" }, "2026-10")).toBe(3500);
   });
 });
 
@@ -306,7 +305,7 @@ describe("computeLedgerSummary", () => {
       history: [
         { year_month: "2026-08", budget: 350000, actual: 0 },
         { year_month: "2026-09", budget: 323000, actual: 5000 },
-        { year_month: "2026-10", budget: 310000, actual: 93500 },
+        { year_month: "2026-10", budget: 310000, actual: 3500 },
       ],
     });
   });

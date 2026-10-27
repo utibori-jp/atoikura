@@ -37,10 +37,8 @@ export interface JournalEntryContext {
 }
 
 const MAX_ITEM_LENGTH = 100;
-const MAX_JOURNAL_NOTE_LENGTH = 500;
-// Not limited by the legacy API; capped so that one pushed change stays under the
-// 16 KiB per-change limit of the sync protocol (3 bytes per character at worst).
-export const MAX_FREE_NOTE_LENGTH = 5000;
+// Journal entry notes, daily notes and monthly review notes share one cap.
+export const MAX_NOTE_LENGTH = 500;
 const MAX_AMOUNT = 2_147_483_647;
 
 // Length in Unicode code points, matching Go's len([]rune(s)).
@@ -72,7 +70,7 @@ export function validateJournalEntry(
   if (entry_input.item != null && codePointLength(entry_input.item) > MAX_ITEM_LENGTH) {
     return invalid("itemは100文字以内で入力してください");
   }
-  if (entry_input.note != null && codePointLength(entry_input.note) > MAX_JOURNAL_NOTE_LENGTH) {
+  if (entry_input.note != null && codePointLength(entry_input.note) > MAX_NOTE_LENGTH) {
     return invalid("noteは500文字以内で入力してください");
   }
 
@@ -90,7 +88,12 @@ export function validateJournalEntry(
   }
   const warnings: ValidationWarning[] =
     category_status === "deleted"
-      ? [{ code: "DELETED_CATEGORY", message: "削除済みのカテゴリが指定されています" }]
+      ? [
+          {
+            code: "DELETED_CATEGORY",
+            message: "削除済みのカテゴリです。別のカテゴリを選んでください",
+          },
+        ]
       : [];
   return { valid: true, warnings };
 }
@@ -108,8 +111,8 @@ export function validateDailyNote(note_input: DailyNoteInput): ValidationResult 
   if (note_input.note === undefined) {
     return invalid("リクエストの形式が不正です");
   }
-  if (codePointLength(note_input.note) > MAX_FREE_NOTE_LENGTH) {
-    return invalid(`noteは${MAX_FREE_NOTE_LENGTH}文字以内で入力してください`);
+  if (codePointLength(note_input.note) > MAX_NOTE_LENGTH) {
+    return invalid(`noteは${MAX_NOTE_LENGTH}文字以内で入力してください`);
   }
   return { valid: true, warnings: [] };
 }
@@ -130,8 +133,8 @@ export function validateMonthlyReviewNote(note_input: MonthlyReviewNoteInput): V
   if (note_input.note === undefined) {
     return invalid("リクエストの形式が不正です");
   }
-  if (codePointLength(note_input.note) > MAX_FREE_NOTE_LENGTH) {
-    return invalid(`noteは${MAX_FREE_NOTE_LENGTH}文字以内で入力してください`);
+  if (codePointLength(note_input.note) > MAX_NOTE_LENGTH) {
+    return invalid(`noteは${MAX_NOTE_LENGTH}文字以内で入力してください`);
   }
   return { valid: true, warnings: [] };
 }

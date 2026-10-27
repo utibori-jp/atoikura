@@ -9,7 +9,7 @@ import {
 import { addMonths, isValidDate, monthsBetween, todayInJst } from "./calendar";
 import { billingDateInMonth, pendingRecurringPostings, type RecurringExpense } from "./recurring";
 import {
-  MAX_FREE_NOTE_LENGTH,
+  MAX_NOTE_LENGTH,
   validateDailyNote,
   validateJournalEntry,
   validateMonthlyReviewNote,
@@ -128,7 +128,12 @@ describe("journal entry validation (client-only rules)", () => {
       validateJournalEntry(valid_entry, { is_household: false, categoryStatus: () => "deleted" })
     ).toEqual({
       valid: true,
-      warnings: [{ code: "DELETED_CATEGORY", message: "削除済みのカテゴリが指定されています" }],
+      warnings: [
+        {
+          code: "DELETED_CATEGORY",
+          message: "削除済みのカテゴリです。別のカテゴリを選んでください",
+        },
+      ],
     });
     expect(
       validateJournalEntry(valid_entry, { is_household: false, categoryStatus: () => "unknown" })
@@ -155,7 +160,7 @@ describe("note validation", () => {
       warnings: [],
     });
     expect(
-      validateDailyNote({ date: "2026-10-27", note: "あ".repeat(MAX_FREE_NOTE_LENGTH + 1) }).valid
+      validateDailyNote({ date: "2026-10-27", note: "あ".repeat(MAX_NOTE_LENGTH + 1) }).valid
     ).toBe(false);
     expect(validateDailyNote({ date: "2026-02-30", note: "x" })).toEqual({
       valid: false,
