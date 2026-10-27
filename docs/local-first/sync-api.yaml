@@ -29,6 +29,8 @@ paths:
         change. Superseded fields (older HLC, or a tombstoned record) are not an error.
         Request-level errors apply nothing.
       operationId: pushChanges
+      parameters:
+        - $ref: "#/components/parameters/SyncProtocol"
       requestBody:
         required: true
         content:
@@ -52,6 +54,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          $ref: "#/components/responses/UpdateRequired"
 
   /sync/pull:
     get:
@@ -62,6 +66,7 @@ paths:
         the device has stored, the device resets its cursor to 0 and pulls again.
       operationId: pullChanges
       parameters:
+        - $ref: "#/components/parameters/SyncProtocol"
         - name: since
           in: query
           required: true
@@ -87,16 +92,117 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "426":
+          $ref: "#/components/responses/UpdateRequired"
+
+  /auth/token:
+    post:
+      summary: Log in and get an access token and a refresh token
+      description: |
+        The access token lives 1 hour. The refresh token lives 90 days, is bound to one
+        device (a token family), and is stored only as a SHA-256 hash on the server.
+      operationId: issueTokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                device_name:
+                  type: string
+                  maxLength: 100
+      responses:
+        "200":
+          description: Token pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/refresh:
+    post:
+      summary: Exchange a refresh token for a new token pair
+      description: |
+        The presented refresh token is rotated: it can't be used again. Presenting a
+        token that was already rotated revokes its whole family (theft detection), and
+        the device must log in again.
+      operationId: refreshTokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/logout:
+    post:
+      summary: Revoke the refresh token family of this device
+      description: Answers 204 for any well-formed request, so it reveals nothing about the token.
+      operationId: logout
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "204":
+          description: Revoked (or unknown)
+        "400":
+          $ref: "#/components/responses/BadRequest"
 
 components:
+  parameters:
+    SyncProtocol:
+      name: X-Atoikura-Sync-Protocol
+      in: header
+      required: true
+      description: |
+        Sync protocol version of the client (currently 1). The server answers 426 when it
+        is missing or older than the oldest supported version, and returns its own
+        version in the same response header.
+      schema:
+        type: integer
+        minimum: 1
+
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Sent in the `Authorization` header (not a cookie). Lifetime and refresh are decided in Step 5.
+      description: Sent in the `Authorization` header (not a cookie). Access tokens live 1 hour; use /auth/refresh to get a new one.
 
   responses:
+    UpdateRequired:
+      description: The client speaks a sync protocol the server no longer supports (code UPDATE_REQUIRED).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     BadRequest:
       description: Malformed request
       content:
@@ -111,6 +217,31 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
 
   schemas:
+    TokenPair:
+      type: object
+      required: [access_token, access_token_expires_at, refresh_token, refresh_token_expires_at, user_id]
+      properties:
+        access_token:
+          type: string
+        access_token_expires_at:
+          type: string
+          format: date-time
+        refresh_token:
+          type: string
+        refresh_token_expires_at:
+          type: string
+          format: date-time
+        user_id:
+          type: integer
+          format: int64
+
+    RefreshTokenRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
     ErrorResponse:
       type: object
       required: [code, message]

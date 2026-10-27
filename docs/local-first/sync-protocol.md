@@ -37,12 +37,19 @@ OpenAPI contract: [`sync-api.yaml`](sync-api.yaml).
 - Computed views (`allowance_totals`) get a `seq` whenever they are recomputed.
 - **Commit-order caveat:** a transaction can take a lower `seq` but commit after
   a higher one. A pull in between would then skip it forever. To prevent this,
-  pull returns only rows with `seq ≤` the **safe watermark**: the highest `seq`
-  below which no transaction is still in flight. Two ways to compute it:
-  - track in-flight sequence numbers in the application
-  - use `pg_snapshot_xmin`, together with a per-row transaction ID
-  
-  Step 5 picks one and tests it with concurrent writers.
+  pull may only return rows with `seq ≤` the **safe watermark**: the highest `seq`
+  below which no transaction is still in flight.
+- **Chosen approach (Step 5a):** the watermark is enforced on the write side.
+  Every writer takes a transaction-level advisory lock
+  (`pg_advisory_xact_lock`) right before `nextval('lf.sync_seq')` and holds it
+  until commit. Seq allocation and commit are therefore serialized, so commit
+  order equals seq order, and every committed row is below the watermark. Pull
+  needs no extra filter. The lock covers only the tail of each write transaction
+  (allocate seq, write, commit); validation and loading happen before it. All
+  writers must allocate seq through the same helper
+  (`repository.txAllocator.allocateSeq`). The integration test
+  `TestPull_WatermarkUnderConcurrentWriters` pulls while concurrent writers push,
+  and it fails when the lock is removed.
 
 ---
 
@@ -64,12 +71,16 @@ the token.
 |---|---|
 | `collection` is pushable | `UNKNOWN_COLLECTION` |
 | every field name is on the collection's allowlist | `UNKNOWN_FIELD` |
-| the size limits hold (string fields have the same length limits as today; each change ≤ 16 KiB) | `TOO_LARGE` |
+| each change is ≤ 16 KiB as encoded JSON | `TOO_LARGE` |
 | every HLC is well-formed and ≤ server now + 5 min | `CLOCK_SKEW` |
 | the record (`id`) exists and the caller is not allowed to write it: it is not the caller's, and it is not a shared-ledger recurring posting in the caller's ledger | `FORBIDDEN` |
 | the field values pass content validation (formats, positive amounts; `wallet` ∈ {ledger, allowance}, with `allowance` only in household mode; `category_id` belongs to the caller's ledger, and may be deleted) | `INVALID` |
 | `wallet` changes on an existing record (moving an entry between the shared ledger and an allowance) | `IMMUTABLE` |
-| a new record omits a required field (for journal entries: `wallet`, `transaction_date`, `amount`, `category_id`) | `INVALID` |
+| a new record omits a required field (for journal entries: `wallet`, `transaction_date`, `amount`, `is_excluded`, `category_id`) | `INVALID` |
+
+String length limits (`item` ≤ 100 characters, notes ≤ 500 characters) are content
+validation, so they return `INVALID` with the same Japanese message as the client.
+A change also carries the UUID `id`; a malformed `id` is `INVALID`.
 
 `FORBIDDEN` does not reveal whether the record exists.
 

@@ -10,7 +10,13 @@ import (
 	"time"
 )
 
+// jwtTokenExpiry is the lifetime of tokens issued by the legacy /auth/login and
+// /auth/signup endpoints.
 const jwtTokenExpiry = 24 * time.Hour
+
+// AccessTokenLifetime is the lifetime of access tokens issued together with a
+// refresh token (/auth/token, /auth/refresh).
+const AccessTokenLifetime = time.Hour
 
 var (
 	errJWTMalformed = errors.New("malformed token")
@@ -23,7 +29,11 @@ var jwtHeaderEncoded = base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS25
 
 // IssueJWT signs a new HS256 JWT containing user_id as the subject.
 func IssueJWT(user_id int64, secret []byte) (string, error) {
-	now := time.Now()
+	return IssueJWTWithLifetime(user_id, secret, time.Now(), jwtTokenExpiry)
+}
+
+// IssueJWTWithLifetime signs a new HS256 JWT for user_id that expires lifetime after now.
+func IssueJWTWithLifetime(user_id int64, secret []byte, now time.Time, lifetime time.Duration) (string, error) {
 	payload, err := json.Marshal(struct {
 		Sub int64 `json:"sub"`
 		Iat int64 `json:"iat"`
@@ -31,7 +41,7 @@ func IssueJWT(user_id int64, secret []byte) (string, error) {
 	}{
 		Sub: user_id,
 		Iat: now.Unix(),
-		Exp: now.Add(jwtTokenExpiry).Unix(),
+		Exp: now.Add(lifetime).Unix(),
 	})
 	if err != nil {
 		return "", err

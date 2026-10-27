@@ -52,7 +52,8 @@ func AllowCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Expose-Headers", SyncProtocolHeader)
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, "+SyncProtocolHeader)
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
@@ -62,12 +63,15 @@ func AllowCORS(next http.Handler) http.Handler {
 	})
 }
 
-// publicPaths bypass JWT auth entirely. /auth/login and /auth/signup are
-// open endpoints; the former verifies credentials itself.
+// publicPaths bypass JWT auth entirely. The /auth endpoints verify credentials
+// (password or refresh token) themselves.
 var publicPaths = map[string]bool{
-	"/health":      true,
-	"/auth/login":  true,
-	"/auth/signup": true,
+	"/health":       true,
+	"/auth/login":   true,
+	"/auth/signup":  true,
+	"/auth/token":   true,
+	"/auth/refresh": true,
+	"/auth/logout":  true,
 }
 
 // RequireBearerAuth enforces JWT Bearer auth on every protected request and
