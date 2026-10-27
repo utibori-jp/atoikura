@@ -18,7 +18,7 @@ The UI is in Japanese (the target users are native Japanese speakers); the codeb
 - Docker / Docker Compose
 - Either:
   - VS Code with the **Dev Containers** extension (recommended; everything is bundled in `.devcontainer/`)
-  - Or, for local development: Go 1.25+ and Node 24+
+  - Or, for local development: Go 1.27+ and Node 24+
 
 ---
 
