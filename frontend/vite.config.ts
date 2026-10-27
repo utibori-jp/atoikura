@@ -76,6 +76,14 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
     },
+    // SQLite WASM (local-first DB, #199) locates sqlite3.wasm relative to its own
+    // module, which breaks if Vite pre-bundles it. The DB runs in a module worker.
+    optimizeDeps: {
+      exclude: ["@sqlite.org/sqlite-wasm"],
+    },
+    worker: {
+      format: "es",
+    },
     test: {
       environment: "jsdom",
       globals: true,
