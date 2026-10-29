@@ -6,7 +6,10 @@ import type {
   DbWorkerEvent,
   SqlStatement,
 } from "./protocol";
+import type { LocalQueryArgs, LocalQueryName, LocalQueryResult } from "./localQueries";
 import type { SqlRow, SqlValue } from "./types";
+
+type DbSuccess = Extract<DbResponse, { ok: true }>;
 
 // Main-thread handle to the on-device database. Screens are wired to it in Step 4a.
 
@@ -43,6 +46,11 @@ export interface LocalDb {
   exec(sql: string, bind?: SqlValue[]): Promise<void>;
   // Runs every statement in one transaction.
   batch(statements: SqlStatement[]): Promise<void>;
+  // Runs a registered read query in the worker (localQueries.ts).
+  query<TName extends LocalQueryName>(
+    query_name: TName,
+    ...query_args: LocalQueryArgs<TName>
+  ): Promise<LocalQueryResult<TName>>;
   close(): Promise<void>;
 }
 
@@ -94,11 +102,11 @@ function waitForWorkerEvent(db_worker: Worker): Promise<DbWorkerEvent> {
 // Correlates worker requests with their responses.
 function createRequestChannel(
   db_worker: Worker
-): (request_body: DbRequestBody) => Promise<SqlRow[]> {
+): (request_body: DbRequestBody) => Promise<DbSuccess> {
   let next_request_id = 1;
   const pending_requests = new Map<
     number,
-    { resolve: (rows: SqlRow[]) => void; reject: (error: Error) => void }
+    { resolve: (db_success: DbSuccess) => void; reject: (error: Error) => void }
   >();
   db_worker.addEventListener(
     "message",
@@ -109,7 +117,7 @@ function createRequestChannel(
       if (!pending_request) return;
       pending_requests.delete(db_response.request_id);
       if (db_response.ok) {
-        pending_request.resolve(db_response.rows);
+        pending_request.resolve(db_response);
       } else {
         const sql_error = new Error(db_response.error_message);
         sql_error.name = db_response.error_name;
@@ -118,9 +126,9 @@ function createRequestChannel(
     }
   );
   return (request_body) =>
-    new Promise((resolve_rows, reject_rows) => {
+    new Promise((resolve_success, reject_request) => {
       const request_id = next_request_id++;
-      pending_requests.set(request_id, { resolve: resolve_rows, reject: reject_rows });
+      pending_requests.set(request_id, { resolve: resolve_success, reject: reject_request });
       db_worker.postMessage({ ...request_body, request_id } as DbRequest);
     });
 }
@@ -150,13 +158,16 @@ export async function openLocalDb(): Promise<LocalDb> {
   const createLocalDb = (schema_version: number): LocalDb => ({
     schema_version,
     storage_persistence,
-    select: (sql, bind) => sendRequest({ kind: "select", statement: { sql, bind } }),
+    select: async (sql, bind) =>
+      (await sendRequest({ kind: "select", statement: { sql, bind } })).rows,
     exec: async (sql, bind) => {
       await sendRequest({ kind: "exec", statement: { sql, bind } });
     },
     batch: async (statements) => {
       await sendRequest({ kind: "batch", statements });
     },
+    query: async (query_name, ...query_args) =>
+      (await sendRequest({ kind: "query", query_name, query_args })).result as never,
     close: closeDb,
   });
 
@@ -167,12 +178,13 @@ export async function openLocalDb(): Promise<LocalDb> {
     throw new LocalDbInitError(init_event.error_code, init_event.error_message);
   }
   const recoverable_db: RecoverableLocalDb = {
-    select: (sql, bind) => sendRequest({ kind: "select", statement: { sql, bind } }),
+    select: async (sql, bind) =>
+      (await sendRequest({ kind: "select", statement: { sql, bind } })).rows,
     batch: async (statements) => {
       await sendRequest({ kind: "batch", statements });
     },
     recreate: async () => {
-      const [recreated_row] = await sendRequest({ kind: "recreate" });
+      const [recreated_row] = (await sendRequest({ kind: "recreate" })).rows;
       return createLocalDb(Number(recreated_row?.schema_version));
     },
     close: closeDb,

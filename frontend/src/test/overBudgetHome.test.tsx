@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import App from "../App";
+import { createTestAppServices } from "./appServices";
 import { server } from "./server";
 import type { components } from "../api/types";
 
@@ -9,8 +10,6 @@ import type { components } from "../api/types";
 // clamping 『あといくら』to a bare ¥0. Locks the behaviour for web and mobile.
 
 const API_BASE = "http://localhost:8080";
-const TOKEN_KEY = "atoikura.jwt_token";
-
 class ResizeObserverMock {
   observe() {}
   unobserve() {}
@@ -47,8 +46,6 @@ describe("#125 — Home surfaces the over-budget state", () => {
   beforeAll(() => {
     global.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
   });
-  beforeEach(() => sessionStorage.setItem(TOKEN_KEY, "test-token"));
-  afterEach(() => sessionStorage.removeItem(TOKEN_KEY));
 
   it("shows 予算オーバー and the overspend amount on the desktop home", async () => {
     mockMatchMedia(false); // desktop
@@ -58,7 +55,7 @@ describe("#125 — Home surfaces the over-budget state", () => {
       )
     );
 
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("予算オーバー")).toBeInTheDocument());
     // Overspend = 3000 − 2000 = 1000, shown with a leading minus (glyph-robust).
@@ -77,7 +74,7 @@ describe("#125 — Home surfaces the over-budget state", () => {
       )
     );
 
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("予算オーバー")).toBeInTheDocument());
     expect(

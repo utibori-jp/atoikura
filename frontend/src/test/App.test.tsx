@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import App from "../App";
+import { createTestAppServices } from "./appServices";
 
 // recharts ResponsiveContainer uses ResizeObserver, which jsdom doesn't provide
 class ResizeObserverMock {
@@ -27,20 +28,13 @@ function mockMatchMedia(matches: boolean) {
   });
 }
 
-const TOKEN_KEY = "atoikura.jwt_token";
-
 describe("App — mobile layout (≤ 1023 px)", () => {
   beforeEach(() => {
     mockMatchMedia(true);
-    sessionStorage.setItem(TOKEN_KEY, "test-token");
-  });
-
-  afterEach(() => {
-    sessionStorage.removeItem(TOKEN_KEY);
   });
 
   it("renders bottom tab bar instead of top nav", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
@@ -55,7 +49,7 @@ describe("App — mobile layout (≤ 1023 px)", () => {
   });
 
   it("opens EntrySheet when FAB is clicked", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
@@ -67,7 +61,7 @@ describe("App — mobile layout (≤ 1023 px)", () => {
   });
 
   it("closes EntrySheet when the close button is clicked", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
@@ -80,7 +74,7 @@ describe("App — mobile layout (≤ 1023 px)", () => {
   });
 
   it("shows month navigation when journal tab is active", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
@@ -93,7 +87,7 @@ describe("App — mobile layout (≤ 1023 px)", () => {
   });
 
   it("navigates to account view when avatar is clicked", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
@@ -110,15 +104,10 @@ describe("App — mobile layout (≤ 1023 px)", () => {
 describe("App — desktop layout (≥ 1024 px)", () => {
   beforeEach(() => {
     mockMatchMedia(false);
-    sessionStorage.setItem(TOKEN_KEY, "test-token");
-  });
-
-  afterEach(() => {
-    sessionStorage.removeItem(TOKEN_KEY);
   });
 
   it("renders top navigation bar with a <nav> element", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
@@ -126,7 +115,7 @@ describe("App — desktop layout (≥ 1024 px)", () => {
   });
 
   it("includes マスタ tab that is absent from the mobile tab bar", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
@@ -134,7 +123,7 @@ describe("App — desktop layout (≥ 1024 px)", () => {
   });
 
   it("returns to the budget hub when the header 予算 button is clicked from a sub-screen (#134)", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
@@ -160,7 +149,7 @@ describe("App — desktop layout (≥ 1024 px)", () => {
 
   it("pushes a history entry for each in-app screen transition (#165)", async () => {
     const push_spy = vi.spyOn(window.history, "pushState");
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
     const nav = document.querySelector("nav") as HTMLElement;
@@ -181,7 +170,7 @@ describe("App — desktop layout (≥ 1024 px)", () => {
   });
 
   it("browser Back (popstate) returns to the previous in-app screen (#165)", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
     const nav = document.querySelector("nav") as HTMLElement;

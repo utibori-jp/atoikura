@@ -64,6 +64,28 @@ describe("handleDbRequest", () => {
     ]);
   });
 
+  it("runs registered queries and refuses unknown ones", () => {
+    const query_response = handleDbRequest(test_db, {
+      request_id: 5,
+      kind: "query",
+      query_name: "listPostedRecurringIds",
+      query_args: ["l1", "2026-10"],
+    });
+    const unknown_response = handleDbRequest(test_db, {
+      request_id: 6,
+      kind: "query",
+      query_name: "constructor",
+      query_args: [],
+    });
+
+    expect(query_response).toEqual({ request_id: 5, ok: true, rows: [], result: new Set() });
+    expect(unknown_response).toMatchObject({
+      request_id: 6,
+      ok: false,
+      error_name: "UnknownLocalQueryError",
+    });
+  });
+
   it("returns SQL errors as a failed response instead of throwing", () => {
     const select_response = handleDbRequest(test_db, {
       request_id: 4,

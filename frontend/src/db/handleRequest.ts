@@ -1,3 +1,4 @@
+import { runLocalQuery } from "./localQueries";
 import type { DbRequest, DbResponse } from "./protocol";
 import type { SqlDatabase } from "./types";
 
@@ -25,6 +26,13 @@ export function handleDbRequest(
           }
         });
         return { request_id: request.request_id, ok: true, rows: [] };
+      case "query":
+        return {
+          request_id: request.request_id,
+          ok: true,
+          rows: [],
+          result: runLocalQuery(db, request.query_name, request.query_args),
+        };
     }
   } catch (caught_error) {
     const sql_error =

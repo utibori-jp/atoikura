@@ -52,7 +52,7 @@ describe("pushOutboxAndRecreate", () => {
     );
 
     expect(local_db.schema_version).toBe(2);
-    expect(recovery_report).toEqual({ pushed_change_count: 2, rejected_results: [] });
+    expect(recovery_report).toEqual({ pushed_change_count: 2, rejected_changes: [] });
     expect(
       server
         .listRecords("daily_notes")
@@ -95,8 +95,8 @@ describe("pushOutboxAndRecreate", () => {
       server.transportFor(USER_ID)
     );
 
-    expect(recovery_report.rejected_results).toMatchObject([
-      { status: "rejected", reason: "INVALID" },
+    expect(recovery_report.rejected_changes).toMatchObject([
+      { collection: "daily_notes", reason: "INVALID" },
     ]);
     expect(recreate).toHaveBeenCalledTimes(1);
   });

@@ -498,12 +498,38 @@ const dailyNotes: components["schemas"]["DailyNoteListResponse"] = {
   ],
 };
 
+const DEMO_LEDGER_ID = "01920000-0000-7000-8000-00000000de30";
+
+function demoTokenPair() {
+  const expires_at = new Date(Date.now() + 3_600_000).toISOString();
+  return {
+    access_token: "demo",
+    access_token_expires_at: expires_at,
+    refresh_token: "demo",
+    refresh_token_expires_at: expires_at,
+    user_id: user.id,
+  };
+}
+
+// Signs the demo in, as if it had logged in before.
+export function seedDemoSession(): void {
+  localStorage.setItem("atoikura.refresh_token", "demo");
+  localStorage.setItem("atoikura.user_id", String(user.id));
+}
+
 // --- handlers ---------------------------------------------------------------
 
 export const demoHandlers = [
   // auth / user
   http.get(`${API_BASE}/users/me`, () => HttpResponse.json(user)),
-  http.post(`${API_BASE}/auth/login`, () => HttpResponse.json({ token: "demo", ...user })),
+  // Token session and an empty sync until the demo moves to the local DB (#201).
+  http.post(`${API_BASE}/auth/token`, () => HttpResponse.json(demoTokenPair())),
+  http.post(`${API_BASE}/auth/refresh`, () => HttpResponse.json(demoTokenPair())),
+  http.post(`${API_BASE}/auth/logout`, () => new HttpResponse(null, { status: 204 })),
+  http.get(`${API_BASE}/sync/pull`, () =>
+    HttpResponse.json({ ledger_id: DEMO_LEDGER_ID, rows: [], next_since: 0, has_more: false })
+  ),
+  http.post(`${API_BASE}/sync/push`, () => HttpResponse.json({ results: [] })),
   http.post(`${API_BASE}/auth/signup`, () =>
     HttpResponse.json({ token: "demo", ...user }, { status: 201 })
   ),

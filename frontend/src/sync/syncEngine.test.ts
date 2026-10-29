@@ -39,6 +39,7 @@ async function createDevice(
   const transport = server.transportFor(user_id);
   const engine = new SyncEngine({ store, transport, environment, pull_page_limit: 3 });
   await engine.start(user_id);
+  await engine.syncNow();
   const test_device = { db, store, engine, environment, transport, clock };
   opened_devices.push(test_device);
   return test_device;

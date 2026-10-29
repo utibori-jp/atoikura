@@ -1,5 +1,5 @@
 import type { LocalDb } from "../db/client";
-import { AuthSession } from "./authSession";
+import type { AuthSession } from "./authSession";
 import { SyncEngine, type SyncEnvironment } from "./engine";
 import { createLedgerCommands } from "./ledgerCommands";
 import { SyncStore } from "./store";
@@ -13,11 +13,12 @@ import { HttpSyncTransport } from "./transport";
 export interface SyncClientOptions {
   local_db: LocalDb;
   api_base_url: string;
+  auth_session: AuthSession;
   environment?: SyncEnvironment;
 }
 
 export function createSyncClient(options: SyncClientOptions) {
-  const auth_session = new AuthSession({ api_base_url: options.api_base_url });
+  const auth_session = options.auth_session;
   const transport = new HttpSyncTransport({
     api_base_url: options.api_base_url,
     auth: auth_session,
