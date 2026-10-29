@@ -9,7 +9,7 @@ info:
 
     The caller's user and ledger are always derived from the bearer token.
     `owner_id` and `ledger_id` are never accepted in a request body.
-    Online-only collections are written through REST commands (contracts defined in Step 5),
+    Online-only collections are written through the REST commands under `/ledger`,
     and every device reads them through pull.
 
 servers:
@@ -175,8 +175,279 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
+  # --- REST commands for online-only collections (#213) ---
+  # Every command needs the X-Atoikura-Sync-Protocol header, rejects unknown body
+  # fields (so a body can't name an owner or a ledger), and returns the written row
+  # in the shape pull returns it. The same row reaches other devices through pull.
+  # Rows of another ledger, and other members' allowance recurring expenses, are
+  # reported as 404.
+
+  /ledger/category-groups:
+    post:
+      summary: Create a category group
+      operationId: createCategoryGroup
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CategoryGroupInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/category-groups/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    put:
+      summary: Update a category group
+      operationId: updateCategoryGroup
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CategoryGroupInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    delete:
+      summary: Delete a category group
+      description: Rejected with 400 while the group still has live categories.
+      operationId: deleteCategoryGroup
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/expense-categories:
+    post:
+      summary: Create a category in a live group of the caller's ledger
+      operationId: createExpenseCategory
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategoryInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/expense-categories/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    put:
+      summary: Update a category, possibly moving it to another group
+      operationId: updateExpenseCategory
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategoryInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    delete:
+      summary: Delete a category
+      description: Entries that reference it stay valid; devices flag them.
+      operationId: deleteExpenseCategory
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/income-records:
+    post:
+      summary: Record income earned by the caller
+      operationId: createIncomeRecord
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/IncomeRecordInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/income-records/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    put:
+      summary: Update one of the caller's income records
+      description: Another member's income is visible but returns 403.
+      operationId: updateIncomeRecord
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/IncomeRecordInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    delete:
+      summary: Delete one of the caller's income records
+      operationId: deleteIncomeRecord
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/base-income:
+    put:
+      summary: Set the caller's base income
+      description: The ledger's base income is the sum over its members.
+      operationId: putBaseIncome
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BaseIncomeInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/recurring-expenses:
+    post:
+      summary: Create a recurring expense
+      description: The `allowance` wallet is accepted only in a household. The category must be live in the caller's ledger.
+      operationId: createRecurringExpense
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RecurringExpenseInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/recurring-expenses/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    put:
+      summary: Update a recurring expense
+      description: The wallet can't change (400).
+      operationId: updateRecurringExpense
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RecurringExpenseInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    delete:
+      summary: Delete a recurring expense
+      description: Entries it already posted stay.
+      operationId: deleteRecurringExpense
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/recurring-expenses/{id}/confirm:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    post:
+      summary: Post a recurring expense's amount for a month
+      description: |
+        Creates the month's journal entry on the billing day (clamped to the month's last
+        day) and returns it. Each recurring expense is posted at most once per month,
+        also if that posting was deleted later (409).
+      operationId: confirmRecurringExpense
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MonthlyAmountInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/savings-goals:
+    post:
+      summary: Create a savings goal
+      operationId: createSavingsGoal
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SavingsGoalInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/savings-goals/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    put:
+      summary: Update a savings goal
+      operationId: updateSavingsGoal
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SavingsGoalInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    delete:
+      summary: Delete a savings goal
+      description: Its postings stay as history.
+      operationId: deleteSavingsGoal
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/savings-goals/{id}/postings:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    post:
+      summary: Record a manual savings posting for a month
+      description: A month with a manual posting gets no automatic posting.
+      operationId: createSavingsPosting
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MonthlyAmountInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/budget:
+    put:
+      summary: Set the ledger's budget
+      operationId: putBudget
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BudgetInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/surplus-allocations:
+    post:
+      summary: Allocate part of a month's surplus
+      description: |
+        The amount may not exceed the month's unallocated surplus,
+        max(0, income − Σ base incomes) − already allocated (400). Allocations are
+        append-only.
+      operationId: createSurplusAllocation
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SurplusAllocationInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
 components:
   parameters:
+    RowId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     SyncProtocol:
       name: X-Atoikura-Sync-Protocol
       in: header
@@ -197,6 +468,30 @@ components:
       description: Sent in the `Authorization` header (not a cookie). Access tokens live 1 hour; use /auth/refresh to get a new one.
 
   responses:
+    WrittenRow:
+      description: The written row, in the shape pull returns it (a tombstone for deletes)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/PulledRow"
+    Forbidden:
+      description: The row is visible to the caller but only its author may change it
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: No live row with this ID in the caller's ledger
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: A uniqueness invariant would break
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     UpdateRequired:
       description: The client speaks a sync protocol the server no longer supports (code UPDATE_REQUIRED).
       content:
@@ -217,6 +512,97 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
 
   schemas:
+    CategoryGroupInput:
+      type: object
+      additionalProperties: false
+      required: [name, statement_type_code]
+      properties:
+        name: { type: string, minLength: 1, description: Unique among the ledger's live groups }
+        statement_type_code: { type: string, enum: [food, other, fixed, excluded] }
+        description: { type: [string, "null"] }
+
+    ExpenseCategoryInput:
+      type: object
+      additionalProperties: false
+      required: [group_id, name]
+      properties:
+        group_id: { type: string, format: uuid, description: A live group of the caller's ledger }
+        name: { type: string, minLength: 1, description: Unique among the group's live categories }
+        description: { type: [string, "null"] }
+
+    IncomeRecordInput:
+      type: object
+      additionalProperties: false
+      required: [transaction_date, amount, name, income_type, emoji]
+      description: The earner is always the caller.
+      properties:
+        transaction_date: { type: string, format: date }
+        amount: { type: integer, minimum: 1, maximum: 2147483647 }
+        name: { type: string, minLength: 1, maxLength: 50 }
+        income_type: { type: string, enum: [salary, side, bonus, oneoff] }
+        emoji: { type: string }
+        note: { type: string }
+
+    BaseIncomeInput:
+      type: object
+      additionalProperties: false
+      required: [amount]
+      properties:
+        amount: { type: integer, minimum: 0, maximum: 2147483647 }
+
+    RecurringExpenseInput:
+      type: object
+      additionalProperties: false
+      required: [wallet, name, emoji, billing_day, type, category_id]
+      properties:
+        wallet: { type: string, enum: [ledger, allowance] }
+        name: { type: string, minLength: 1, maxLength: 50 }
+        emoji: { type: string }
+        billing_day: { type: integer, minimum: 1, maximum: 31 }
+        amount: { type: [integer, "null"], minimum: 1, maximum: 2147483647, description: Fixed expenses with an amount are posted every month }
+        type: { type: string, enum: [fixed, variable] }
+        category_id: { type: string, format: uuid }
+
+    MonthlyAmountInput:
+      type: object
+      additionalProperties: false
+      required: [amount, year_month]
+      properties:
+        amount: { type: integer, minimum: 1, maximum: 2147483647 }
+        year_month: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+
+    SavingsGoalInput:
+      type: object
+      additionalProperties: false
+      required: [name, emoji, monthly_amount, target_amount]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50 }
+        emoji: { type: string }
+        monthly_amount: { type: integer, minimum: 0, maximum: 2147483647 }
+        target_amount: { type: integer, minimum: 0, maximum: 2147483647 }
+        deadline: { type: [string, "null"], description: "YYYY-MM; an empty string clears it" }
+        memo: { type: string }
+
+    BudgetInput:
+      type: object
+      additionalProperties: false
+      required: [monthly_budget, goal_amount]
+      properties:
+        monthly_budget: { type: integer, minimum: 0, maximum: 2147483647 }
+        goal_text: { type: [string, "null"] }
+        goal_amount: { type: integer, minimum: 0, maximum: 2147483647 }
+
+    SurplusAllocationInput:
+      type: object
+      additionalProperties: false
+      required: [year_month, amount, destination]
+      description: "`savings_goal_id` is required for `savings` and forbidden for `budget`."
+      properties:
+        year_month: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        amount: { type: integer, minimum: 1, maximum: 2147483647 }
+        destination: { type: string, enum: [budget, savings] }
+        savings_goal_id: { type: [string, "null"], format: uuid }
+
     TokenPair:
       type: object
       required: [access_token, access_token_expires_at, refresh_token, refresh_token_expires_at, user_id]

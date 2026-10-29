@@ -49,7 +49,8 @@ OpenAPI contract: [`sync-api.yaml`](sync-api.yaml).
   writers must allocate seq through the same helper
   (`repository.txAllocator.allocateSeq`). The integration test
   `TestPull_WatermarkUnderConcurrentWriters` pulls while concurrent writers push,
-  and it fails when the lock is removed.
+  and it fails when the lock is removed. REST commands (Step 5b), monthly
+  postings and `allowance_totals` recomputation allocate seq the same way.
 
 ---
 

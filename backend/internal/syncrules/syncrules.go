@@ -162,6 +162,16 @@ var (
 	yearMonthPattern = regexp.MustCompile(`^\d{4}-(0[1-9]|1[0-2])$`)
 )
 
+// IsYearMonth reports whether the text is a YYYY-MM month.
+func IsYearMonth(text string) bool {
+	return yearMonthPattern.MatchString(text)
+}
+
+// IsDate reports whether the text is a real YYYY-MM-DD date.
+func IsDate(text string) bool {
+	return isValidDateValue(text)
+}
+
 // IsUUID reports whether the text is a canonical UUID.
 func IsUUID(text string) bool {
 	return uuidPattern.MatchString(text)
@@ -178,6 +188,15 @@ func hlcWallTime(hlc string) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return time.UnixMilli(unix_ms), true
+}
+
+// serverDeviceID is the device part of HLCs stamped by the server, e.g. on
+// recurring postings, so that any later edit from a device wins.
+const serverDeviceID = "server"
+
+// ServerHLC returns the HLC for a field the server writes at now.
+func ServerHLC(now time.Time) string {
+	return fmt.Sprintf("%013d-0000-%s", now.UnixMilli(), serverDeviceID)
 }
 
 // CheckHLC reports whether the HLC is well-formed and not too far ahead of now.

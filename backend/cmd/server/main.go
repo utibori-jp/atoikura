@@ -112,6 +112,7 @@ func registerRoutes(mux *http.ServeMux, repo *repository.Repository, jwt_secret 
 	mux.Handle("POST /auth/logout", handler.LogoutHandler(repo))
 	mux.Handle("POST /sync/push", handler.RequireSyncProtocol(handler.PushHandler(repo)))
 	mux.Handle("GET /sync/pull", handler.RequireSyncProtocol(handler.PullHandler(repo)))
+	registerLedgerCommandRoutes(mux, repo)
 	mux.Handle("GET /users/me", handler.GetCurrentUserHandler(repo))
 	mux.Handle("PUT /users/me/password", handler.ChangePasswordHandler(repo))
 	mux.Handle("GET /category-groups", handler.ListCategoryGroupsHandler(repo))
@@ -153,4 +154,35 @@ func registerRoutes(mux *http.ServeMux, repo *repository.Repository, jwt_secret 
 	mux.Handle("GET /budget-summary", handler.GetBudgetSummaryHandler(repo))
 	mux.Handle("GET /surplus-allocations", handler.ListSurplusAllocationsHandler(repo))
 	mux.Handle("POST /surplus-allocations", handler.CreateSurplusAllocationHandler(repo))
+}
+
+// registerLedgerCommandRoutes registers the REST commands for the online-only
+// collections of the local-first clients (#213). Like /sync, they require the
+// client's sync protocol version.
+func registerLedgerCommandRoutes(mux *http.ServeMux, repo *repository.Repository) {
+	ledger_command_routes := map[string]http.HandlerFunc{
+		"POST /ledger/category-groups":                 handler.CreateLedgerCategoryGroupHandler(repo),
+		"PUT /ledger/category-groups/{id}":             handler.UpdateLedgerCategoryGroupHandler(repo),
+		"DELETE /ledger/category-groups/{id}":          handler.DeleteLedgerCategoryGroupHandler(repo),
+		"POST /ledger/expense-categories":              handler.CreateLedgerExpenseCategoryHandler(repo),
+		"PUT /ledger/expense-categories/{id}":          handler.UpdateLedgerExpenseCategoryHandler(repo),
+		"DELETE /ledger/expense-categories/{id}":       handler.DeleteLedgerExpenseCategoryHandler(repo),
+		"POST /ledger/income-records":                  handler.CreateLedgerIncomeRecordHandler(repo),
+		"PUT /ledger/income-records/{id}":              handler.UpdateLedgerIncomeRecordHandler(repo),
+		"DELETE /ledger/income-records/{id}":           handler.DeleteLedgerIncomeRecordHandler(repo),
+		"PUT /ledger/base-income":                      handler.PutLedgerBaseIncomeHandler(repo),
+		"POST /ledger/recurring-expenses":              handler.CreateLedgerRecurringExpenseHandler(repo),
+		"PUT /ledger/recurring-expenses/{id}":          handler.UpdateLedgerRecurringExpenseHandler(repo),
+		"DELETE /ledger/recurring-expenses/{id}":       handler.DeleteLedgerRecurringExpenseHandler(repo),
+		"POST /ledger/recurring-expenses/{id}/confirm": handler.ConfirmLedgerRecurringExpenseHandler(repo),
+		"POST /ledger/savings-goals":                   handler.CreateLedgerSavingsGoalHandler(repo),
+		"PUT /ledger/savings-goals/{id}":               handler.UpdateLedgerSavingsGoalHandler(repo),
+		"DELETE /ledger/savings-goals/{id}":            handler.DeleteLedgerSavingsGoalHandler(repo),
+		"POST /ledger/savings-goals/{id}/postings":     handler.CreateLedgerSavingsPostingHandler(repo),
+		"PUT /ledger/budget":                           handler.PutLedgerBudgetHandler(repo),
+		"POST /ledger/surplus-allocations":             handler.CreateLedgerSurplusAllocationHandler(repo),
+	}
+	for route_pattern, command_handler := range ledger_command_routes {
+		mux.Handle(route_pattern, handler.RequireSyncProtocol(command_handler))
+	}
 }

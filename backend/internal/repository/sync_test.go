@@ -475,21 +475,16 @@ func TestHousehold_PushAndPullVisibility(t *testing.T) {
 	mustApply(t, user_a.UserID, dailyNoteChange(t, note_id, "2026-10-05", "private"))
 
 	allowance_recurring_id := newUUID(t)
+	// Variable, so that pull does not post it into the allowance total checked below.
 	if _, err := testPool.Exec(context.Background(),
 		`INSERT INTO lf.recurring_expenses (id, ledger_id, owner_id, seq, wallet, name, billing_day, amount, type, category_id)
-		 VALUES ($1::uuid, $2::uuid, $3, nextval('lf.sync_seq'), 'allowance', 'Gym', 1, 5000, 'fixed', $4::uuid)`,
+		 VALUES ($1::uuid, $2::uuid, $3, nextval('lf.sync_seq'), 'allowance', 'Gym', 1, 5000, 'variable', $4::uuid)`,
 		allowance_recurring_id, household_id, user_a.UserID, user_a.CategoryID,
 	); err != nil {
 		t.Fatalf("inserting recurring expense: %v", err)
 	}
+	// The push of the allowance entry computed A's total for October.
 	allowance_total_id := fmt.Sprintf("%d:2026-10", user_a.UserID)
-	if _, err := testPool.Exec(context.Background(),
-		`INSERT INTO lf.allowance_totals (id, ledger_id, owner_id, seq, member_id, year_month, spent)
-		 VALUES ($1, $2::uuid, $3, nextval('lf.sync_seq'), $3, '2026-10', 200)`,
-		allowance_total_id, household_id, user_a.UserID,
-	); err != nil {
-		t.Fatalf("inserting allowance total: %v", err)
-	}
 
 	t.Run("member cannot write another member's entries", func(t *testing.T) {
 		for _, target_entry_id := range []string{allowance_entry_id, shared_entry_id} {
@@ -512,8 +507,8 @@ func TestHousehold_PushAndPullVisibility(t *testing.T) {
 				t.Fatalf("B pulled A's private row %s", hidden_key)
 			}
 		}
-		if _, found := rows_by_key["allowance_totals/"+allowance_total_id]; !found {
-			t.Fatal("allowance_totals missing for B")
+		if allowance_total := rows_by_key["allowance_totals/"+allowance_total_id]; string(allowance_total.Data["spent"]) != "200" {
+			t.Fatalf("allowance total for B = %s, want 200", allowance_total.Data["spent"])
 		}
 	})
 
