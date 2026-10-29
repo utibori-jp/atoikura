@@ -184,10 +184,32 @@ const SCHEMA_V1_STATEMENTS = [
   `CREATE INDEX savings_postings_goal_idx ON savings_postings (goal_id)`,
 ];
 
+// Sync engine bookkeeping (#204).
+const SCHEMA_V2_STATEMENTS = [
+  // The signed-in user whose data this database holds; another user resets it.
+  `ALTER TABLE _sync_state ADD COLUMN user_id INTEGER`,
+  `ALTER TABLE _sync_state ADD COLUMN last_synced_at TEXT`,
+  // Changes the server rejected and the engine rolled back, kept until the user
+  // has seen them.
+  `CREATE TABLE _sync_rejections (
+    rejection_id INTEGER PRIMARY KEY,
+    collection TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    message TEXT NOT NULL,
+    rejected_at TEXT NOT NULL
+  )`,
+];
+
 export const MIGRATIONS: Migration[] = [
   {
     version: 1,
     description: "initial local-first schema (#199)",
     statements: SCHEMA_V1_STATEMENTS,
+  },
+  {
+    version: 2,
+    description: "sync engine bookkeeping (#204)",
+    statements: SCHEMA_V2_STATEMENTS,
   },
 ];

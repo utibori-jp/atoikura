@@ -170,6 +170,43 @@ Retries:
 - A `400` or `413` for the whole request is a client bug: the engine stops and
   reports it.
 
+### 5.1 Implementation notes (Step 6, `frontend/src/sync/`)
+
+- **Atomic steps.** Each local write, each set of push results and each pull
+  page is one SQLite transaction. A pull page and its new cursor commit
+  together, so an interrupted pull resumes from the last applied page.
+- **In-flight edits.** An outbox entry is dropped only if it still holds the HLC
+  that was sent. A field edited again while its push was in flight stays
+  pending, and its shadow becomes the value the server accepted.
+- **Lost responses.** If the push response never arrives, the next sync sends
+  the same changes again. The server finds them already stored (equal HLCs are
+  superseded), so nothing is duplicated.
+- **Rejections** are written to `_sync_rejections` (schema v2) and stay there
+  until the user dismisses them. A rejected record the server never accepted
+  (`seq` is null) is removed. Otherwise each rejected field is restored from
+  its shadow, and a rejected deletion brings the record back.
+- **`merged_into`.** The local record takes the existing ID, together with its
+  outbox and shadow entries. If a row with that ID is already on the device,
+  the local duplicate is dropped.
+- **Pull merge.** A field keeps its local value only while it has a pending
+  change whose HLC is greater than the pulled `field_hlc`. That pulled value
+  becomes the field's shadow. A pulled tombstone always wins.
+- **Ledger and user changes.** `_sync_state.user_id` (schema v2) binds the
+  database to one user. If another user signs in, everything is wiped. If the
+  ledger changes, the engine pushes the outbox, clears the synced tables and
+  pulls from 0.
+- **Tokens.** The access token stays in memory. The refresh token and the user
+  ID are kept in `localStorage`, so the app can sync after a restart without the
+  password; the strict CSP is what protects them. Refreshes are serialized
+  across tabs with the Web Lock `atoikura-auth-refresh`, and each refresh
+  re-reads the stored token inside the lock. Two tabs therefore never present
+  the same rotated token, which would trip reuse detection.
+- **Reset and re-sync.** If a migration fails, or the database is newer than
+  the app, the worker keeps the old database open as a recoverable handle
+  (`MIGRATION_FAILED` / `SCHEMA_TOO_NEW`). The app pushes the outbox, recreates
+  the database, and pulls everything again. If the push fails, nothing is
+  deleted.
+
 ---
 
 ## 6. Security test matrix (Step 5, required)
