@@ -31,9 +31,10 @@ function listTableNames(db: SqlDatabase): string[] {
     .map((table_row) => String(table_row.name));
 }
 
-const EXPECTED_V1_TABLES = [
+const EXPECTED_TABLES = [
   "_outbox",
   "_shadow",
+  "_sync_rejections",
   "_sync_state",
   "allowance_totals",
   "allowances",
@@ -57,9 +58,9 @@ describe("runMigrations", () => {
   it("creates the full schema on an empty database", () => {
     const applied_versions = runMigrations(test_db, MIGRATIONS);
 
-    expect(applied_versions).toEqual([1]);
+    expect(applied_versions).toEqual([1, 2]);
     expect(getSchemaVersion(test_db)).toBe(MIGRATIONS.length);
-    expect(listTableNames(test_db)).toEqual(EXPECTED_V1_TABLES);
+    expect(listTableNames(test_db)).toEqual(EXPECTED_TABLES);
   });
 
   it("is a no-op when re-run on an up-to-date database", () => {

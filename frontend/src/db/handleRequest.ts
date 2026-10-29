@@ -2,10 +2,10 @@ import type { DbRequest, DbResponse } from "./protocol";
 import type { SqlDatabase } from "./types";
 
 // Executes one worker request against the database. Kept separate from worker.ts
-// so it can be tested without a Worker or OPFS. "close" is handled by the worker.
+// so it can be tested without a Worker or OPFS. "close" and "recreate" are handled by the worker.
 export function handleDbRequest(
   db: SqlDatabase,
-  request: Exclude<DbRequest, { kind: "close" }>
+  request: Exclude<DbRequest, { kind: "close" | "recreate" }>
 ): DbResponse {
   try {
     switch (request.kind) {
