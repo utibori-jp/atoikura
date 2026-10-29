@@ -39,13 +39,23 @@ type txAllocator struct {
 	is_locked bool
 }
 
+// lock takes the seq lock once per transaction. Statements that call
+// nextval('lf.sync_seq') themselves must run after it.
+func (seq_allocator *txAllocator) lock(ctx context.Context) error {
+	if seq_allocator.is_locked {
+		return nil
+	}
+	if _, err := seq_allocator.tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", syncSeqLockKey); err != nil {
+		return fmt.Errorf("acquiring seq lock: %w", err)
+	}
+	seq_allocator.is_locked = true
+	return nil
+}
+
 // allocateSeq takes the seq lock (once per transaction) and returns the next seq.
 func (seq_allocator *txAllocator) allocateSeq(ctx context.Context) (int64, error) {
-	if !seq_allocator.is_locked {
-		if _, err := seq_allocator.tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", syncSeqLockKey); err != nil {
-			return 0, fmt.Errorf("acquiring seq lock: %w", err)
-		}
-		seq_allocator.is_locked = true
+	if err := seq_allocator.lock(ctx); err != nil {
+		return 0, err
 	}
 	var next_seq int64
 	if err := seq_allocator.tx.QueryRow(ctx, "SELECT nextval('lf.sync_seq')").Scan(&next_seq); err != nil {
@@ -263,6 +273,18 @@ func (r *Repository) pushChange(ctx context.Context, user_id int64, caller_ledge
 	}
 	if err != nil {
 		return PushResult{}, err
+	}
+	if collection_spec.Name == "journal_entries" {
+		entry_owner_id := user_id
+		var stored_values syncrules.Row
+		if stored_record != nil {
+			entry_owner_id = stored_record.OwnerID
+			stored_values = stored_record.Values
+		}
+		allowance_months := allowanceMonthsTouched(stored_values, merge_result.Candidate)
+		if err := recomputeAllowanceTotals(ctx, seq_allocator, caller_ledger.ID, entry_owner_id, allowance_months); err != nil {
+			return PushResult{}, err
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return PushResult{}, fmt.Errorf("committing push: %w", err)
@@ -489,6 +511,11 @@ func (r *Repository) Pull(ctx context.Context, user_id int64, since int64, limit
 	if err != nil {
 		return nil, err
 	}
+	// The first pull of a month posts that month's fixed recurring expenses and
+	// savings (design.md §5.3), so the postings are part of this very pull.
+	if err := r.PostMonthlyForLedger(ctx, caller_ledger.ID, time.Now().In(jstLocation()).Format("2006-01")); err != nil {
+		return nil, err
+	}
 	pulled_rows, err := r.pool.Query(ctx, pullQuery, caller_ledger.ID, since, user_id, limit+1)
 	if err != nil {
 		return nil, fmt.Errorf("pulling changes: %w", err)
@@ -507,21 +534,10 @@ func (r *Repository) Pull(ctx context.Context, user_id int64, since int64, limit
 			pull_result.HasMore = true
 			break
 		}
-		var row_columns map[string]json.RawMessage
-		if err := json.Unmarshal(row_json, &row_columns); err != nil {
-			return nil, fmt.Errorf("decoding pulled row: %w", err)
+		pulled_row, err := decodePulledRow(collection_name, row_json)
+		if err != nil {
+			return nil, err
 		}
-		pulled_row := PulledRow{Collection: collection_name, Seq: row_seq}
-		_ = json.Unmarshal(row_columns["id"], &pulled_row.ID)
-		_ = json.Unmarshal(row_columns["owner_id"], &pulled_row.OwnerID)
-		_ = json.Unmarshal(row_columns["deleted"], &pulled_row.Deleted)
-		if field_hlc_json, found := row_columns["field_hlc"]; found {
-			_ = json.Unmarshal(field_hlc_json, &pulled_row.FieldHLC)
-		}
-		for _, envelope_column := range envelopeColumns {
-			delete(row_columns, envelope_column)
-		}
-		pulled_row.Data = row_columns
 		pull_result.Rows = append(pull_result.Rows, pulled_row)
 		pull_result.NextSince = row_seq
 	}
@@ -529,4 +545,26 @@ func (r *Repository) Pull(ctx context.Context, user_id int64, since int64, limit
 		return nil, fmt.Errorf("reading pulled rows: %w", err)
 	}
 	return pull_result, nil
+}
+
+// decodePulledRow turns a to_jsonb row into the shape pull returns: envelope
+// columns are lifted out of data.
+func decodePulledRow(collection_name string, row_json []byte) (PulledRow, error) {
+	var row_columns map[string]json.RawMessage
+	if err := json.Unmarshal(row_json, &row_columns); err != nil {
+		return PulledRow{}, fmt.Errorf("decoding %s row: %w", collection_name, err)
+	}
+	pulled_row := PulledRow{Collection: collection_name}
+	_ = json.Unmarshal(row_columns["id"], &pulled_row.ID)
+	_ = json.Unmarshal(row_columns["owner_id"], &pulled_row.OwnerID)
+	_ = json.Unmarshal(row_columns["seq"], &pulled_row.Seq)
+	_ = json.Unmarshal(row_columns["deleted"], &pulled_row.Deleted)
+	if field_hlc_json, found := row_columns["field_hlc"]; found {
+		_ = json.Unmarshal(field_hlc_json, &pulled_row.FieldHLC)
+	}
+	for _, envelope_column := range envelopeColumns {
+		delete(row_columns, envelope_column)
+	}
+	pulled_row.Data = row_columns
+	return pulled_row, nil
 }

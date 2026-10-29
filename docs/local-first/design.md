@@ -114,7 +114,7 @@ Common columns on every synced table:
 | `income_records` | `earner_id`, `transaction_date`, `amount`, `name`, `income_type`, `emoji`, `note` | members | the earner | Income is shared within a household. |
 | `base_incomes` | `member_id`, `amount` | members | that member | Replaces `base_income_settings`; the ledger's base income is the sum over its members. |
 | `recurring_expenses` | `wallet`, `name`, `emoji`, `billing_day`, `amount`, `type`, `category_id` | ledger wallet: members; allowance wallet: **owner only** | ledger wallet: any member; allowance wallet: owner | Personal fixed costs use the allowance wallet (D8). |
-| `savings_goals` / `savings_postings` | as today, plus postings | members | any member | Online, so today's server logic (including manual postings) carries over. `accumulated` is derived from the postings. |
+| `savings_goals` / `savings_postings` | as today, plus postings | members | any member | Online, so today's server logic (including manual postings) carries over. `accumulated` is derived on device: the goal's postings plus its `savings` surplus allocations (an allocation is not copied into a posting). |
 | `budgets` | `monthly_budget`, `goal_text`, `goal_amount` | members | any member | One row per ledger |
 | `allowances` | `member_id`, `effective_from` (YYYY-MM), `amount` | members | any member, via the household settings (Q4) | Household mode only. A **history**: one row per change, unique per `(member_id, effective_from)`. The carry-over needs the amount in effect for every past month. |
 | `surplus_allocations` | as today | members | any member | Append-only. The upper bound stays a server-side **error**, as today. |
@@ -199,12 +199,22 @@ the first place.
 
 ### 5.3 Recurring postings and savings (server side)
 
-- On the first sync or request of a month, the server posts that month's
-  **fixed** recurring expenses and monthly savings, as the lazy posting does
-  today. A unique key on `(recurring_expense_id, year_month)` replaces the
-  advisory lock.
+- On the first pull of a month, the server posts that month's **fixed**
+  recurring expenses and monthly savings, as the lazy posting does today. A
+  unique key on `(recurring_expense_id, year_month)` replaces the advisory lock,
+  so concurrent pulls post exactly once (Step 5b).
+  - A posting the user deleted is **not** posted again: its tombstone still
+    holds the key. The same applies to confirming a variable expense: each
+    recurring expense is posted at most once per month.
+  - A manual savings posting for a month counts as that month's posting, as
+    `last_posted_month` did.
+  - Posted entries are stamped with a server HLC (`…-server`), so any later
+    edit from a device wins.
 - **Variable** recurring expenses are confirmed through an online command.
 - Posted journal entries enter the pull stream like any other change.
+  Whenever an allowance entry changes (push, confirm or posting), the server
+  recomputes that member's `allowance_totals` for the affected months in the
+  same transaction.
   - Shared-ledger postings can be edited by any member.
   - Allowance postings can only be edited by their owner.
 - Until a month's postings arrive, an offline device projects the budget using
