@@ -7,6 +7,7 @@ export class FakeSyncEnvironment implements SyncEnvironment {
   private next_timer_id = 1;
   readonly timers = new Map<number, { callback: () => void; delay_ms: number }>();
   private readonly wake_listeners = new Set<() => void>();
+  private readonly offline_listeners = new Set<() => void>();
 
   isOnline = (): boolean => this.online;
 
@@ -27,8 +28,24 @@ export class FakeSyncEnvironment implements SyncEnvironment {
     return () => this.wake_listeners.delete(listener);
   };
 
+  onOffline = (listener: () => void): (() => void) => {
+    this.offline_listeners.add(listener);
+    return () => this.offline_listeners.delete(listener);
+  };
+
   wake(): void {
     for (const listener of this.wake_listeners) listener();
+  }
+
+  // Changes connectivity the way the browser reports it: losing the connection
+  // fires "offline", regaining it wakes the engine.
+  setOnline(is_online: boolean): void {
+    this.online = is_online;
+    if (is_online) {
+      this.wake();
+    } else {
+      for (const listener of this.offline_listeners) listener();
+    }
   }
 
   scheduledDelays(): number[] {

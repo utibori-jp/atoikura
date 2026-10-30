@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import { useLedgerApi, type BudgetSummaryView } from "../../data/ledgerApi";
+import { useDataVersion } from "../../session/sessionHooks";
 import { T } from "../../theme";
 
-type BudgetSummary = components["schemas"]["BudgetSummaryResponse"];
+type BudgetSummary = BudgetSummaryView;
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 const yenSlim = (n: number) => Math.round(n).toLocaleString("ja-JP");
@@ -32,6 +32,8 @@ interface Props {
 }
 
 export function WebBudget({ onNavigate }: Props) {
+  const api = useLedgerApi();
+  const data_version = useDataVersion();
   const [summary, setSummary] = useState<BudgetSummary | null>(null);
   const [counts, setCounts] = useState<{
     income: number;
@@ -59,7 +61,7 @@ export function WebBudget({ onNavigate }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [ym]);
+  }, [ym, api, data_version]);
 
   if (!summary || !counts) {
     return (

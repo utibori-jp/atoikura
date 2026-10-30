@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import {
+  commandErrorMessage,
+  useCanEditOnline,
+  useLedgerApi,
+  type SavingsGoalFields,
+  type SavingsGoalView,
+} from "../../data/ledgerApi";
+import { useDataVersion } from "../../session/sessionHooks";
+import { OnlineEditNotice } from "../OnlineEditNotice";
 import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
 import { useConfirm } from "../dialogContext";
 import { useEntityForm, FormField, AmountField, FormError, FormActions } from "../forms";
 
-type SavingsGoal = components["schemas"]["SavingsGoal"];
+type SavingsGoal = SavingsGoalView;
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 const yenSlim = (n: number) => Math.round(n).toLocaleString("ja-JP");
@@ -26,7 +33,7 @@ interface Props {
 
 // Form state for create / edit. id=null means "create mode".
 interface GoalFormState {
-  id: number | null;
+  id: string | null;
   name: string;
   emoji: string;
   monthly_amount_yen: string;
@@ -60,6 +67,10 @@ function goal_to_form(g: SavingsGoal): GoalFormState {
 }
 
 export function WebSavings({ onBack }: Props) {
+  const api = useLedgerApi();
+  const data_version = useDataVersion();
+  const can_edit = useCanEditOnline();
+  const [command_error, setCommandError] = useState("");
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const confirm = useConfirm();
   const ym = currentMonthJST();
@@ -80,11 +91,11 @@ export function WebSavings({ onBack }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [api, data_version]);
 
   const monthly_total = goals.reduce((s, g) => s + g.monthly_amount, 0);
 
-  const handle_delete = async (id: number) => {
+  const handle_delete = async (id: string) => {
     const confirmed = await confirm({
       title: "削除の確認",
       message: "この貯金目標を削除しますか？",
@@ -92,8 +103,21 @@ export function WebSavings({ onBack }: Props) {
       danger: true,
     });
     if (!confirmed) return;
-    await api.deleteSavingsGoal(id).catch(() => {});
-    setGoals((prev) => prev.filter((g) => g.id !== id));
+    setCommandError("");
+    try {
+      await api.deleteSavingsGoal(id);
+    } catch (delete_error) {
+      setCommandError(commandErrorMessage(delete_error, "削除できませんでした"));
+    }
+  };
+
+  const handle_post_monthly = async (goal: SavingsGoal) => {
+    setCommandError("");
+    try {
+      await api.postMonthlySavings(goal.id, goal.monthly_amount, ym);
+    } catch (post_error) {
+      setCommandError(commandErrorMessage(post_error, "記録できませんでした"));
+    }
   };
 
   const goal_form = useEntityForm<GoalFormState, SavingsGoal>({
@@ -109,7 +133,7 @@ export function WebSavings({ onBack }: Props) {
       return null;
     },
     onSubmit: async (f) => {
-      const request_body: components["schemas"]["SavingsGoalRequest"] = {
+      const request_body: SavingsGoalFields = {
         name: f.name.trim(),
         emoji: f.emoji.trim() || DEFAULT_SAVINGS_EMOJI,
         monthly_amount: parseInt(f.monthly_amount_yen, 10),
@@ -163,6 +187,7 @@ export function WebSavings({ onBack }: Props) {
         </div>
         <button
           onClick={goal_form.openCreate}
+          disabled={!can_edit}
           style={{
             border: "none",
             background: T.coral,
@@ -179,6 +204,8 @@ export function WebSavings({ onBack }: Props) {
           ＋ 貯金目標を追加
         </button>
       </div>
+
+      <OnlineEditNotice can_edit={can_edit} command_error={command_error} />
 
       {/* Inline create / edit form */}
       {goal_form.form && (
@@ -429,42 +456,44 @@ export function WebSavings({ onBack }: Props) {
                     )}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 4 }}>
-                  <span
-                    onClick={() => goal_form.openEdit(g)}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 8,
-                      background: T.bgSoft,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 13,
-                      color: T.inkSoft,
-                      cursor: "pointer",
-                    }}
-                  >
-                    ✎
-                  </span>
-                  <span
-                    onClick={() => handle_delete(g.id)}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 8,
-                      background: T.bgSoft,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 13,
-                      color: T.inkSoft,
-                      cursor: "pointer",
-                    }}
-                  >
-                    🗑
-                  </span>
-                </div>
+                {can_edit && (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <span
+                      onClick={() => goal_form.openEdit(g)}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        background: T.bgSoft,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 13,
+                        color: T.inkSoft,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✎
+                    </span>
+                    <span
+                      onClick={() => handle_delete(g.id)}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        background: T.bgSoft,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 13,
+                        color: T.inkSoft,
+                        cursor: "pointer",
+                      }}
+                    >
+                      🗑
+                    </span>
+                  </div>
+                )}
               </div>
 
               {g.memo && (
@@ -545,12 +574,8 @@ export function WebSavings({ onBack }: Props) {
 
               {!g.is_posted_this_month && (
                 <button
-                  onClick={() =>
-                    api
-                      .postMonthlySavings(g.id, g.monthly_amount, ym)
-                      .then(() => api.listSavingsGoals().then((r) => setGoals(r.savings_goals)))
-                      .catch(() => {})
-                  }
+                  onClick={() => handle_post_monthly(g)}
+                  disabled={!can_edit}
                   style={{
                     border: "none",
                     background: T.mustard,

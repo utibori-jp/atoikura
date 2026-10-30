@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import {
+  commandErrorMessage,
+  useCanEditOnline,
+  useLedgerApi,
+  type IncomeRecordFields,
+  type IncomeRecordView,
+  type SavingsGoalView,
+  type SurplusAllocationView,
+} from "../../data/ledgerApi";
+import { useDataVersion } from "../../session/sessionHooks";
+import { OnlineEditNotice } from "../OnlineEditNotice";
 import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
 import { DateField } from "../DateField";
@@ -15,10 +24,10 @@ import {
   inputStyle,
 } from "../forms";
 
-type IncomeRecord = components["schemas"]["IncomeRecord"];
-type BaseIncomeSetting = components["schemas"]["BaseIncomeSetting"];
-type SavingsGoal = components["schemas"]["SavingsGoal"];
-type SurplusAllocation = components["schemas"]["SurplusAllocation"];
+type IncomeRecord = IncomeRecordView;
+type BaseIncomeSetting = { amount: number };
+type SavingsGoal = SavingsGoalView;
+type SurplusAllocation = SurplusAllocationView;
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 
@@ -67,7 +76,7 @@ interface Props {
 
 // Form state for create / edit. id=null means "create mode".
 interface IncomeRecordFormState {
-  id: number | null;
+  id: string | null;
   name: string;
   emoji: string;
   amount_yen: string;
@@ -104,7 +113,7 @@ function income_record_to_form(record: IncomeRecord): IncomeRecordFormState {
 interface AllocFormState {
   amount_yen: string;
   destination: "savings" | "budget";
-  savings_goal_id: number | null;
+  savings_goal_id: string | null;
 }
 
 function blank_alloc_form(savings_goals: SavingsGoal[]): AllocFormState {
@@ -116,6 +125,10 @@ function blank_alloc_form(savings_goals: SavingsGoal[]): AllocFormState {
 }
 
 export function WebIncome({ onBack }: Props) {
+  const api = useLedgerApi();
+  const data_version = useDataVersion();
+  const can_edit = useCanEditOnline();
+  const [command_error, setCommandError] = useState("");
   const confirm = useConfirm();
   const current_ym = currentMonthJST();
   const [active_ym, setActiveYm] = useState(current_ym);
@@ -165,7 +178,7 @@ export function WebIncome({ onBack }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [active_ym]);
+  }, [active_ym, api, data_version]);
 
   const income_total = records.reduce((s, r) => s + r.amount, 0);
   const base_amount = base_income?.amount ?? 0;
@@ -175,7 +188,7 @@ export function WebIncome({ onBack }: Props) {
 
   const days_with_income = [...new Set(records.map((r) => r.transaction_date))].sort().reverse();
 
-  const handle_delete = async (id: number) => {
+  const handle_delete = async (id: string) => {
     const confirmed = await confirm({
       title: "削除の確認",
       message: "この収入記録を削除しますか？",
@@ -183,8 +196,12 @@ export function WebIncome({ onBack }: Props) {
       danger: true,
     });
     if (!confirmed) return;
-    await api.deleteIncomeRecord(id).catch(() => {});
-    setRecords((prev) => prev.filter((r) => r.id !== id));
+    setCommandError("");
+    try {
+      await api.deleteIncomeRecord(id);
+    } catch (delete_error) {
+      setCommandError(commandErrorMessage(delete_error, "削除できませんでした"));
+    }
   };
 
   // Income record create / edit form.
@@ -200,7 +217,7 @@ export function WebIncome({ onBack }: Props) {
       return null;
     },
     onSubmit: async (f) => {
-      const request_body: components["schemas"]["IncomeRecordRequest"] = {
+      const request_body: IncomeRecordFields = {
         name: f.name.trim(),
         emoji: f.emoji.trim() || DEFAULT_INCOME_EMOJI,
         amount: parseInt(f.amount_yen, 10),
@@ -252,8 +269,9 @@ export function WebIncome({ onBack }: Props) {
       return isNaN(amount) || amount < 1 ? "基準収入を正しく入力してください" : null;
     },
     onSubmit: async (f) => {
-      const res = await api.updateBaseIncome(parseInt(f.amount_yen, 10));
-      setBaseIncome(res);
+      const base_amount_yen = parseInt(f.amount_yen, 10);
+      await api.updateBaseIncome(base_amount_yen);
+      setBaseIncome({ amount: base_amount_yen });
     },
   });
 
@@ -294,6 +312,7 @@ export function WebIncome({ onBack }: Props) {
         </div>
         <button
           onClick={income_form.openCreate}
+          disabled={!can_edit}
           style={{
             border: "none",
             background: T.sage,
@@ -310,6 +329,7 @@ export function WebIncome({ onBack }: Props) {
           ＋ 収入を記録
         </button>
       </div>
+      <OnlineEditNotice can_edit={can_edit} command_error={command_error} />
 
       {/* Create / edit form as a centered modal popup (#132) */}
       {income_form.form && (
@@ -490,6 +510,7 @@ export function WebIncome({ onBack }: Props) {
               {!base_form.form && (
                 <button
                   onClick={base_form.openCreate}
+                  disabled={!can_edit}
                   style={{
                     marginTop: 10,
                     padding: "7px 14px",
@@ -614,6 +635,7 @@ export function WebIncome({ onBack }: Props) {
               </div>
               <button
                 onClick={alloc_form.openCreate}
+                disabled={!can_edit}
                 style={{
                   marginTop: 10,
                   padding: "9px 16px",
@@ -722,10 +744,7 @@ export function WebIncome({ onBack }: Props) {
                       <select
                         value={alloc_form.form.savings_goal_id ?? ""}
                         onChange={(e) =>
-                          alloc_form.setField(
-                            "savings_goal_id",
-                            e.target.value ? Number(e.target.value) : null
-                          )
+                          alloc_form.setField("savings_goal_id", e.target.value || null)
                         }
                         style={inputStyle}
                       >
@@ -961,30 +980,32 @@ export function WebIncome({ onBack }: Props) {
                           >
                             +{yen(e.amount)}
                           </div>
-                          <div style={{ display: "flex", gap: 6, opacity: 0.45 }}>
-                            <span
-                              onClick={() => income_form.openEdit(e)}
-                              style={{
-                                padding: "4px 8px",
-                                borderRadius: 8,
-                                fontSize: 12,
-                                cursor: "pointer",
-                              }}
-                            >
-                              ✎
-                            </span>
-                            <span
-                              onClick={() => handle_delete(e.id)}
-                              style={{
-                                padding: "4px 8px",
-                                borderRadius: 8,
-                                fontSize: 12,
-                                cursor: "pointer",
-                              }}
-                            >
-                              🗑
-                            </span>
-                          </div>
+                          {can_edit && (
+                            <div style={{ display: "flex", gap: 6, opacity: 0.45 }}>
+                              <span
+                                onClick={() => income_form.openEdit(e)}
+                                style={{
+                                  padding: "4px 8px",
+                                  borderRadius: 8,
+                                  fontSize: 12,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                ✎
+                              </span>
+                              <span
+                                onClick={() => handle_delete(e.id)}
+                                style={{
+                                  padding: "4px 8px",
+                                  borderRadius: 8,
+                                  fontSize: 12,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                🗑
+                              </span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

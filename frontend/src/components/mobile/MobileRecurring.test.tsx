@@ -1,191 +1,57 @@
-import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
-import type { ReactElement } from "react";
-import { http, HttpResponse } from "msw";
-import { server } from "../../test/server";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { todayInJst } from "../../logic";
+import {
+  putRecurringExpense,
+  RENT_CATEGORY_ID,
+  seedFixedCategory,
+  seedPersonalLedger,
+  TestLedgerServer,
+} from "../../test/ledgerFixtures";
+import { renderWithLedger } from "../../test/renderWithLedger";
 import { MobileRecurring } from "./MobileRecurring";
-import { DialogProvider } from "../dialogs";
-import type { components } from "../../api/types";
 
-// MobileRecurring consumes the confirm dialog via context (#166).
-function renderWithDialogs(ui: ReactElement) {
-  return render(<DialogProvider>{ui}</DialogProvider>);
+const current_month = todayInJst().slice(0, 7);
+
+// A food group (variable) and a fixed-cost group, so the picker filter is visible.
+function recurringLedgerServer(add_rows: (ledger_server: TestLedgerServer) => void = () => {}) {
+  const ledger_server = new TestLedgerServer();
+  seedPersonalLedger(ledger_server);
+  seedFixedCategory(ledger_server);
+  add_rows(ledger_server);
+  return ledger_server;
 }
 
-const API_BASE = "http://localhost:8080";
-
-// --- fixture helpers ---
-
-function makeRecurring(
-  overrides: Partial<components["schemas"]["RecurringExpense"]> = {}
-): components["schemas"]["RecurringExpense"] {
-  return {
-    id: 1,
-    name: "家賃",
-    emoji: "🏠",
-    billing_day: 25,
-    amount: 80000,
-    type: "fixed",
-    category_id: 1,
-    group_id: 1,
-    group_name: "固定費",
-    category_name: "家賃",
-    ...overrides,
-  };
+async function renderRecurring(ledger_server: TestLedgerServer) {
+  const rendered = await renderWithLedger(<MobileRecurring onBack={() => {}} />, ledger_server);
+  expect(
+    await screen.findByText("毎月の固定・半固定費を管理", undefined, { timeout: 5000 })
+  ).toBeInTheDocument();
+  return rendered;
 }
 
-function makeRecurringList(
-  items: components["schemas"]["RecurringExpense"][]
-): components["schemas"]["RecurringExpenseListResponse"] {
-  return { recurring_expenses: items };
-}
-
-function makePendingList(
-  items: components["schemas"]["PendingRecurring"][] = []
-): components["schemas"]["PendingRecurringListResponse"] {
-  return { pending: items };
-}
-
-function makePendingItem(
-  overrides: Partial<components["schemas"]["PendingRecurring"]> = {}
-): components["schemas"]["PendingRecurring"] {
-  return {
-    id: 10,
-    name: "電気代",
-    emoji: "💡",
-    billing_day: 10,
-    last_amount: 7480,
-    group_name: "固定費",
-    ...overrides,
-  };
-}
-
-function makeCategoryList(): components["schemas"]["ExpenseCategoryListResponse"] {
-  return {
-    expense_categories: [
-      {
-        id: 1,
-        category_name: "家賃",
-        category_code: "rent",
-        group_id: 1,
-        group_name: "固定費",
-        description: null,
-      },
-    ],
-  };
-}
-
-// Category groups where group id=1 is treated as fixed-cost, so that makeCategoryList()
-// categories (group_id=1) pass the fixed-cost filter in MobileRecurring.
-function makeDefaultCategoryGroups(): components["schemas"]["CategoryGroupListResponse"] {
-  return {
-    category_groups: [
-      {
-        id: 1,
-        group_name: "固定費",
-        statement_type: { id: 3, type_code: "fixed", statement_type_name: "固定費" },
-        description: null,
-      },
-    ],
-  };
-}
-
-// Override recurring + pending + expense-categories for a test suite
-function useDefaultHandlers(
-  recurringList: components["schemas"]["RecurringExpenseListResponse"] = makeRecurringList([]),
-  pendingList: components["schemas"]["PendingRecurringListResponse"] = makePendingList()
-) {
-  server.use(
-    http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(recurringList)),
-    http.get(`${API_BASE}/recurring-expenses/pending`, () => HttpResponse.json(pendingList)),
-    http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
-    http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups()))
-  );
-}
-
-// Wait until the subtitle is rendered (after loading completes)
-async function waitForReady() {
-  await waitFor(() => {
-    expect(screen.getByText("毎月の固定・半固定費を管理")).toBeInTheDocument();
+async function fillRequiredFields(): Promise<void> {
+  await screen.findByRole("option", { name: "家賃" });
+  fireEvent.change(screen.getByPlaceholderText("家賃"), { target: { value: "サブスク" } });
+  fireEvent.change(screen.getByPlaceholderText("25"), { target: { value: "1" } });
+  fireEvent.change(screen.getByDisplayValue("選択してください"), {
+    target: { value: RENT_CATEGORY_ID },
   });
 }
 
-// --- category-filter fixtures ---
-
-function makeFixedOnlyGroups(): components["schemas"]["CategoryGroupListResponse"] {
-  return {
-    category_groups: [
-      {
-        id: 3,
-        group_name: "固定費",
-        statement_type: { id: 3, type_code: "fixed", statement_type_name: "固定費" },
-        description: null,
-      },
-      {
-        id: 1,
-        group_name: "食費",
-        statement_type: { id: 1, type_code: "food", statement_type_name: "食費（変動費）" },
-        description: null,
-      },
-    ],
-  };
-}
-
-function makeMixedCategories(): components["schemas"]["ExpenseCategoryListResponse"] {
-  return {
-    expense_categories: [
-      {
-        id: 10,
-        category_name: "家賃",
-        category_code: "rent",
-        group_id: 3,
-        group_name: "固定費",
-        description: null,
-      },
-      {
-        id: 20,
-        category_name: "スーパー",
-        category_code: "food_super",
-        group_id: 1,
-        group_name: "食費",
-        description: null,
-      },
-    ],
-  };
-}
-
-// --- tests ---
-
 describe("MobileRecurring — category filter (fixed-cost only)", () => {
   it("shows only fixed-cost categories in the recurring picker", async () => {
-    server.use(
-      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(makeRecurringList([]))),
-      http.get(`${API_BASE}/recurring-expenses/pending`, () =>
-        HttpResponse.json(makePendingList())
-      ),
-      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeMixedCategories())),
-      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeFixedOnlyGroups()))
-    );
+    await renderRecurring(recurringLedgerServer());
 
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-    await waitForReady();
-
-    // Open the bottom sheet to reveal the category select
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
 
-    // Fixed-cost category should be present
-    expect(screen.getByRole("option", { name: "家賃" })).toBeInTheDocument();
-
-    // Variable category must NOT be present
+    expect(await screen.findByRole("option", { name: "家賃" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "スーパー" })).not.toBeInTheDocument();
   });
 });
 
 describe("MobileRecurring — create form", () => {
   it("opens the bottom-sheet when ＋ 定期支出を追加 is clicked", async () => {
-    useDefaultHandlers();
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-    await waitForReady();
+    await renderRecurring(recurringLedgerServer());
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
 
@@ -193,149 +59,76 @@ describe("MobileRecurring — create form", () => {
     expect(screen.getByPlaceholderText("家賃")).toBeInTheDocument();
   });
 
-  it("calls POST /recurring-expenses and refreshes list on submit", async () => {
-    const created_recurring = makeRecurring({ id: 99, name: "サブスク", emoji: "📱" });
-    let post_called = false;
+  it("creates the expense with a ledger command and shows it", async () => {
+    const ledger_server = recurringLedgerServer();
+    await renderRecurring(ledger_server);
 
-    server.use(
-      http.get(`${API_BASE}/recurring-expenses`, () => {
-        if (post_called) return HttpResponse.json(makeRecurringList([created_recurring]));
-        return HttpResponse.json(makeRecurringList([]));
-      }),
-      http.get(`${API_BASE}/recurring-expenses/pending`, () =>
-        HttpResponse.json(makePendingList())
-      ),
-      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
-      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
-      http.post(`${API_BASE}/recurring-expenses`, async () => {
-        post_called = true;
-        return HttpResponse.json(created_recurring, { status: 201 });
-      })
-    );
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-    await waitForReady();
-
-    // Open create sheet
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
-
-    // Fill required fields
-    fireEvent.change(screen.getByPlaceholderText("家賃"), { target: { value: "サブスク" } });
+    await fillRequiredFields();
     fireEvent.change(screen.getByPlaceholderText("🏠"), { target: { value: "📱" } });
-    fireEvent.change(screen.getByPlaceholderText("25"), { target: { value: "1" } });
-
-    // Select category
-    const category_select = screen.getByDisplayValue("選択してください");
-    fireEvent.change(category_select, { target: { value: "1" } });
-
-    // Submit
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
 
-    // After save, the new item should appear and the sheet should close
-    await waitFor(() => {
-      expect(screen.getAllByText("サブスク").length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.queryByText("定期支出を追加")).not.toBeInTheDocument());
+    expect((await screen.findAllByText("サブスク")).length).toBeGreaterThan(0);
+    expect(ledger_server.recorded_commands[0]).toMatchObject({
+      method: "POST",
+      path: "recurring-expenses",
+      request_body: {
+        name: "サブスク",
+        emoji: "📱",
+        category_id: RENT_CATEGORY_ID,
+        wallet: "ledger",
+      },
     });
-
-    // Sheet heading should no longer be visible
-    expect(screen.queryByText("定期支出を追加")).not.toBeInTheDocument();
   });
 
   it("shows validation error when name is empty", async () => {
-    useDefaultHandlers();
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-    await waitForReady();
+    await renderRecurring(recurringLedgerServer());
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
-
-    // Submit without filling any field
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
 
     expect(screen.getByText("名前を入力してください")).toBeInTheDocument();
   });
 
   it("submits the default emoji when the emoji field is untouched", async () => {
-    let posted_body: components["schemas"]["RecurringExpenseRequest"] | null = null;
-    server.use(
-      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(makeRecurringList([]))),
-      http.get(`${API_BASE}/recurring-expenses/pending`, () =>
-        HttpResponse.json(makePendingList())
-      ),
-      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
-      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
-      http.post(`${API_BASE}/recurring-expenses`, async ({ request }) => {
-        posted_body = (await request.json()) as components["schemas"]["RecurringExpenseRequest"];
-        return HttpResponse.json(makeRecurring(), { status: 201 });
-      })
-    );
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-    await waitForReady();
+    const ledger_server = recurringLedgerServer();
+    await renderRecurring(ledger_server);
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
-
-    // Fill only the non-emoji required fields, then submit.
-    fireEvent.change(screen.getByPlaceholderText("家賃"), { target: { value: "家賃" } });
-    fireEvent.change(screen.getByPlaceholderText("25"), { target: { value: "1" } });
-    fireEvent.change(screen.getByDisplayValue("選択してください"), { target: { value: "1" } });
+    await fillRequiredFields();
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
 
-    await waitFor(() => expect(posted_body).not.toBeNull());
-    expect(posted_body).toMatchObject({ emoji: "🏠" });
+    await waitFor(() => expect(ledger_server.recorded_commands).toHaveLength(1));
+    expect(ledger_server.recorded_commands[0].request_body).toMatchObject({ emoji: "🏠" });
   });
 
   it("lets the user pick a different emoji from the list", async () => {
-    let posted_body: components["schemas"]["RecurringExpenseRequest"] | null = null;
-    server.use(
-      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(makeRecurringList([]))),
-      http.get(`${API_BASE}/recurring-expenses/pending`, () =>
-        HttpResponse.json(makePendingList())
-      ),
-      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
-      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
-      http.post(`${API_BASE}/recurring-expenses`, async ({ request }) => {
-        posted_body = (await request.json()) as components["schemas"]["RecurringExpenseRequest"];
-        return HttpResponse.json(makeRecurring(), { status: 201 });
-      })
-    );
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-    await waitForReady();
+    const ledger_server = recurringLedgerServer();
+    await renderRecurring(ledger_server);
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
-
-    fireEvent.change(screen.getByPlaceholderText("家賃"), { target: { value: "家賃" } });
-    fireEvent.change(screen.getByPlaceholderText("25"), { target: { value: "1" } });
-    fireEvent.change(screen.getByDisplayValue("選択してください"), { target: { value: "1" } });
-    // Choose a non-default emoji from the picker.
+    await fillRequiredFields();
     fireEvent.click(screen.getByRole("button", { name: "📱" }));
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
 
-    await waitFor(() => expect(posted_body).not.toBeNull());
-    expect(posted_body).toMatchObject({ emoji: "📱" });
+    await waitFor(() => expect(ledger_server.recorded_commands).toHaveLength(1));
+    expect(ledger_server.recorded_commands[0].request_body).toMatchObject({ emoji: "📱" });
   });
 
   it("shows validation error when billing_day is out of range", async () => {
-    useDefaultHandlers();
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-    await waitForReady();
+    await renderRecurring(recurringLedgerServer());
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
     fireEvent.change(screen.getByPlaceholderText("家賃"), { target: { value: "家賃" } });
-    fireEvent.change(screen.getByPlaceholderText("🏠"), { target: { value: "🏠" } });
     fireEvent.change(screen.getByPlaceholderText("25"), { target: { value: "99" } });
-
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
 
     expect(screen.getByText("引落日を1〜31で入力してください")).toBeInTheDocument();
   });
 
   it("closes the sheet when ✕ is clicked", async () => {
-    useDefaultHandlers();
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-    await waitForReady();
+    await renderRecurring(recurringLedgerServer());
 
     fireEvent.click(screen.getByRole("button", { name: /定期支出を追加/ }));
     expect(screen.getByText("定期支出を追加")).toBeInTheDocument();
@@ -347,264 +140,131 @@ describe("MobileRecurring — create form", () => {
 
 describe("MobileRecurring — edit form", () => {
   it("opens the edit sheet pre-filled when ✎ is clicked", async () => {
-    const existing_recurring = makeRecurring();
-
-    useDefaultHandlers(makeRecurringList([existing_recurring]));
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-
-    // Wait for the item to render
-    await waitFor(() => {
-      expect(screen.getByText("家賃")).toBeInTheDocument();
-    });
-
-    // Click edit icon
-    fireEvent.click(screen.getByRole("button", { name: "編集" }));
-
-    expect(screen.getByText("定期支出を編集")).toBeInTheDocument();
-
-    // Name input should be pre-filled (placeholder="家賃", type=text with value 家賃)
-    const name_input = screen.getByPlaceholderText("家賃");
-    expect((name_input as HTMLInputElement).value).toBe("家賃");
-    // billing_day should be pre-filled
-    expect(screen.getByDisplayValue("25")).toBeInTheDocument();
-  });
-
-  it("calls PUT /recurring-expenses/:id and refreshes list on submit", async () => {
-    const existing_recurring = makeRecurring();
-    const updated_recurring = makeRecurring({ name: "更新済み家賃", amount: 90000 });
-    let put_called = false;
-
-    server.use(
-      http.get(`${API_BASE}/recurring-expenses`, () => {
-        if (put_called) return HttpResponse.json(makeRecurringList([updated_recurring]));
-        return HttpResponse.json(makeRecurringList([existing_recurring]));
-      }),
-      http.get(`${API_BASE}/recurring-expenses/pending`, () =>
-        HttpResponse.json(makePendingList())
-      ),
-      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
-      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
-      http.put(`${API_BASE}/recurring-expenses/1`, async () => {
-        put_called = true;
-        return HttpResponse.json(updated_recurring);
+    await renderRecurring(
+      recurringLedgerServer((seeded_server) => {
+        putRecurringExpense(seeded_server, { name: "マンション", billing_day: 25 });
       })
     );
 
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
+    fireEvent.click(await screen.findByRole("button", { name: "編集" }));
 
-    await waitFor(() => {
-      expect(screen.getByText("家賃")).toBeInTheDocument();
+    expect(screen.getByText("定期支出を編集")).toBeInTheDocument();
+    expect((screen.getByPlaceholderText("家賃") as HTMLInputElement).value).toBe("マンション");
+    expect(screen.getByDisplayValue("25")).toBeInTheDocument();
+  });
+
+  it("updates the expense with a ledger command and shows the new name", async () => {
+    let recurring_id = "";
+    const ledger_server = recurringLedgerServer((seeded_server) => {
+      recurring_id = putRecurringExpense(seeded_server, { name: "マンション" });
     });
+    await renderRecurring(ledger_server);
 
-    // Open edit sheet
-    fireEvent.click(screen.getByRole("button", { name: "編集" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("定期支出を編集")).toBeInTheDocument();
-    });
-
-    // Change name (use the text input placeholder to uniquely target the name field)
-    const name_input = screen.getByPlaceholderText("家賃");
-    fireEvent.change(name_input, { target: { value: "更新済み家賃" } });
-
-    // Submit
+    fireEvent.click(await screen.findByRole("button", { name: "編集" }));
+    fireEvent.change(screen.getByPlaceholderText("家賃"), { target: { value: "更新済み家賃" } });
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
 
-    // After save, updated item should appear and sheet should close
-    await waitFor(() => {
-      expect(screen.getAllByText("更新済み家賃").length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.queryByText("定期支出を編集")).not.toBeInTheDocument());
+    expect((await screen.findAllByText("更新済み家賃")).length).toBeGreaterThan(0);
+    expect(ledger_server.recorded_commands[0]).toMatchObject({
+      method: "PUT",
+      path: `recurring-expenses/${recurring_id}`,
     });
-
-    expect(screen.queryByText("定期支出を編集")).not.toBeInTheDocument();
   });
 });
 
 describe("MobileRecurring — delete", () => {
-  it("calls DELETE /recurring-expenses/:id and removes item from list after confirm", async () => {
-    const existing_recurring = makeRecurring();
-    let delete_called = false;
-
-    server.use(
-      http.get(`${API_BASE}/recurring-expenses`, () =>
-        HttpResponse.json(makeRecurringList([existing_recurring]))
-      ),
-      http.get(`${API_BASE}/recurring-expenses/pending`, () =>
-        HttpResponse.json(makePendingList())
-      ),
-      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
-      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
-      http.delete(`${API_BASE}/recurring-expenses/1`, () => {
-        delete_called = true;
-        return new HttpResponse(null, { status: 204 });
-      })
-    );
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("家賃")).toBeInTheDocument();
+  it("deletes the expense with a ledger command after confirmation", async () => {
+    let recurring_id = "";
+    const ledger_server = recurringLedgerServer((seeded_server) => {
+      recurring_id = putRecurringExpense(seeded_server, { name: "マンション" });
     });
+    await renderRecurring(ledger_server);
 
-    // The 🗑 trigger opens the in-app confirm Modal (#166); confirm inside it.
-    fireEvent.click(screen.getByRole("button", { name: "削除" }));
+    fireEvent.click(await screen.findByRole("button", { name: "削除" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "削除" }));
 
-    await waitFor(() => {
-      expect(delete_called).toBe(true);
-    });
-
-    // Item should be removed from DOM
-    expect(screen.queryByText("家賃")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("マンション")).not.toBeInTheDocument());
+    expect(ledger_server.recorded_commands).toEqual([
+      { method: "DELETE", path: `recurring-expenses/${recurring_id}`, request_body: null },
+    ]);
   });
 
   it("does NOT delete when the confirm Modal is cancelled", async () => {
-    const existing_recurring = makeRecurring();
-    let delete_called = false;
-
-    server.use(
-      http.get(`${API_BASE}/recurring-expenses`, () =>
-        HttpResponse.json(makeRecurringList([existing_recurring]))
-      ),
-      http.get(`${API_BASE}/recurring-expenses/pending`, () =>
-        HttpResponse.json(makePendingList())
-      ),
-      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
-      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
-      http.delete(`${API_BASE}/recurring-expenses/1`, () => {
-        delete_called = true;
-        return new HttpResponse(null, { status: 204 });
-      })
-    );
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("家賃")).toBeInTheDocument();
+    const ledger_server = recurringLedgerServer((seeded_server) => {
+      putRecurringExpense(seeded_server, { name: "マンション" });
     });
+    await renderRecurring(ledger_server);
 
-    // Open the confirm Modal, then cancel it.
-    fireEvent.click(screen.getByRole("button", { name: "削除" }));
+    fireEvent.click(await screen.findByRole("button", { name: "削除" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
 
-    // Give time for any async operation
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(delete_called).toBe(false);
-    expect(screen.getByText("家賃")).toBeInTheDocument();
+    expect(ledger_server.recorded_commands).toEqual([]);
+    expect(screen.getByText("マンション")).toBeInTheDocument();
   });
 });
 
 describe("MobileRecurring — confirm pending", () => {
-  it("shows pending items with amount input and 金額を確定 button", async () => {
-    const pending_item = makePendingItem();
-
-    useDefaultHandlers(makeRecurringList([]), makePendingList([pending_item]));
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("電気代")).toBeInTheDocument();
+  function pendingLedgerServer() {
+    let recurring_id = "";
+    const ledger_server = recurringLedgerServer((seeded_server) => {
+      recurring_id = putRecurringExpense(seeded_server, {
+        name: "電気代",
+        type: "variable",
+        amount: 7480,
+      });
     });
+    return { ledger_server, recurring_id: () => recurring_id };
+  }
 
+  it("shows pending items with amount input and 金額を確定 button", async () => {
+    await renderRecurring(pendingLedgerServer().ledger_server);
+
+    expect((await screen.findAllByText("電気代")).length).toBeGreaterThan(0);
     expect(screen.getByText("💬 確認待ち")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "金額を確定" })).toBeInTheDocument();
   });
 
-  it("calls POST /recurring-expenses/:id/confirm and removes item from pending list", async () => {
-    const pending_item = makePendingItem();
-    let confirm_called = false;
-    let confirm_body: Record<string, unknown> | null = null;
+  it("confirms the amount with a ledger command and removes the pending item", async () => {
+    const { ledger_server, recurring_id } = pendingLedgerServer();
+    await renderRecurring(ledger_server);
 
-    server.use(
-      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(makeRecurringList([]))),
-      http.get(`${API_BASE}/recurring-expenses/pending`, () => {
-        if (confirm_called) return HttpResponse.json(makePendingList([]));
-        return HttpResponse.json(makePendingList([pending_item]));
-      }),
-      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
-      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
-      http.post(`${API_BASE}/recurring-expenses/10/confirm`, async ({ request }) => {
-        confirm_called = true;
-        confirm_body = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json(
-          {
-            id: 200,
-            transaction_date: "2026-06-10",
-            item: "電気代",
-            amount: 6800,
-            category_id: 1,
-            category_name: "家賃",
-            group_id: 1,
-            group_name: "固定費",
-            is_excluded: false,
-            note: null,
-            created_at: "2026-06-10T00:00:00Z",
-          },
-          { status: 201 }
-        );
-      })
-    );
-
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("電気代")).toBeInTheDocument();
-    });
-
-    // Enter confirm amount
-    const amount_input = screen.getByPlaceholderText("7480");
-    fireEvent.change(amount_input, { target: { value: "6800" } });
-
-    // Click confirm button
+    fireEvent.change(await screen.findByPlaceholderText("7480"), { target: { value: "6800" } });
     fireEvent.click(screen.getByRole("button", { name: "金額を確定" }));
 
-    await waitFor(() => {
-      expect(confirm_called).toBe(true);
-    });
-
-    // Verify the request body includes amount and year_month
-    expect(confirm_body).toMatchObject({ amount: 6800 });
-    expect(typeof confirm_body?.year_month).toBe("string");
-
-    // Pending item should be removed after refresh
-    await waitFor(() => {
-      expect(screen.queryByText("電気代")).not.toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.queryByText("💬 確認待ち")).not.toBeInTheDocument());
+    expect(ledger_server.recorded_commands).toEqual([
+      {
+        method: "POST",
+        path: `recurring-expenses/${recurring_id()}/confirm`,
+        request_body: { amount: 6800, year_month: current_month },
+      },
+    ]);
   });
 
   it("does not call confirm when amount input is empty", async () => {
-    const pending_item = makePendingItem();
-    let confirm_called = false;
+    const { ledger_server } = pendingLedgerServer();
+    await renderRecurring(ledger_server);
 
-    server.use(
-      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(makeRecurringList([]))),
-      http.get(`${API_BASE}/recurring-expenses/pending`, () =>
-        HttpResponse.json(makePendingList([pending_item]))
-      ),
-      http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategoryList())),
-      http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeDefaultCategoryGroups())),
-      http.post(`${API_BASE}/recurring-expenses/10/confirm`, () => {
-        confirm_called = true;
-        return HttpResponse.json({}, { status: 201 });
-      })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "金額を確定" }));
 
-    renderWithDialogs(<MobileRecurring onBack={() => {}} />);
+    expect(ledger_server.recorded_commands).toEqual([]);
+    expect(screen.getByText("💬 確認待ち")).toBeInTheDocument();
+  });
 
-    await waitFor(() => {
-      expect(screen.getByText("電気代")).toBeInTheDocument();
-    });
+  it("disables confirming and editing while offline", async () => {
+    const { app_services } = await renderRecurring(pendingLedgerServer().ledger_server);
+    expect(await screen.findByRole("button", { name: "金額を確定" })).toBeEnabled();
 
-    // Click confirm without entering an amount
-    fireEvent.click(screen.getByRole("button", { name: "金額を確定" }));
+    app_services.sync_environment.setOnline(false);
 
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(confirm_called).toBe(false);
-    // Pending item still shown
-    expect(screen.getByText("電気代")).toBeInTheDocument();
+    expect(
+      await screen.findByText("オフラインのため閲覧のみです。接続すると編集できます")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "金額を確定" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "編集" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /定期支出を追加/ })).toBeDisabled();
   });
 });

@@ -24,7 +24,7 @@ afterEach(async () => {
 
 // A signed-in session whose database has synced the server's rows.
 export async function openSyncedSession(ledger_server: TestLedgerServer) {
-  server.use(ledger_server.pullHandler());
+  server.use(ledger_server.pullHandler(), ledger_server.commandHandler());
   const app_services = createTestAppServices();
   const local_db: MemorySyncDb = await openMemorySyncDb("test-device");
   const sync_client = createSyncClient({
@@ -55,7 +55,8 @@ export async function renderWithLedger(
   screen_element: ReactElement,
   ledger_server: TestLedgerServer
 ) {
-  const { app_session, local_db, sync_client } = await openSyncedSession(ledger_server);
+  const { app_session, local_db, sync_client, app_services } =
+    await openSyncedSession(ledger_server);
   const render_result = render(
     <DialogProvider is_mobile={false}>
       <SessionProvider session={app_session}>
@@ -63,5 +64,5 @@ export async function renderWithLedger(
       </SessionProvider>
     </DialogProvider>
   );
-  return { ...render_result, local_db, sync_client };
+  return { ...render_result, local_db, sync_client, app_services };
 }

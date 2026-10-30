@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { T } from "../../theme";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import { useLedgerApi, type BudgetSummaryView } from "../../data/ledgerApi";
+import { useDataVersion } from "../../session/sessionHooks";
 
-type BudgetSummary = components["schemas"]["BudgetSummaryResponse"];
+type BudgetSummary = BudgetSummaryView;
 
 type BudgetSubScreen = "income" | "recurring" | "savings";
 
@@ -23,6 +23,8 @@ function monthLabel(ym: string): string {
 }
 
 export function MobileBudget({ onNavigate }: MobileBudgetProps) {
+  const api = useLedgerApi();
+  const data_version = useDataVersion();
   const [summary, setSummary] = useState<BudgetSummary | null>(null);
   const [counts, setCounts] = useState<{
     income: number;
@@ -31,17 +33,24 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
   } | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const ym = currentMonthJST();
     Promise.all([
       api.getBudgetSummary(ym),
       api.listIncomeRecords(ym).then((r) => r.income_records),
       api.listRecurringExpenses().then((r) => r.recurring_expenses),
       api.listSavingsGoals().then((r) => r.savings_goals),
-    ]).then(([s, incomes, recurring, savings]) => {
-      setSummary(s);
-      setCounts({ income: incomes.length, recurring: recurring.length, savings: savings.length });
-    });
-  }, []);
+    ])
+      .then(([s, incomes, recurring, savings]) => {
+        if (cancelled) return;
+        setSummary(s);
+        setCounts({ income: incomes.length, recurring: recurring.length, savings: savings.length });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [api, data_version]);
 
   if (!summary || !counts) {
     return <p style={{ color: T.inkSoft, fontSize: 14, textAlign: "center" }}>読み込み中…</p>;

@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
 import { T } from "../../theme";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import {
+  commandErrorMessage,
+  useCanEditOnline,
+  useLedgerApi,
+  type IncomeRecordFields,
+  type IncomeRecordView,
+  type SavingsGoalView,
+  type SurplusAllocationView,
+} from "../../data/ledgerApi";
+import { useDataVersion } from "../../session/sessionHooks";
+import { OnlineEditNotice } from "../OnlineEditNotice";
 import { DateField } from "../DateField";
 import { useConfirm } from "../dialogContext";
 import { useEntityForm } from "../forms";
 
-type IncomeRecord = components["schemas"]["IncomeRecord"];
-type BaseIncomeSetting = components["schemas"]["BaseIncomeSetting"];
-type SavingsGoal = components["schemas"]["SavingsGoal"];
-type SurplusAllocation = components["schemas"]["SurplusAllocation"];
+type IncomeRecord = IncomeRecordView;
+type BaseIncomeSetting = { amount: number };
+type SavingsGoal = SavingsGoalView;
+type SurplusAllocation = SurplusAllocationView;
 
 interface MobileIncomeProps {
   onBack: () => void;
@@ -40,7 +49,7 @@ function formatDateParts(date_str: string): { day: number; month: number; weekda
 
 // Form state for create / edit. editing_id=null means create mode.
 interface IncomeFormState {
-  editing_id: number | null;
+  editing_id: string | null;
   name: string;
   emoji: string;
   amount_yen: string;
@@ -82,6 +91,7 @@ interface IncomeSheetProps {
 }
 
 export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeSheetProps) {
+  const api = useLedgerApi();
   // Standalone sheet (mounted = open): seed the shared form controller from the
   // injected initial_form on mount, then drive it through useEntityForm (#138).
   const income_form = useEntityForm<IncomeFormState, IncomeRecord>({
@@ -95,7 +105,7 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
       return null;
     },
     onSubmit: async (f) => {
-      const request_body: components["schemas"]["IncomeRecordRequest"] = {
+      const request_body: IncomeRecordFields = {
         name: f.name.trim(),
         emoji: f.emoji.trim() || EMOJI_OPTIONS[0],
         amount: parseInt(f.amount_yen, 10),
@@ -447,7 +457,7 @@ export function MobileIncomeSheet({ initial_form, onClose, onSaved }: IncomeShee
 interface AllocFormState {
   amount_yen: string;
   destination: "savings" | "budget";
-  savings_goal_id: number | null;
+  savings_goal_id: string | null;
 }
 
 interface AllocateSheetProps {
@@ -465,6 +475,7 @@ export function MobileAllocateSheet({
   savings_goals,
   onAllocated,
 }: AllocateSheetProps) {
+  const api = useLedgerApi();
   // Standalone sheet (mounted = open): create-only allocation form via useEntityForm (#138).
   const alloc_form = useEntityForm<AllocFormState, never>({
     blank: () => ({
@@ -894,6 +905,7 @@ interface EditBaseSheetProps {
 }
 
 export function MobileEditBaseSheet({ onClose, base_amount, onSaved }: EditBaseSheetProps) {
+  const api = useLedgerApi();
   // Standalone sheet (mounted = open): single-value editor driven by useEntityForm (#138).
   const base_form = useEntityForm<{ amount_yen: string }, BaseIncomeSetting>({
     blank: () => ({ amount_yen: String(base_amount) }),
@@ -903,8 +915,9 @@ export function MobileEditBaseSheet({ onClose, base_amount, onSaved }: EditBaseS
       return isNaN(parsed_amount) || parsed_amount < 1 ? "金額を正しく入力してください" : null;
     },
     onSubmit: async (f) => {
-      const res = await api.updateBaseIncome(parseInt(f.amount_yen, 10));
-      onSaved(res.amount);
+      const base_amount_yen = parseInt(f.amount_yen, 10);
+      await api.updateBaseIncome(base_amount_yen);
+      onSaved(base_amount_yen);
       onClose();
     },
   });
@@ -1133,6 +1146,10 @@ export function MobileEditBaseSheet({ onClose, base_amount, onSaved }: EditBaseS
 // ── Main screen ──────────────────────────────────────────────────────────
 
 export function MobileIncome({ onBack }: MobileIncomeProps) {
+  const api = useLedgerApi();
+  const data_version = useDataVersion();
+  const can_edit = useCanEditOnline();
+  const [command_error, setCommandError] = useState("");
   const confirm = useConfirm();
   const [incomes, setIncomes] = useState<IncomeRecord[] | null>(null);
   const [base_income, setBaseIncome] = useState<BaseIncomeSetting | null>(null);
@@ -1160,19 +1177,25 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
   };
 
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
       api.listIncomeRecords(current_ym).then((r) => r.income_records),
       api.getBaseIncome(),
       api.listSavingsGoals().then((r) => r.savings_goals),
       api.listSurplusAllocations(current_ym).then((r) => r.surplus_allocations),
-    ]).then(([inc, base, goals, allocs]) => {
-      setIncomes(inc);
-      setBaseIncome(base);
-      setSavingsGoals(goals);
-      setSurplusAllocations(allocs);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    ])
+      .then(([inc, base, goals, allocs]) => {
+        if (cancelled) return;
+        setIncomes(inc);
+        setBaseIncome(base);
+        setSavingsGoals(goals);
+        setSurplusAllocations(allocs);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [current_ym, api, data_version]);
 
   const is_loading = incomes === null;
   const income_total = incomes?.reduce((s, e) => s + e.amount, 0) ?? 0;
@@ -1194,7 +1217,7 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
     setActiveSheet("income");
   };
 
-  const handle_delete = async (record_id: number) => {
+  const handle_delete = async (record_id: string) => {
     const confirmed = await confirm({
       title: "削除の確認",
       message: "この収入記録を削除しますか？",
@@ -1202,8 +1225,12 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
       danger: true,
     });
     if (!confirmed) return;
-    await api.deleteIncomeRecord(record_id).catch(() => {});
-    setIncomes((prev) => (prev ? prev.filter((r) => r.id !== record_id) : prev));
+    setCommandError("");
+    try {
+      await api.deleteIncomeRecord(record_id);
+    } catch (delete_error) {
+      setCommandError(commandErrorMessage(delete_error, "削除できませんでした"));
+    }
   };
 
   const handle_close_income_sheet = () => {
@@ -1238,6 +1265,10 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
         >
           ‹ 予算
         </button>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <OnlineEditNotice can_edit={can_edit} command_error={command_error} />
       </div>
 
       <div style={{ marginBottom: 20 }}>
@@ -1323,6 +1354,7 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
                 <button
                   type="button"
                   onClick={() => setActiveSheet("edit-base")}
+                  disabled={!can_edit}
                   style={{
                     marginTop: 10,
                     padding: "6px 12px",
@@ -1405,6 +1437,7 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
                 <button
                   type="button"
                   onClick={() => setActiveSheet("allocate")}
+                  disabled={!can_edit}
                   style={{
                     marginTop: 8,
                     padding: "6px 12px",
@@ -1596,46 +1629,48 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
                             +¥{yenSlim(e.amount)}
                           </div>
                           {/* Edit / delete action buttons */}
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            <button
-                              type="button"
-                              onClick={() => handle_open_edit(e)}
-                              style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: 8,
-                                background: T.bgSoft,
-                                border: "none",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: 13,
-                                color: T.inkSoft,
-                                cursor: "pointer",
-                              }}
-                            >
-                              ✎
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handle_delete(e.id)}
-                              style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: 8,
-                                background: T.bgSoft,
-                                border: "none",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: 13,
-                                color: T.inkSoft,
-                                cursor: "pointer",
-                              }}
-                            >
-                              🗑
-                            </button>
-                          </div>
+                          {can_edit && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              <button
+                                type="button"
+                                onClick={() => handle_open_edit(e)}
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 8,
+                                  background: T.bgSoft,
+                                  border: "none",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 13,
+                                  color: T.inkSoft,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                ✎
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handle_delete(e.id)}
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 8,
+                                  background: T.bgSoft,
+                                  border: "none",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 13,
+                                  color: T.inkSoft,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                🗑
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1649,6 +1684,7 @@ export function MobileIncome({ onBack }: MobileIncomeProps) {
           <button
             type="button"
             onClick={handle_open_create}
+            disabled={!can_edit}
             style={{
               width: "100%",
               marginTop: 16,

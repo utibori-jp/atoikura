@@ -1,11 +1,18 @@
 import { useEffect, useState } from "react";
 import { T } from "../../theme";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import {
+  commandErrorMessage,
+  useCanEditOnline,
+  useLedgerApi,
+  type SavingsGoalFields,
+  type SavingsGoalView,
+} from "../../data/ledgerApi";
+import { useDataVersion } from "../../session/sessionHooks";
+import { OnlineEditNotice } from "../OnlineEditNotice";
 import { useConfirm } from "../dialogContext";
 import { useEntityForm, type UseEntityForm } from "../forms";
 
-type SavingsGoal = components["schemas"]["SavingsGoal"];
+type SavingsGoal = SavingsGoalView;
 
 interface MobileSavingsProps {
   onBack: () => void;
@@ -21,7 +28,7 @@ function currentMonthJST(): string {
 
 // Form state for create / edit. goal_id=null means "create mode".
 interface GoalFormState {
-  goal_id: number | null;
+  goal_id: string | null;
   name: string;
   emoji: string;
   monthly_amount_yen: string;
@@ -316,6 +323,10 @@ export function MobileSavingsSheet({ goal_form }: MobileSavingsSheetProps) {
 }
 
 export function MobileSavings({ onBack }: MobileSavingsProps) {
+  const api = useLedgerApi();
+  const data_version = useDataVersion();
+  const can_edit = useCanEditOnline();
+  const [command_error, setCommandError] = useState("");
   const [savings_goals, setSavingsGoals] = useState<SavingsGoal[] | null>(null);
   const confirm = useConfirm();
   const ym = currentMonthJST();
@@ -338,7 +349,7 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
       return null;
     },
     onSubmit: async (f) => {
-      const request_body: components["schemas"]["SavingsGoalRequest"] = {
+      const request_body: SavingsGoalFields = {
         name: f.name.trim(),
         emoji: f.emoji.trim() || EMOJI_OPTIONS[0],
         monthly_amount: parseInt(f.monthly_amount_yen, 10),
@@ -366,12 +377,12 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [api, data_version]);
 
   const is_loading = savings_goals === null;
   const savings_monthly_total = savings_goals?.reduce((sum, g) => sum + g.monthly_amount, 0) ?? 0;
 
-  const handle_delete = async (goal_id: number) => {
+  const handle_delete = async (goal_id: string) => {
     const confirmed = await confirm({
       title: "削除の確認",
       message: "この貯金目標を削除しますか？",
@@ -379,13 +390,21 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
       danger: true,
     });
     if (!confirmed) return;
-    await api.deleteSavingsGoal(goal_id).catch(() => {});
-    setSavingsGoals((prev) => (prev ? prev.filter((g) => g.id !== goal_id) : prev));
+    setCommandError("");
+    try {
+      await api.deleteSavingsGoal(goal_id);
+    } catch (delete_error) {
+      setCommandError(commandErrorMessage(delete_error, "削除できませんでした"));
+    }
   };
 
   const handle_post_monthly = async (g: SavingsGoal) => {
-    await api.postMonthlySavings(g.id, g.monthly_amount, ym).catch(() => {});
-    await refresh_goals();
+    setCommandError("");
+    try {
+      await api.postMonthlySavings(g.id, g.monthly_amount, ym);
+    } catch (post_error) {
+      setCommandError(commandErrorMessage(post_error, "記録できませんでした"));
+    }
   };
 
   return (
@@ -416,6 +435,10 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontWeight: 900, fontSize: 22, color: T.ink }}>貯金目標</div>
         <div style={{ fontSize: 13, color: T.inkSoft, marginTop: 2 }}>目的別に積み上げる</div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <OnlineEditNotice can_edit={can_edit} command_error={command_error} />
       </div>
 
       {is_loading && (
@@ -577,6 +600,7 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
                       <button
                         type="button"
                         onClick={() => goal_form.openEdit(g)}
+                        disabled={!can_edit}
                         style={{
                           width: 30,
                           height: 30,
@@ -599,6 +623,7 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
                       <button
                         type="button"
                         onClick={() => handle_delete(g.id)}
+                        disabled={!can_edit}
                         style={{
                           width: 30,
                           height: 30,
@@ -706,6 +731,7 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
                     <button
                       type="button"
                       onClick={() => handle_post_monthly(g)}
+                      disabled={!can_edit}
                       style={{
                         marginTop: 12,
                         width: "100%",
@@ -734,6 +760,7 @@ export function MobileSavings({ onBack }: MobileSavingsProps) {
       <button
         type="button"
         onClick={goal_form.openCreate}
+        disabled={!can_edit}
         style={{
           width: "100%",
           marginTop: 16,
