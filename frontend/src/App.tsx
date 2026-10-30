@@ -19,8 +19,9 @@ import { WebIncome } from "./components/web/WebIncome";
 import { WebReview } from "./components/web/WebReview";
 import { WebJournal } from "./components/web/WebJournal";
 import { WebMaster } from "./components/web/WebMaster";
-import type { components } from "./api/types";
 import { SyncStatusIndicator } from "./components/SyncStatusIndicator";
+import type { JournalEntryView } from "./data/journal";
+import { LedgerDataProvider } from "./data/LedgerDataProvider";
 import { SessionProvider } from "./session/SessionContext";
 import {
   createBrowserAppServices,
@@ -32,7 +33,6 @@ import { T } from "./theme";
 
 type Tab = "home" | "list" | "budget" | "master" | "review" | "account";
 type BudgetSubScreen = "hub" | "income" | "recurring" | "savings";
-type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
 
 // A point in the in-app navigation, mirrored onto the browser history stack so
 // the native Back button walks screens instead of leaving the SPA (#165).
@@ -501,15 +501,15 @@ function MobileTabBar({ active, onChange, onPlusClick, addTone = "coral" }: Mobi
 
 interface EntrySheetProps {
   onClose: () => void;
-  onSuccess: () => void;
-  edit_entry?: JournalEntryResponse | null;
+  edit_entry?: JournalEntryView | null;
   is_mobile?: boolean;
 }
 
-function EntrySheet({ onClose, onSuccess, edit_entry, is_mobile = false }: EntrySheetProps) {
+function EntrySheet({ onClose, edit_entry, is_mobile = false }: EntrySheetProps) {
   const is_edit = !!edit_entry;
+  // Screens re-read local data on their own; an edit closes the sheet, while a
+  // new entry keeps it open for the next one.
   const handle_success = () => {
-    onSuccess();
     if (is_edit) onClose();
   };
 
@@ -523,7 +523,9 @@ function EntrySheet({ onClose, onSuccess, edit_entry, is_mobile = false }: Entry
       is_mobile={is_mobile}
       maxWidth={460}
     >
-      <MobileEntryForm onSuccess={handle_success} edit_entry={edit_entry} />
+      <LedgerDataProvider>
+        <MobileEntryForm onSuccess={handle_success} edit_entry={edit_entry} />
+      </LedgerDataProvider>
     </Modal>
   );
 }
@@ -541,10 +543,9 @@ function AppContent({
   );
   const [active_tab, setActiveTab] = useState<Tab>("home");
   const [budget_sub, setBudgetSub] = useState<BudgetSubScreen>("hub");
-  const [refresh_token, setRefreshToken] = useState(0);
   const [list_year_month, setListYearMonth] = useState(currentMonthJST());
   const [show_entry_sheet, setShowEntrySheet] = useState(false);
-  const [edit_entry, setEditEntry] = useState<JournalEntryResponse | null>(null);
+  const [edit_entry, setEditEntry] = useState<JournalEntryView | null>(null);
 
   // ── In-app history (#165) ──────────────────────────────────────────────────
   // Screen navigation is React state, not URL routes, so without History API
@@ -661,130 +662,127 @@ function AppContent({
             overflowX: "hidden",
           }}
         >
-          {/* Month navigation for list tab on mobile */}
-          {is_mobile && active_tab === "list" && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 16,
-                justifyContent: "center",
-              }}
-            >
-              <button
-                onClick={() => setListYearMonth(addMonths(list_year_month, -1))}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 999,
-                  border: `1.5px solid ${T.hair}`,
-                  background: T.card,
-                  color: T.inkSoft,
-                  fontSize: 16,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                ‹
-              </button>
-              <span
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: 999,
-                  border: `1.5px solid ${T.hair}`,
-                  background: T.card,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: T.ink,
-                }}
-              >
-                {formatMonthJP(list_year_month)}
-              </span>
-              <button
-                onClick={() => setListYearMonth(addMonths(list_year_month, 1))}
-                disabled={isCurrent}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 999,
-                  border: `1.5px solid ${T.hair}`,
-                  background: T.card,
-                  fontSize: 16,
-                  cursor: isCurrent ? "default" : "pointer",
-                  color: isCurrent ? T.hair : T.inkSoft,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                ›
-              </button>
-            </div>
+          {/* The account screen works before the first sync, so sign-out is always
+              reachable; every other screen waits for the ledger's data. */}
+          {active_tab === "account" ? (
+            <UserInfo user={session.user} onLogout={handleLogout} />
+          ) : (
+            <LedgerDataProvider>
+              {/* Month navigation for list tab on mobile */}
+              {is_mobile && active_tab === "list" && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 16,
+                    justifyContent: "center",
+                  }}
+                >
+                  <button
+                    onClick={() => setListYearMonth(addMonths(list_year_month, -1))}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 999,
+                      border: `1.5px solid ${T.hair}`,
+                      background: T.card,
+                      color: T.inkSoft,
+                      fontSize: 16,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    ‹
+                  </button>
+                  <span
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: 999,
+                      border: `1.5px solid ${T.hair}`,
+                      background: T.card,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: T.ink,
+                    }}
+                  >
+                    {formatMonthJP(list_year_month)}
+                  </span>
+                  <button
+                    onClick={() => setListYearMonth(addMonths(list_year_month, 1))}
+                    disabled={isCurrent}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 999,
+                      border: `1.5px solid ${T.hair}`,
+                      background: T.card,
+                      fontSize: 16,
+                      cursor: isCurrent ? "default" : "pointer",
+                      color: isCurrent ? T.hair : T.inkSoft,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    ›
+                  </button>
+                </div>
+              )}
+
+              {active_tab === "home" &&
+                (is_mobile ? (
+                  <MobileHome onShowList={() => navigate({ tab: "list" })} />
+                ) : (
+                  <WebHome />
+                ))}
+
+              {active_tab === "list" &&
+                (is_mobile ? (
+                  <MobileJournal
+                    year_month={list_year_month}
+                    onEditEntry={(entry) => {
+                      setEditEntry(entry);
+                      setShowEntrySheet(true);
+                    }}
+                  />
+                ) : (
+                  <WebJournal
+                    year_month={list_year_month}
+                    onEditEntry={(entry) => {
+                      setEditEntry(entry);
+                      setShowEntrySheet(true);
+                    }}
+                  />
+                ))}
+
+              {active_tab === "review" && (is_mobile ? <ReviewScreen /> : <WebReview />)}
+
+              {active_tab === "budget" &&
+                (() => {
+                  if (is_mobile) {
+                    if (budget_sub === "income")
+                      return <MobileIncome onBack={() => navigate({ sub: "hub" })} />;
+                    if (budget_sub === "recurring")
+                      return <MobileRecurring onBack={() => navigate({ sub: "hub" })} />;
+                    if (budget_sub === "savings")
+                      return <MobileSavings onBack={() => navigate({ sub: "hub" })} />;
+                    return <MobileBudget onNavigate={(s) => navigate({ sub: s })} />;
+                  }
+                  if (budget_sub === "income")
+                    return <WebIncome onBack={() => navigate({ sub: "hub" })} />;
+                  if (budget_sub === "recurring")
+                    return <WebRecurring onBack={() => navigate({ sub: "hub" })} />;
+                  if (budget_sub === "savings")
+                    return <WebSavings onBack={() => navigate({ sub: "hub" })} />;
+                  return <WebBudget onNavigate={(s) => navigate({ sub: s })} />;
+                })()}
+
+              {active_tab === "master" && <WebMaster />}
+            </LedgerDataProvider>
           )}
-
-          {active_tab === "home" &&
-            (is_mobile ? (
-              <MobileHome
-                refresh_token={refresh_token}
-                onShowList={() => navigate({ tab: "list" })}
-              />
-            ) : (
-              <WebHome
-                refresh_token={refresh_token}
-                onSuccess={() => setRefreshToken((t) => t + 1)}
-              />
-            ))}
-
-          {active_tab === "list" &&
-            (is_mobile ? (
-              <MobileJournal
-                year_month={list_year_month}
-                refresh_token={refresh_token}
-                onEditEntry={(entry) => {
-                  setEditEntry(entry);
-                  setShowEntrySheet(true);
-                }}
-              />
-            ) : (
-              <WebJournal
-                year_month={list_year_month}
-                refresh_token={refresh_token}
-                onEditEntry={(entry) => {
-                  setEditEntry(entry);
-                  setShowEntrySheet(true);
-                }}
-                onRefresh={() => setRefreshToken((t) => t + 1)}
-              />
-            ))}
-
-          {active_tab === "review" && (is_mobile ? <ReviewScreen /> : <WebReview />)}
-
-          {active_tab === "budget" &&
-            (() => {
-              if (is_mobile) {
-                if (budget_sub === "income")
-                  return <MobileIncome onBack={() => navigate({ sub: "hub" })} />;
-                if (budget_sub === "recurring")
-                  return <MobileRecurring onBack={() => navigate({ sub: "hub" })} />;
-                if (budget_sub === "savings")
-                  return <MobileSavings onBack={() => navigate({ sub: "hub" })} />;
-                return <MobileBudget onNavigate={(s) => navigate({ sub: s })} />;
-              }
-              if (budget_sub === "income")
-                return <WebIncome onBack={() => navigate({ sub: "hub" })} />;
-              if (budget_sub === "recurring")
-                return <WebRecurring onBack={() => navigate({ sub: "hub" })} />;
-              if (budget_sub === "savings")
-                return <WebSavings onBack={() => navigate({ sub: "hub" })} />;
-              return <WebBudget onNavigate={(s) => navigate({ sub: s })} />;
-            })()}
-
-          {active_tab === "master" && <WebMaster />}
-
-          {active_tab === "account" && <UserInfo user={session.user} onLogout={handleLogout} />}
         </main>
 
         {is_mobile && (
@@ -807,7 +805,6 @@ function AppContent({
               setShowEntrySheet(false);
               setEditEntry(null);
             }}
-            onSuccess={() => setRefreshToken((t) => t + 1)}
             edit_entry={edit_entry}
             is_mobile={is_mobile}
           />

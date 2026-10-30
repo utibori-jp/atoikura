@@ -814,9 +814,14 @@ export class SyncStore {
       });
       await this.db.batch(page_statements);
       this.observePulledHlcs(pull_page.rows);
+      // The first page binds the ledger, which screens wait for even when the
+      // ledger has no rows yet.
       this.emitChange({
         source: "remote",
-        collections: [...new Set(pull_page.rows.map((pulled_row) => pulled_row.collection))],
+        collections:
+          sync_state.ledger_id === null
+            ? SYNCED_TABLES
+            : [...new Set(pull_page.rows.map((pulled_row) => pulled_row.collection))],
       });
       return { ledger_changed: false };
     });

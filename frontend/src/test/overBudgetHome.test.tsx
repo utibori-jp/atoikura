@@ -1,15 +1,14 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
 import App from "../App";
+import { todayInJst } from "../logic";
 import { createTestAppServices } from "./appServices";
+import { putJournalEntry, seedPersonalLedger, TestLedgerServer } from "./ledgerFixtures";
 import { server } from "./server";
-import type { components } from "../api/types";
 
 // #125 — when the month's spend exceeds the variable budget, Home must surface
 // the over-budget state explicitly (label + overspend amount) instead of
 // clamping 『あといくら』to a bare ¥0. Locks the behaviour for web and mobile.
 
-const API_BASE = "http://localhost:8080";
 class ResizeObserverMock {
   observe() {}
   unobserve() {}
@@ -32,15 +31,17 @@ function mockMatchMedia(matches: boolean) {
   });
 }
 
-// Budget ¥2,000 with ¥3,000 spent → ¥1,000 over budget, 150% used.
-function overBudgetCumulative(): components["schemas"]["DailyCumulativeResponse"] {
-  return {
-    year_month: "2026-06",
-    variable_budget: 2000,
-    daily_budget: 5000,
-    days: [{ date: "2026-06-01", food: 1800, other: 1200, total: 3000, is_actual: true }],
-  };
+// Budget ¥2,000 (the base income, nothing else deducted) with ¥3,000 spent today
+// → ¥1,000 over budget, 150% used.
+function serveOverBudgetLedger(): void {
+  const ledger_server = new TestLedgerServer();
+  seedPersonalLedger(ledger_server, { base_income_amount: 2000 });
+  putJournalEntry(ledger_server, { transaction_date: todayInJst(), amount: 3000 });
+  server.use(ledger_server.pullHandler());
 }
+
+// The first render of a file waits for SQLite WASM to initialize.
+const INITIAL_LOAD = { timeout: 5000 };
 
 describe("#125 — Home surfaces the over-budget state", () => {
   beforeAll(() => {
@@ -49,15 +50,11 @@ describe("#125 — Home surfaces the over-budget state", () => {
 
   it("shows 予算オーバー and the overspend amount on the desktop home", async () => {
     mockMatchMedia(false); // desktop
-    server.use(
-      http.get(`${API_BASE}/expenses/daily-cumulative`, () =>
-        HttpResponse.json(overBudgetCumulative())
-      )
-    );
+    serveOverBudgetLedger();
 
     render(<App services={createTestAppServices()} />);
 
-    await waitFor(() => expect(screen.getByText("予算オーバー")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("予算オーバー")).toBeInTheDocument(), INITIAL_LOAD);
     // Overspend = 3000 − 2000 = 1000, shown with a leading minus (glyph-robust).
     expect(
       screen.getByText((content) => content.replace(/[−-]/, "-") === "-1,000")
@@ -68,15 +65,11 @@ describe("#125 — Home surfaces the over-budget state", () => {
 
   it("shows 予算オーバー and the overspend amount on the mobile home", async () => {
     mockMatchMedia(true); // mobile
-    server.use(
-      http.get(`${API_BASE}/expenses/daily-cumulative`, () =>
-        HttpResponse.json(overBudgetCumulative())
-      )
-    );
+    serveOverBudgetLedger();
 
     render(<App services={createTestAppServices()} />);
 
-    await waitFor(() => expect(screen.getByText("予算オーバー")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("予算オーバー")).toBeInTheDocument(), INITIAL_LOAD);
     expect(
       screen.getByText((content) => content.replace(/[−-]/, "-") === "-1,000")
     ).toBeInTheDocument();

@@ -1,20 +1,20 @@
-import { useEffect, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import { useState } from "react";
+import { useLedgerData, useLocalData } from "../../data/ledgerData";
+import { listMonthlyReviewNotes, saveMonthlyReviewNotes } from "../../data/notes";
+import { loadMonthlyBreakdownItems, type MonthlyBreakdownItem } from "../../data/spending";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
 
-type BreakdownItem = components["schemas"]["MonthlyBreakdownItem"];
-type ReviewNote = components["schemas"]["MonthlyReviewNote"];
+type BreakdownItem = MonthlyBreakdownItem;
 
 interface StatementGroup {
-  statement_type_id: number;
+  statement_type_order: number;
   statement_type_name: string;
   category_groups: CategoryGroupData[];
 }
 
 interface CategoryGroupData {
-  group_id: number;
+  group_id: string;
   group_name: string;
   categories: BreakdownItem[];
   expanded: boolean;
@@ -23,14 +23,14 @@ interface CategoryGroupData {
 function buildGrouped(items: BreakdownItem[]): StatementGroup[] {
   const statement_map = new Map<number, StatementGroup>();
   for (const item of items) {
-    if (!statement_map.has(item.statement_type_id)) {
-      statement_map.set(item.statement_type_id, {
-        statement_type_id: item.statement_type_id,
+    if (!statement_map.has(item.statement_type_order)) {
+      statement_map.set(item.statement_type_order, {
+        statement_type_order: item.statement_type_order,
         statement_type_name: item.statement_type_name,
         category_groups: [],
       });
     }
-    const st = statement_map.get(item.statement_type_id)!;
+    const st = statement_map.get(item.statement_type_order)!;
     let cg = st.category_groups.find((g) => g.group_id === item.group_id);
     if (!cg) {
       cg = {
@@ -44,7 +44,7 @@ function buildGrouped(items: BreakdownItem[]): StatementGroup[] {
     cg.categories.push(item);
   }
   const result = [...statement_map.values()].sort(
-    (a, b) => a.statement_type_id - b.statement_type_id
+    (a, b) => a.statement_type_order - b.statement_type_order
   );
   for (const st of result) {
     st.category_groups.sort((a, b) => a.group_name.localeCompare(b.group_name));
@@ -113,57 +113,40 @@ export function WebReview() {
     addMonths(current_ym, 1),
   ];
   const [year_month, setYearMonth] = useState(addMonths(current_ym, -1));
-  const [breakdown, setBreakdown] = useState<BreakdownItem[]>([]);
-  const [memos, setMemos] = useState<Record<number, string>>({});
-  const [saved_memos, setSavedMemos] = useState<Record<number, string>>({});
-  const [loading, setLoading] = useState(false);
+  const ledger_data = useLedgerData();
+  const { data: review_data } = useLocalData(
+    async (loaded_ledger_data) => ({
+      breakdown: await loadMonthlyBreakdownItems(loaded_ledger_data, year_month),
+      saved_memos: await listMonthlyReviewNotes(loaded_ledger_data, year_month),
+    }),
+    [year_month]
+  );
+  const breakdown = review_data?.breakdown ?? [];
+  const loading = review_data === null;
+  // Unsaved edits per category of the month shown, over the saved notes.
+  const [memo_drafts, setMemoDrafts] = useState<{
+    year_month: string;
+    memos: Record<string, string>;
+  }>({ year_month, memos: {} });
+  const draft_memos = memo_drafts.year_month === year_month ? memo_drafts.memos : {};
+  const saved_memos = review_data?.saved_memos ?? {};
+  const memos: Record<string, string> = { ...saved_memos, ...draft_memos };
+  const setMemos = (
+    updateMemos: (previous_memos: Record<string, string>) => Record<string, string>
+  ) => setMemoDrafts({ year_month, memos: updateMemos(draft_memos) });
   const [saving, setSaving] = useState(false);
   const [save_msg, setSaveMsg] = useState("");
-  const [expanded_groups, setExpandedGroups] = useState<Set<number>>(new Set());
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setLoading(true);
-      try {
-        const [breakdown_res, reviews_res] = await Promise.all([
-          api.getMonthlyBreakdown(year_month),
-          api.getMonthlyReviews(year_month),
-        ]);
-        if (cancelled) return;
-        const memo_map: Record<number, string> = {};
-        for (const n of reviews_res.notes) {
-          memo_map[n.category_id] = n.note;
-        }
-        setBreakdown(breakdown_res.breakdown);
-        setMemos(memo_map);
-        setSavedMemos(memo_map);
-        setSaveMsg("");
-      } catch {
-        /* ignore fetch errors */
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [year_month]);
+  const [expanded_groups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const grouped = buildGrouped(breakdown);
 
   const handle_save = async () => {
     setSaving(true);
     setSaveMsg("");
-    const notes: ReviewNote[] = Object.entries(memos)
-      .filter(([, note]) => note !== "")
-      .map(([id, note]) => ({ category_id: Number(id), note }));
     try {
-      const res = await api.updateMonthlyReviews(year_month, notes);
-      const new_saved: Record<number, string> = {};
-      for (const n of res.notes) new_saved[n.category_id] = n.note;
-      setSavedMemos(new_saved);
-      setMemos(new_saved);
+      // An emptied memo is deleted.
+      await saveMonthlyReviewNotes(ledger_data, year_month, draft_memos);
+      setMemoDrafts({ year_month, memos: {} });
       setSaveMsg("保存しました");
     } catch {
       setSaveMsg("保存に失敗しました");
@@ -186,7 +169,9 @@ export function WebReview() {
       ?.category_groups.reduce((s, g) => s + g.categories.reduce((a, c) => a + c.total, 0), 0) ?? 0;
   const total = variable_total + fixed_total + excluded_total;
 
-  const has_unsaved = JSON.stringify(memos) !== JSON.stringify(saved_memos);
+  const has_unsaved = Object.entries(draft_memos).some(
+    ([category_id, draft_memo]) => draft_memo !== (saved_memos[category_id] ?? "")
+  );
 
   const month_num = parseInt(year_month.split("-")[1]);
 
@@ -312,7 +297,7 @@ export function WebReview() {
               );
               return (
                 <div
-                  key={sec.statement_type_id}
+                  key={sec.statement_type_order}
                   style={{ marginBottom: si < grouped.length - 1 ? 24 : 0 }}
                 >
                   <div
