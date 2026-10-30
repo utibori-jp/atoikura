@@ -584,9 +584,10 @@ function AppContent({
     void session_controller.initialize();
   }, [session_controller]);
 
-  function handleLogout() {
-    setActiveTab("home");
-    void session_controller.logout();
+  async function handleLogout(options?: { discard_pending_changes?: boolean }) {
+    const logout_result = await session_controller.logout(options);
+    if (logout_result.outcome === "signed_out") setActiveTab("home");
+    return logout_result;
   }
 
   if (session_state.status === "checking" || session_state.status === "unavailable") {

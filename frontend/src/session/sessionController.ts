@@ -47,7 +47,14 @@ export type SessionState =
   | { status: "unavailable"; message: string }
   | { status: "ready"; session: AppSession };
 
+export type LogoutResult =
+  | { outcome: "signed_out" }
+  // Changes couldn't be sent (offline, server error); nothing was signed out.
+  | { outcome: "pending_changes"; pending_count: number };
+
 const PROFILE_STORAGE_KEY = "atoikura.user_profile";
+// How long logout waits for pending changes to be pushed before asking.
+const LOGOUT_SYNC_TIMEOUT_MS = 10_000;
 
 function errorMessage(caught_error: unknown, fallback_message: string): string {
   return caught_error instanceof Error && caught_error.message
@@ -112,26 +119,65 @@ export class SessionController {
     await this.login(email, password);
   }
 
-  // Signs out. Local data stays on the device until another user signs in;
-  // pending changes are pushed when the same user comes back.
-  async logout(notice: string | null = null): Promise<void> {
-    await this.closeSession();
+  // Signs out at the user's request and deletes the local database: synced data
+  // comes back from the server on the next sign-in, and a shared device keeps
+  // nothing of this user. Pending changes are pushed first; if some can't be
+  // sent, nothing happens and their count is returned so the UI can ask before
+  // calling again with discard_pending_changes.
+  async logout({ discard_pending_changes = false } = {}): Promise<LogoutResult> {
+    if (this.state.status === "ready" && !discard_pending_changes) {
+      const pending_count = await this.pushBeforeLogout(this.state.session.sync_client);
+      // The push found the sign-in expired and the session already ended,
+      // keeping the database so the changes can still be sent after signing in.
+      if (this.state.status !== "ready") return { outcome: "signed_out" };
+      if (pending_count > 0) return { outcome: "pending_changes", pending_count };
+    }
+    await this.closeSession({ delete_local_data: true });
+    await this.signOut(null);
+    return { outcome: "signed_out" };
+  }
+
+  // Returns how many changes are still unsent after trying to push them.
+  private async pushBeforeLogout(sync_client: SyncClient): Promise<number> {
+    let timeout_timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      sync_client.engine.syncNow(),
+      new Promise<void>((resolve_timeout) => {
+        timeout_timer = setTimeout(resolve_timeout, LOGOUT_SYNC_TIMEOUT_MS);
+      }),
+    ]);
+    clearTimeout(timeout_timer);
+    if (this.state.status !== "ready") return 0;
+    return sync_client.store.countPendingRecords();
+  }
+
+  // Signs out without the user asking (expired session). The local database
+  // stays, so the same user's pending changes are pushed after signing back in;
+  // it is reset if a different user signs in instead.
+  private async endSession(notice: string): Promise<void> {
+    await this.closeSession({ delete_local_data: false });
+    await this.signOut(notice);
+  }
+
+  private async signOut(notice: string | null): Promise<void> {
     await this.services.auth_session.logout();
     this.services.profile_storage.removeItem(PROFILE_STORAGE_KEY);
     void clearRuntimeCaches();
     this.setState({ status: "anonymous", notice });
   }
 
-  private async closeSession(): Promise<void> {
+  private async closeSession({ delete_local_data = false } = {}): Promise<void> {
     const teardown = this.session_teardown;
     this.session_teardown = null;
     if (!teardown) return;
     await teardown();
     if (this.state.status === "ready") {
+      const local_db = this.state.session.local_db;
       try {
-        await this.state.session.local_db.close();
+        await (delete_local_data ? local_db.destroy() : local_db.close());
       } catch {
-        // Closing is best-effort; the worker goes away with the page anyway.
+        // Best-effort: if deleting fails, the next sign-in of a different user
+        // still resets the database before syncing.
       }
     }
   }
@@ -214,7 +260,7 @@ export class SessionController {
     });
     const unsubscribe_status = sync_client.engine.subscribe((sync_status) => {
       if (sync_status.phase === "auth_required") {
-        void this.logout("ログインの有効期限が切れました。再度ログインしてください");
+        void this.endSession("ログインの有効期限が切れました。再度ログインしてください");
       }
     });
     this.session_teardown = async () => {

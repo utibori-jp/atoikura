@@ -19,7 +19,7 @@ export interface MemorySyncDb extends LocalDb {
 }
 
 type DbRequestBody =
-  Exclude<DbRequest, { kind: "close" | "recreate" }> extends infer TRequest
+  Exclude<DbRequest, { kind: "close" | "recreate" | "destroy" }> extends infer TRequest
     ? TRequest extends { request_id: number }
       ? Omit<TRequest, "request_id">
       : never
@@ -37,7 +37,7 @@ export async function openMemorySyncDb(device_id: string): Promise<MemorySyncDb>
     const db_response: DbResponse = handleDbRequest(raw_db, {
       ...request_body,
       request_id: next_request_id++,
-    } as Exclude<DbRequest, { kind: "close" | "recreate" }>);
+    } as Exclude<DbRequest, { kind: "close" | "recreate" | "destroy" }>);
     if (!db_response.ok) {
       const sql_error = new Error(db_response.error_message);
       sql_error.name = db_response.error_name;
@@ -61,5 +61,7 @@ export async function openMemorySyncDb(device_id: string): Promise<MemorySyncDb>
     query: async (query_name, ...query_args) =>
       (await sendRequest({ kind: "query", query_name, query_args })).result as never,
     close: async () => oo1_db.close(),
+    // An in-memory database is gone once closed.
+    destroy: async () => oo1_db.close(),
   };
 }

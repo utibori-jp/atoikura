@@ -85,8 +85,27 @@ async function start(): Promise<void> {
     };
   }
 
-  worker_scope.onmessage = (message_event: MessageEvent<DbRequest>) => {
+  worker_scope.onmessage = async (message_event: MessageEvent<DbRequest>) => {
     const db_request = message_event.data;
+    if (db_request.kind === "destroy") {
+      let destroy_response: DbResponse;
+      try {
+        opened_db.close();
+        // Clearing a pool file truncates it, so the data doesn't linger in OPFS.
+        await vfs_util.wipeFiles();
+        destroy_response = { request_id: db_request.request_id, ok: true, rows: [] };
+      } catch (caught_error) {
+        destroy_response = {
+          request_id: db_request.request_id,
+          ok: false,
+          error_name: caught_error instanceof Error ? caught_error.name : "Error",
+          error_message: errorMessage(caught_error),
+        };
+      }
+      worker_scope.postMessage(destroy_response);
+      worker_scope.close();
+      return;
+    }
     if (db_request.kind === "close") {
       opened_db.close();
       worker_scope.postMessage({ request_id: db_request.request_id, ok: true, rows: [] });

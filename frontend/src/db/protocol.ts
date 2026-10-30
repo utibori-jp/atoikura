@@ -17,7 +17,10 @@ export type DbRequest =
   | { request_id: number; kind: "close" }
   // Deletes the database file and creates a fresh one at the latest schema. The
   // response row carries the new schema_version.
-  | { request_id: number; kind: "recreate" };
+  | { request_id: number; kind: "recreate" }
+  // Closes the database, deletes every file in the storage pool and ends the
+  // worker, so nothing of a signed-out user stays on the device.
+  | { request_id: number; kind: "destroy" };
 
 export type DbResponse =
   | { request_id: number; ok: true; rows: SqlRow[]; result?: unknown }

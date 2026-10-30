@@ -52,6 +52,8 @@ export interface LocalDb {
     ...query_args: LocalQueryArgs<TName>
   ): Promise<LocalQueryResult<TName>>;
   close(): Promise<void>;
+  // Closes the database and deletes it from the device.
+  destroy(): Promise<void>;
 }
 
 // The old database of a failed open, kept only to read pending changes before
@@ -155,6 +157,13 @@ export async function openLocalDb(): Promise<LocalDb> {
       releaseDbLock();
     }
   };
+  const destroyDb = async () => {
+    try {
+      await sendRequest({ kind: "destroy" });
+    } finally {
+      releaseDbLock();
+    }
+  };
   const createLocalDb = (schema_version: number): LocalDb => ({
     schema_version,
     storage_persistence,
@@ -169,6 +178,7 @@ export async function openLocalDb(): Promise<LocalDb> {
     query: async (query_name, ...query_args) =>
       (await sendRequest({ kind: "query", query_name, query_args })).result as never,
     close: closeDb,
+    destroy: destroyDb,
   });
 
   if (init_event.kind === "ready") return createLocalDb(init_event.schema_version);
