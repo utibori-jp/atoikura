@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { ReviewScreen } from "./components/ReviewScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { UserInfo } from "./components/UserInfo";
@@ -19,13 +19,19 @@ import { WebIncome } from "./components/web/WebIncome";
 import { WebReview } from "./components/web/WebReview";
 import { WebJournal } from "./components/web/WebJournal";
 import { WebMaster } from "./components/web/WebMaster";
-import { api, AuthError, clearRuntimeCaches, token_store } from "./api/client";
 import type { components } from "./api/types";
+import { SyncStatusIndicator } from "./components/SyncStatusIndicator";
+import { SessionProvider } from "./session/SessionContext";
+import {
+  createBrowserAppServices,
+  SessionController,
+  type AppServices,
+  type UserProfile,
+} from "./session/sessionController";
 import { T } from "./theme";
 
 type Tab = "home" | "list" | "budget" | "master" | "review" | "account";
 type BudgetSubScreen = "hub" | "income" | "recurring" | "savings";
-type UserProfile = components["schemas"]["UserResponse"];
 type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
 
 // A point in the in-app navigation, mirrored onto the browser history stack so
@@ -299,6 +305,7 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
             </button>
           </div>
         )}
+        <SyncStatusIndicator />
         <UserPill user={user} active={active === "account"} onClick={() => onChange("account")} />
       </div>
     </header>
@@ -365,29 +372,32 @@ function MobileHeader({ user, onAvatarClick }: MobileHeaderProps) {
           Atoikura
         </span>
       </div>
-      <button
-        type="button"
-        onClick={onAvatarClick}
-        title="アカウント"
-        style={{
-          width: 34,
-          height: 34,
-          minWidth: 44,
-          minHeight: 44,
-          borderRadius: "50%",
-          background: T.sage,
-          color: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontWeight: 700,
-          fontSize: 14,
-          border: "none",
-          cursor: "pointer",
-        }}
-      >
-        {display.slice(0, 1).toUpperCase()}
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <SyncStatusIndicator is_mobile />
+        <button
+          type="button"
+          onClick={onAvatarClick}
+          title="アカウント"
+          style={{
+            width: 34,
+            height: 34,
+            minWidth: 44,
+            minHeight: 44,
+            borderRadius: "50%",
+            background: T.sage,
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: 700,
+            fontSize: 14,
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          {display.slice(0, 1).toUpperCase()}
+        </button>
+      </div>
     </div>
   );
 }
@@ -518,14 +528,16 @@ function EntrySheet({ onClose, onSuccess, edit_entry, is_mobile = false }: Entry
   );
 }
 
-type AuthState =
-  | { status: "checking" }
-  | { status: "anonymous" }
-  | { status: "authenticated"; user: UserProfile };
-
-function AppContent({ is_mobile }: { is_mobile: boolean }) {
-  const [auth_state, setAuthState] = useState<AuthState>(() =>
-    token_store.load() ? { status: "checking" } : { status: "anonymous" }
+function AppContent({
+  is_mobile,
+  session_controller,
+}: {
+  is_mobile: boolean;
+  session_controller: SessionController;
+}) {
+  const session_state = useSyncExternalStore(
+    session_controller.subscribe,
+    session_controller.getState
   );
   const [active_tab, setActiveTab] = useState<Tab>("home");
   const [budget_sub, setBudgetSub] = useState<BudgetSubScreen>("hub");
@@ -554,9 +566,9 @@ function AppContent({ is_mobile }: { is_mobile: boolean }) {
   // Seed the first history entry once the user is authenticated so the initial
   // popstate has a location to restore and Back from home exits cleanly.
   useEffect(() => {
-    if (auth_state.status !== "authenticated") return;
+    if (session_state.status !== "ready") return;
     window.history.replaceState({ nav: { tab: "home", sub: "hub" } satisfies NavLocation }, "");
-  }, [auth_state.status]);
+  }, [session_state.status]);
 
   useEffect(() => {
     const handle_popstate = (event: PopStateEvent) => {
@@ -569,35 +581,16 @@ function AppContent({ is_mobile }: { is_mobile: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (auth_state.status !== "checking") return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const user = await api.getCurrentUser();
-        if (!cancelled) setAuthState({ status: "authenticated", user });
-      } catch (err) {
-        if (cancelled) return;
-        if (err instanceof AuthError) {
-          token_store.clear();
-        }
-        setAuthState({ status: "anonymous" });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [auth_state.status]);
+    void session_controller.initialize();
+  }, [session_controller]);
 
-  function handleLogout() {
-    token_store.clear();
-    // Purge cached per-user master data so the next account does not inherit
-    // this user's categories from the service worker cache (#114).
-    void clearRuntimeCaches();
-    setActiveTab("home");
-    setAuthState({ status: "anonymous" });
+  async function handleLogout(options?: { discard_pending_changes?: boolean }) {
+    const logout_result = await session_controller.logout(options);
+    if (logout_result.outcome === "signed_out") setActiveTab("home");
+    return logout_result;
   }
 
-  if (auth_state.status === "checking") {
+  if (session_state.status === "checking" || session_state.status === "unavailable") {
     return (
       <div
         style={{
@@ -610,216 +603,232 @@ function AppContent({ is_mobile }: { is_mobile: boolean }) {
           fontSize: 14,
         }}
       >
-        読み込み中…
+        {session_state.status === "unavailable" ? session_state.message : "読み込み中…"}
       </div>
     );
   }
 
-  if (auth_state.status === "anonymous") {
-    return <LoginScreen onSuccess={(user) => setAuthState({ status: "authenticated", user })} />;
+  if (session_state.status === "anonymous") {
+    return (
+      <LoginScreen
+        notice={session_state.notice}
+        onLogin={(email, password) => session_controller.login(email, password)}
+        onSignup={(email, password, display_name) =>
+          session_controller.signup(email, password, display_name)
+        }
+      />
+    );
   }
+
+  const { session } = session_state;
 
   const isCurrent = list_year_month >= currentMonthJST();
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        minHeight: "100vh",
-        background: T.bg,
-        overflowX: "hidden",
-      }}
-    >
-      {is_mobile ? (
-        <MobileHeader user={auth_state.user} onAvatarClick={() => navigate({ tab: "account" })} />
-      ) : (
-        <NavBar
-          active={active_tab}
-          // Tapping a nav button always lands on a tab's top-level view, so
-          // reset the budget sub-screen to the hub (#134) — otherwise the
-          // header "予算" button leaves you stranded on income/recurring.
-          onChange={(tab) => navigate({ tab, sub: "hub" })}
-          listYearMonth={list_year_month}
-          onListMonthChange={setListYearMonth}
-          user={auth_state.user}
-        />
-      )}
-
-      <main
+    <SessionProvider session={session}>
+      <div
         style={{
-          flex: 1,
-          padding: is_mobile ? "16px 20px 96px" : "32px 36px",
-          maxWidth: is_mobile ? undefined : 1280,
-          width: "100%",
-          margin: "0 auto",
-          alignSelf: "stretch",
+          display: "flex",
+          flexDirection: "column",
+          minHeight: "100vh",
+          background: T.bg,
           overflowX: "hidden",
         }}
       >
-        {/* Month navigation for list tab on mobile */}
-        {is_mobile && active_tab === "list" && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 16,
-              justifyContent: "center",
-            }}
-          >
-            <button
-              onClick={() => setListYearMonth(addMonths(list_year_month, -1))}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                color: T.inkSoft,
-                fontSize: 16,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              ‹
-            </button>
-            <span
-              style={{
-                padding: "10px 20px",
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                fontSize: 14,
-                fontWeight: 600,
-                color: T.ink,
-              }}
-            >
-              {formatMonthJP(list_year_month)}
-            </span>
-            <button
-              onClick={() => setListYearMonth(addMonths(list_year_month, 1))}
-              disabled={isCurrent}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                fontSize: 16,
-                cursor: isCurrent ? "default" : "pointer",
-                color: isCurrent ? T.hair : T.inkSoft,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              ›
-            </button>
-          </div>
+        {is_mobile ? (
+          <MobileHeader user={session.user} onAvatarClick={() => navigate({ tab: "account" })} />
+        ) : (
+          <NavBar
+            active={active_tab}
+            // Tapping a nav button always lands on a tab's top-level view, so
+            // reset the budget sub-screen to the hub (#134) — otherwise the
+            // header "予算" button leaves you stranded on income/recurring.
+            onChange={(tab) => navigate({ tab, sub: "hub" })}
+            listYearMonth={list_year_month}
+            onListMonthChange={setListYearMonth}
+            user={session.user}
+          />
         )}
 
-        {active_tab === "home" &&
-          (is_mobile ? (
-            <MobileHome
-              refresh_token={refresh_token}
-              onShowList={() => navigate({ tab: "list" })}
-            />
-          ) : (
-            <WebHome
-              refresh_token={refresh_token}
-              onSuccess={() => setRefreshToken((t) => t + 1)}
-            />
-          ))}
-
-        {active_tab === "list" &&
-          (is_mobile ? (
-            <MobileJournal
-              year_month={list_year_month}
-              refresh_token={refresh_token}
-              onEditEntry={(entry) => {
-                setEditEntry(entry);
-                setShowEntrySheet(true);
+        <main
+          style={{
+            flex: 1,
+            padding: is_mobile ? "16px 20px 96px" : "32px 36px",
+            maxWidth: is_mobile ? undefined : 1280,
+            width: "100%",
+            margin: "0 auto",
+            alignSelf: "stretch",
+            overflowX: "hidden",
+          }}
+        >
+          {/* Month navigation for list tab on mobile */}
+          {is_mobile && active_tab === "list" && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 16,
+                justifyContent: "center",
               }}
-            />
-          ) : (
-            <WebJournal
-              year_month={list_year_month}
-              refresh_token={refresh_token}
-              onEditEntry={(entry) => {
-                setEditEntry(entry);
-                setShowEntrySheet(true);
-              }}
-              onRefresh={() => setRefreshToken((t) => t + 1)}
-            />
-          ))}
+            >
+              <button
+                onClick={() => setListYearMonth(addMonths(list_year_month, -1))}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 999,
+                  border: `1.5px solid ${T.hair}`,
+                  background: T.card,
+                  color: T.inkSoft,
+                  fontSize: 16,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                ‹
+              </button>
+              <span
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 999,
+                  border: `1.5px solid ${T.hair}`,
+                  background: T.card,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: T.ink,
+                }}
+              >
+                {formatMonthJP(list_year_month)}
+              </span>
+              <button
+                onClick={() => setListYearMonth(addMonths(list_year_month, 1))}
+                disabled={isCurrent}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 999,
+                  border: `1.5px solid ${T.hair}`,
+                  background: T.card,
+                  fontSize: 16,
+                  cursor: isCurrent ? "default" : "pointer",
+                  color: isCurrent ? T.hair : T.inkSoft,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                ›
+              </button>
+            </div>
+          )}
 
-        {active_tab === "review" && (is_mobile ? <ReviewScreen /> : <WebReview />)}
+          {active_tab === "home" &&
+            (is_mobile ? (
+              <MobileHome
+                refresh_token={refresh_token}
+                onShowList={() => navigate({ tab: "list" })}
+              />
+            ) : (
+              <WebHome
+                refresh_token={refresh_token}
+                onSuccess={() => setRefreshToken((t) => t + 1)}
+              />
+            ))}
 
-        {active_tab === "budget" &&
-          (() => {
-            if (is_mobile) {
+          {active_tab === "list" &&
+            (is_mobile ? (
+              <MobileJournal
+                year_month={list_year_month}
+                refresh_token={refresh_token}
+                onEditEntry={(entry) => {
+                  setEditEntry(entry);
+                  setShowEntrySheet(true);
+                }}
+              />
+            ) : (
+              <WebJournal
+                year_month={list_year_month}
+                refresh_token={refresh_token}
+                onEditEntry={(entry) => {
+                  setEditEntry(entry);
+                  setShowEntrySheet(true);
+                }}
+                onRefresh={() => setRefreshToken((t) => t + 1)}
+              />
+            ))}
+
+          {active_tab === "review" && (is_mobile ? <ReviewScreen /> : <WebReview />)}
+
+          {active_tab === "budget" &&
+            (() => {
+              if (is_mobile) {
+                if (budget_sub === "income")
+                  return <MobileIncome onBack={() => navigate({ sub: "hub" })} />;
+                if (budget_sub === "recurring")
+                  return <MobileRecurring onBack={() => navigate({ sub: "hub" })} />;
+                if (budget_sub === "savings")
+                  return <MobileSavings onBack={() => navigate({ sub: "hub" })} />;
+                return <MobileBudget onNavigate={(s) => navigate({ sub: s })} />;
+              }
               if (budget_sub === "income")
-                return <MobileIncome onBack={() => navigate({ sub: "hub" })} />;
+                return <WebIncome onBack={() => navigate({ sub: "hub" })} />;
               if (budget_sub === "recurring")
-                return <MobileRecurring onBack={() => navigate({ sub: "hub" })} />;
+                return <WebRecurring onBack={() => navigate({ sub: "hub" })} />;
               if (budget_sub === "savings")
-                return <MobileSavings onBack={() => navigate({ sub: "hub" })} />;
-              return <MobileBudget onNavigate={(s) => navigate({ sub: s })} />;
-            }
-            if (budget_sub === "income")
-              return <WebIncome onBack={() => navigate({ sub: "hub" })} />;
-            if (budget_sub === "recurring")
-              return <WebRecurring onBack={() => navigate({ sub: "hub" })} />;
-            if (budget_sub === "savings")
-              return <WebSavings onBack={() => navigate({ sub: "hub" })} />;
-            return <WebBudget onNavigate={(s) => navigate({ sub: s })} />;
-          })()}
+                return <WebSavings onBack={() => navigate({ sub: "hub" })} />;
+              return <WebBudget onNavigate={(s) => navigate({ sub: s })} />;
+            })()}
 
-        {active_tab === "master" && <WebMaster />}
+          {active_tab === "master" && <WebMaster />}
 
-        {active_tab === "account" && <UserInfo user={auth_state.user} onLogout={handleLogout} />}
-      </main>
+          {active_tab === "account" && <UserInfo user={session.user} onLogout={handleLogout} />}
+        </main>
 
-      {is_mobile && (
-        <MobileTabBar
-          active={active_tab}
-          // Always return to the budget hub on a tab tap, including when the
-          // tapped tab is "予算" itself (#134).
-          onChange={(tab) => navigate({ tab, sub: "hub" })}
-          onPlusClick={() => {
-            setEditEntry(null);
-            setShowEntrySheet(true);
-          }}
-          addTone={active_tab === "budget" && budget_sub === "income" ? "sage" : "coral"}
-        />
-      )}
+        {is_mobile && (
+          <MobileTabBar
+            active={active_tab}
+            // Always return to the budget hub on a tab tap, including when the
+            // tapped tab is "予算" itself (#134).
+            onChange={(tab) => navigate({ tab, sub: "hub" })}
+            onPlusClick={() => {
+              setEditEntry(null);
+              setShowEntrySheet(true);
+            }}
+            addTone={active_tab === "budget" && budget_sub === "income" ? "sage" : "coral"}
+          />
+        )}
 
-      {show_entry_sheet && (
-        <EntrySheet
-          onClose={() => {
-            setShowEntrySheet(false);
-            setEditEntry(null);
-          }}
-          onSuccess={() => setRefreshToken((t) => t + 1)}
-          edit_entry={edit_entry}
-          is_mobile={is_mobile}
-        />
-      )}
-    </div>
+        {show_entry_sheet && (
+          <EntrySheet
+            onClose={() => {
+              setShowEntrySheet(false);
+              setEditEntry(null);
+            }}
+            onSuccess={() => setRefreshToken((t) => t + 1)}
+            edit_entry={edit_entry}
+            is_mobile={is_mobile}
+          />
+        )}
+      </div>
+    </SessionProvider>
   );
 }
 
-export default function App() {
+export default function App({ services }: { services?: AppServices }) {
   // One DialogProvider at the root renders the in-app confirm/alert Modal (#166);
   // `is_mobile` is resolved once here and threaded through both the dialogs and
   // the screen tree so the sheet/centered-card variant stays consistent.
   const is_mobile = useMobile();
+  // Tests pass their own services (in-memory database, fake storage).
+  const [session_controller] = useState(
+    () => new SessionController(services ?? createBrowserAppServices())
+  );
   return (
     <DialogProvider is_mobile={is_mobile}>
-      <AppContent is_mobile={is_mobile} />
+      <AppContent is_mobile={is_mobile} session_controller={session_controller} />
     </DialogProvider>
   );
 }

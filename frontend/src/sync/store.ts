@@ -306,6 +306,29 @@ export class SyncStore {
     });
   }
 
+  // Records rejections that happened outside this database (reset and re-sync).
+  recordRejections(
+    rejections: Omit<SyncRejection, "rejection_id" | "rejected_at">[]
+  ): Promise<void> {
+    return this.mutex.run(async () => {
+      if (rejections.length === 0) return;
+      const rejected_at = this.nowIso();
+      await this.db.batch(
+        rejections.map((rejection) => ({
+          sql: `INSERT INTO _sync_rejections (collection, record_id, reason, message, rejected_at)
+                VALUES (?, ?, ?, ?, ?)`,
+          bind: [
+            rejection.collection,
+            rejection.record_id,
+            rejection.reason,
+            rejection.message,
+            rejected_at,
+          ],
+        }))
+      );
+    });
+  }
+
   dismissRejections(rejection_ids: number[]): Promise<void> {
     return this.mutex.run(async () => {
       if (rejection_ids.length === 0) return;

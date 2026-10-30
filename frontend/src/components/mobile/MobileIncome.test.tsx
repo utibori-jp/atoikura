@@ -17,14 +17,7 @@ function renderIncome(ui: ReactElement) {
   return render(<DialogProvider>{ui}</DialogProvider>);
 }
 
-const TOKEN_KEY = "atoikura.jwt_token";
-
-beforeEach(() => {
-  sessionStorage.setItem(TOKEN_KEY, "test-token");
-});
-
 afterEach(() => {
-  sessionStorage.removeItem(TOKEN_KEY);
   vi.restoreAllMocks();
 });
 

@@ -114,14 +114,13 @@ export class SyncEngine {
     this.pull_page_limit = options.pull_page_limit ?? 500;
   }
 
-  getStatus(): SyncStatus {
-    return this.status;
-  }
+  // Arrow properties, so React can pass them to useSyncExternalStore unbound.
+  getStatus = (): SyncStatus => this.status;
 
-  subscribe(listener: (status: SyncStatus) => void): () => void {
+  subscribe = (listener: (status: SyncStatus) => void): (() => void) => {
     this.status_listeners.add(listener);
     return () => this.status_listeners.delete(listener);
-  }
+  };
 
   private updateStatus(status_changes: Partial<SyncStatus>): void {
     this.status = { ...this.status, ...status_changes };
@@ -129,7 +128,8 @@ export class SyncEngine {
   }
 
   // Starts syncing for the signed-in user. A database holding another user's
-  // data is reset first.
+  // data is reset first. Resolves once the database is bound to the user; the
+  // first sync runs in the background (await syncNow() to wait for it).
   async start(user_id: number): Promise<void> {
     this.stop();
     this.started = true;
@@ -145,10 +145,12 @@ export class SyncEngine {
     this.teardown_callbacks.push(
       this.environment.onWake(() => void this.syncNow()),
       this.store.subscribe((change_event) => {
-        if (change_event.source === "local") this.scheduleSync(this.local_write_debounce_ms);
+        if (change_event.source !== "local") return;
+        this.scheduleSync(this.local_write_debounce_ms);
+        void this.refreshCounts({});
       })
     );
-    await this.syncNow();
+    void this.syncNow();
   }
 
   stop(): void {
@@ -156,6 +158,13 @@ export class SyncEngine {
     this.clearScheduledSync();
     for (const teardown of this.teardown_callbacks) teardown();
     this.teardown_callbacks = [];
+  }
+
+  // Stops and waits for a sync in progress, so the database can be closed.
+  async shutdown(): Promise<void> {
+    this.stop();
+    this.halted = true;
+    await this.running_sync;
   }
 
   private clearScheduledSync(): void {
@@ -214,6 +223,17 @@ export class SyncEngine {
     } catch (sync_error) {
       await this.handleSyncError(sync_error);
     }
+  }
+
+  // Removes rejections the user has seen and updates the count.
+  async dismissRejections(rejection_ids: number[]): Promise<void> {
+    await this.store.dismissRejections(rejection_ids);
+    await this.refreshCounts({});
+  }
+
+  // Re-reads the counts, e.g. after rejections were recorded outside a sync.
+  async refreshStatus(): Promise<void> {
+    await this.refreshCounts({});
   }
 
   private async refreshCounts(status_changes: Partial<SyncStatus>): Promise<void> {

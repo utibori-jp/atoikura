@@ -78,6 +78,19 @@ const defaultUser: components["schemas"]["UserResponse"] = {
   last_login_at: null,
 };
 
+export const TEST_LEDGER_ID = "01920000-0000-7000-8000-0000000000aa";
+
+function testTokenPair() {
+  const expires_at = new Date(Date.now() + 3_600_000).toISOString();
+  return {
+    access_token: "test-access-token",
+    access_token_expires_at: expires_at,
+    refresh_token: "test-refresh-token",
+    refresh_token_expires_at: expires_at,
+    user_id: defaultUser.id,
+  };
+}
+
 const defaultDailyCumulative: components["schemas"]["DailyCumulativeResponse"] = {
   year_month: "2026-06",
   variable_budget: 150000,
@@ -144,7 +157,14 @@ export const handlers = [
 
   http.get(`${API_BASE}/users/me`, () => HttpResponse.json(defaultUser)),
 
-  http.post(`${API_BASE}/auth/login`, () => HttpResponse.json(defaultUser)),
+  // Token session and sync (#201). Pull returns an empty personal ledger.
+  http.post(`${API_BASE}/auth/token`, () => HttpResponse.json(testTokenPair())),
+  http.post(`${API_BASE}/auth/refresh`, () => HttpResponse.json(testTokenPair())),
+  http.post(`${API_BASE}/auth/logout`, () => new HttpResponse(null, { status: 204 })),
+  http.get(`${API_BASE}/sync/pull`, () =>
+    HttpResponse.json({ ledger_id: TEST_LEDGER_ID, rows: [], next_since: 0, has_more: false })
+  ),
+  http.post(`${API_BASE}/sync/push`, () => HttpResponse.json({ results: [] })),
 
   http.post(`${API_BASE}/auth/signup`, () => HttpResponse.json(defaultUser, { status: 201 })),
 

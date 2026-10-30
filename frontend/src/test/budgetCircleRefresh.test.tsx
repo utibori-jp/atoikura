@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import App from "../App";
+import { createTestAppServices } from "./appServices";
 import { server } from "./server";
 import type { components } from "../api/types";
 
@@ -11,8 +12,6 @@ import type { components } from "../api/types";
 // desktop and mobile home screens.
 
 const API_BASE = "http://localhost:8080";
-const TOKEN_KEY = "atoikura.jwt_token";
-
 class ResizeObserverMock {
   observe() {}
   unobserve() {}
@@ -51,8 +50,6 @@ describe("#108 — home budget circle reflects a changed budget", () => {
   beforeAll(() => {
     global.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
   });
-  beforeEach(() => sessionStorage.setItem(TOKEN_KEY, "test-token"));
-  afterEach(() => sessionStorage.removeItem(TOKEN_KEY));
 
   it("updates the desktop home circle after navigating away and back", async () => {
     mockMatchMedia(false); // desktop
@@ -63,7 +60,7 @@ describe("#108 — home budget circle reflects a changed budget", () => {
       )
     );
 
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
     // remaining = 150000 - 3000
     await waitFor(() => expect(screen.getByText("147,000")).toBeInTheDocument());
 
@@ -87,7 +84,7 @@ describe("#108 — home budget circle reflects a changed budget", () => {
       )
     );
 
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
     await waitFor(() => expect(screen.getByText("147,000")).toBeInTheDocument());
 
     budget = 100000;

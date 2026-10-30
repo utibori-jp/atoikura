@@ -1,7 +1,8 @@
+import type { AccessTokenProvider } from "../sync/authSession";
+import { SyncAuthError } from "../sync/errors";
 import type { components } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
-const TOKEN_STORAGE_KEY = "atoikura.jwt_token";
 
 export class AuthError extends Error {
   constructor(message: string) {
@@ -10,17 +11,23 @@ export class AuthError extends Error {
   }
 }
 
-export const token_store = {
-  save(token: string): void {
-    sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
-  },
-  load(): string | null {
-    return sessionStorage.getItem(TOKEN_STORAGE_KEY);
-  },
-  clear(): void {
-    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-  },
-};
+// The legacy REST endpoints accept the same access token as the sync API, so
+// they share the token session (#201). Screens still on the legacy endpoints
+// keep working while they move to the local DB.
+let access_token_provider: AccessTokenProvider | null = null;
+
+export function setApiAccessTokenProvider(token_provider: AccessTokenProvider | null): void {
+  access_token_provider = token_provider;
+}
+
+async function withAuthErrors<TResult>(token_task: () => Promise<TResult>): Promise<TResult> {
+  try {
+    return await token_task();
+  } catch (token_error) {
+    if (token_error instanceof SyncAuthError) throw new AuthError(token_error.message);
+    throw token_error;
+  }
+}
 
 // Deletes all service-worker runtime caches. Per-user master data (category
 // groups, expense categories, statement types) is cached by the PWA, so on
@@ -37,18 +44,36 @@ export async function clearRuntimeCaches(): Promise<void> {
   }
 }
 
-async function request<TResponse>(path: string, init?: RequestInit): Promise<TResponse> {
-  const stored_token = token_store.load();
+interface RequestOptions extends RequestInit {
+  // Sign-up runs before there is a session.
+  anonymous?: boolean;
+}
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(init?.headers as Record<string, string> | undefined),
+async function request<TResponse>(path: string, init?: RequestOptions): Promise<TResponse> {
+  const { anonymous = false, ...fetch_init } = init ?? {};
+  const token_provider = anonymous ? null : access_token_provider;
+  const sendWithToken = (access_token: string | null) => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(fetch_init.headers as Record<string, string> | undefined),
+    };
+    if (access_token) {
+      headers["Authorization"] = `Bearer ${access_token}`;
+    }
+    return fetch(`${API_BASE_URL}${path}`, { ...fetch_init, headers });
   };
-  if (stored_token) {
-    headers["Authorization"] = `Bearer ${stored_token}`;
-  }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  let access_token = token_provider
+    ? await withAuthErrors(() => token_provider.getAccessToken())
+    : null;
+  let response = await sendWithToken(access_token);
+  if (response.status === 401 && token_provider && access_token) {
+    const stale_access_token = access_token;
+    access_token = await withAuthErrors(() =>
+      token_provider.refreshAccessToken(stale_access_token)
+    );
+    response = await sendWithToken(access_token);
+  }
   if (response.status === 401) {
     throw new AuthError("認証に失敗しました");
   }
@@ -65,14 +90,10 @@ async function request<TResponse>(path: string, init?: RequestInit): Promise<TRe
 }
 
 export const api = {
-  login: (email: string, password: string) =>
-    request<components["schemas"]["LoginResponse"]>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    }),
   signup: (body: components["schemas"]["SignupRequest"]) =>
     request<components["schemas"]["LoginResponse"]>("/auth/signup", {
       method: "POST",
+      anonymous: true,
       body: JSON.stringify(body),
     }),
   getCurrentUser: () => request<components["schemas"]["UserResponse"]>("/users/me"),
