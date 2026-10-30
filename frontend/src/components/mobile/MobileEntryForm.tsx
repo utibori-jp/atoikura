@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import { useState } from "react";
+import {
+  createJournalEntry,
+  listCategoryGroups,
+  listExpenseCategories,
+  updateJournalEntry,
+  type JournalEntryView,
+} from "../../data/journal";
+import { useLedgerData, useLocalData } from "../../data/ledgerData";
 import { T } from "../../theme";
 import { emojiForGroup } from "./groupEmoji";
 import { DateField } from "../DateField";
-
-type CategoryGroup = components["schemas"]["CategoryGroup"];
-type ExpenseCategory = components["schemas"]["ExpenseCategory"];
-type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
 
 const COLORS = {
   coralSoft: "#FFE8DD",
@@ -18,18 +20,26 @@ const today_jst = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia
 
 interface Props {
   onSuccess: () => void;
-  edit_entry?: JournalEntryResponse | null;
+  edit_entry?: JournalEntryView | null;
 }
 
 export function MobileEntryForm({ onSuccess, edit_entry }: Props) {
   const is_edit = !!edit_entry;
-  const [category_groups, setCategoryGroups] = useState<CategoryGroup[]>([]);
-  const [all_expense_categories, setAllExpenseCategories] = useState<ExpenseCategory[]>([]);
-  const [selected_group_id, setSelectedGroupId] = useState(
-    edit_entry ? String(edit_entry.group_id) : ""
+  const ledger_data = useLedgerData();
+  const { data: category_lists } = useLocalData(
+    async (loaded_ledger_data) => ({
+      category_groups: await listCategoryGroups(loaded_ledger_data),
+      expense_categories: await listExpenseCategories(loaded_ledger_data),
+    }),
+    []
   );
+  const category_groups = category_lists?.category_groups ?? [];
+  const all_expense_categories = category_lists?.expense_categories ?? [];
+  const [chosen_group_id, setChosenGroupId] = useState(edit_entry ? edit_entry.group_id : "");
+  // A new entry starts on the first group once the categories have loaded.
+  const selected_group_id = chosen_group_id || (edit_entry ? "" : (category_groups[0]?.id ?? ""));
   const [selected_category_id, setSelectedCategoryId] = useState(
-    edit_entry ? String(edit_entry.category_id) : ""
+    edit_entry ? edit_entry.category_id : ""
   );
   const [transaction_date, setTransactionDate] = useState(
     edit_entry?.transaction_date ?? today_jst()
@@ -41,16 +51,6 @@ export function MobileEntryForm({ onSuccess, edit_entry }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error_message, setErrorMessage] = useState("");
   const [success_flash, setSuccessFlash] = useState(false);
-
-  useEffect(() => {
-    api.listCategoryGroups().then((res) => {
-      setCategoryGroups(res.category_groups);
-      if (!edit_entry && res.category_groups.length > 0) {
-        setSelectedGroupId((current) => current || String(res.category_groups[0].id));
-      }
-    });
-    api.listExpenseCategories().then((res) => setAllExpenseCategories(res.expense_categories));
-  }, [edit_entry]);
 
   const filtered_categories = all_expense_categories.filter(
     (cat) => String(cat.group_id) === selected_group_id
@@ -70,19 +70,19 @@ export function MobileEntryForm({ onSuccess, edit_entry }: Props) {
     }
     setSubmitting(true);
     try {
-      const body = {
+      const entry_fields = {
         transaction_date,
         amount: parsed_amount,
-        category_id: parseInt(selected_category_id, 10),
+        category_id: selected_category_id,
         is_excluded,
         item: item || null,
         note: note || null,
       };
       if (is_edit && edit_entry) {
-        await api.updateJournalEntry(edit_entry.id, body);
+        await updateJournalEntry(ledger_data, edit_entry.id, entry_fields);
       } else {
-        await api.createJournalEntry(body);
-        setSelectedGroupId(category_groups.length > 0 ? String(category_groups[0].id) : "");
+        await createJournalEntry(ledger_data, entry_fields);
+        setChosenGroupId("");
         setSelectedCategoryId("");
         setAmount("");
         setItem("");
@@ -239,7 +239,7 @@ export function MobileEntryForm({ onSuccess, edit_entry }: Props) {
               key={g.id}
               type="button"
               onClick={() => {
-                setSelectedGroupId(String(g.id));
+                setChosenGroupId(String(g.id));
                 setSelectedCategoryId("");
               }}
               style={{

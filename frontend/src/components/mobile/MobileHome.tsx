@@ -1,13 +1,10 @@
-import { useEffect, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import { listJournalDays } from "../../data/journal";
+import { useLocalData } from "../../data/ledgerData";
+import { loadDailyCumulative, type DailyCumulative } from "../../data/spending";
 import { T } from "../../theme";
 import { emojiForGroup } from "./groupEmoji";
 import { chartMaxY, niceTicks } from "../chartScale";
 import { smoothPath } from "../chartPath";
-
-type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
-type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
 
 const COLORS = {
   coralSoft: "#FFE8DD",
@@ -285,36 +282,25 @@ function MCard({ children, style }: CardProps) {
 }
 
 interface Props {
-  refresh_token: number;
   onShowList: () => void;
 }
 
-export function MobileHome({ refresh_token, onShowList }: Props) {
-  const [cumulative, setCumulative] = useState<DailyCumulativeResponse | null>(null);
-  const [today_entries, setTodayEntries] = useState<JournalEntryResponse[]>([]);
+export function MobileHome({ onShowList }: Props) {
   const ym = currentMonthJST();
   const today = todayJST();
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getDailyCumulative(ym)
-      .then((res) => {
-        if (!cancelled) setCumulative(res);
-      })
-      .catch(() => {});
-    api
-      .listJournalEntries(ym)
-      .then((res) => {
-        if (cancelled) return;
-        const day = res.entries.find((d) => d.date === today);
-        setTodayEntries(day?.journal_entries ?? []);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [ym, today, refresh_token]);
+  const { data: home_data } = useLocalData(
+    async (ledger_data) => {
+      const [daily_cumulative, journal_days] = await Promise.all([
+        loadDailyCumulative(ledger_data, ym, today),
+        listJournalDays(ledger_data, ym),
+      ]);
+      const today_journal_day = journal_days.find((journal_day) => journal_day.date === today);
+      return { daily_cumulative, today_entries: today_journal_day?.journal_entries ?? [] };
+    },
+    [ym, today]
+  );
+  const cumulative: DailyCumulative | null = home_data?.daily_cumulative ?? null;
+  const today_entries = home_data?.today_entries ?? [];
 
   const days_total = daysInMonth(ym);
   const today_day = todayDayJST();

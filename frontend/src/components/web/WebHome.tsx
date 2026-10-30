@@ -1,15 +1,12 @@
 import { useEffect, useCallback, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import { createJournalEntry, listCategoryGroups, listExpenseCategories } from "../../data/journal";
+import { useLedgerData, useLocalData } from "../../data/ledgerData";
+import { loadDailyCumulative, type DailyCumulative } from "../../data/spending";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
 import { DateField } from "../DateField";
 import { chartMaxY, niceTicks } from "../chartScale";
 import { smoothPath } from "../chartPath";
-
-type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
-type CategoryGroup = components["schemas"]["CategoryGroup"];
-type ExpenseCategory = components["schemas"]["ExpenseCategory"];
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 const yenSlim = (n: number) => Math.round(n).toLocaleString("ja-JP");
@@ -183,7 +180,7 @@ function DonutChart({
 interface AreaChartProps {
   width: number;
   height: number;
-  days: DailyCumulativeResponse["days"];
+  days: DailyCumulative["days"];
   monthly_budget: number;
   today_day: number;
   days_in_month: number;
@@ -444,14 +441,20 @@ function StatPill({ tone, label, value, sub }: StatPillProps) {
   );
 }
 
-interface EntryFormProps {
-  onSuccess: () => void;
-}
-
-function EntryForm({ onSuccess }: EntryFormProps) {
-  const [groups, setGroups] = useState<CategoryGroup[]>([]);
-  const [all_categories, setAllCategories] = useState<ExpenseCategory[]>([]);
-  const [selected_group_id, setSelectedGroupId] = useState("");
+function EntryForm() {
+  const ledger_data = useLedgerData();
+  const { data: category_lists } = useLocalData(
+    async (loaded_ledger_data) => ({
+      category_groups: await listCategoryGroups(loaded_ledger_data),
+      expense_categories: await listExpenseCategories(loaded_ledger_data),
+    }),
+    []
+  );
+  const groups = category_lists?.category_groups ?? [];
+  const all_categories = category_lists?.expense_categories ?? [];
+  const [chosen_group_id, setChosenGroupId] = useState("");
+  // Starts on the first group once the categories have loaded.
+  const selected_group_id = chosen_group_id || (groups[0]?.id ?? "");
   const [selected_category_id, setSelectedCategoryId] = useState("");
   const [transaction_date, setTransactionDate] = useState(todayJST());
   const [amount_str, setAmountStr] = useState("");
@@ -459,16 +462,6 @@ function EntryForm({ onSuccess }: EntryFormProps) {
   const [is_excluded, setIsExcluded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error_msg, setErrorMsg] = useState("");
-
-  useEffect(() => {
-    api.listCategoryGroups().then((res) => {
-      setGroups(res.category_groups);
-      if (res.category_groups.length > 0) {
-        setSelectedGroupId((cur) => cur || String(res.category_groups[0].id));
-      }
-    });
-    api.listExpenseCategories().then((res) => setAllCategories(res.expense_categories));
-  }, []);
 
   const filtered_categories = all_categories.filter(
     (c) => String(c.group_id) === selected_group_id
@@ -481,7 +474,7 @@ function EntryForm({ onSuccess }: EntryFormProps) {
         return still_valid ? cur : "";
       })
     );
-  }, [selected_group_id, all_categories]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected_group_id, category_lists]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handle_submit = useCallback(
     async (e?: React.FormEvent) => {
@@ -498,10 +491,10 @@ function EntryForm({ onSuccess }: EntryFormProps) {
       }
       setSubmitting(true);
       try {
-        await api.createJournalEntry({
+        await createJournalEntry(ledger_data, {
           transaction_date,
           amount: parsed_amount,
-          category_id: parseInt(selected_category_id, 10),
+          category_id: selected_category_id,
           is_excluded,
           item: item || null,
           note: null,
@@ -511,14 +504,13 @@ function EntryForm({ onSuccess }: EntryFormProps) {
         setIsExcluded(false);
         // Keep the entered transaction_date (#118) so consecutive entries on the
         // same past date don't require re-selecting it each time.
-        onSuccess();
       } catch (err) {
         setErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
       } finally {
         setSubmitting(false);
       }
     },
-    [amount_str, selected_category_id, transaction_date, is_excluded, item, onSuccess]
+    [ledger_data, amount_str, selected_category_id, transaction_date, is_excluded, item]
   );
 
   useEffect(() => {
@@ -657,7 +649,7 @@ function EntryForm({ onSuccess }: EntryFormProps) {
               <button
                 key={g.id}
                 type="button"
-                onClick={() => setSelectedGroupId(String(g.id))}
+                onClick={() => setChosenGroupId(String(g.id))}
                 style={{
                   border: `1.5px solid ${active ? T.coral : T.hair}`,
                   background: active ? T.coral : "#fff",
@@ -774,7 +766,7 @@ function EntryForm({ onSuccess }: EntryFormProps) {
               setItem("");
               setIsExcluded(false);
               setTransactionDate(todayJST());
-              setSelectedGroupId(groups.length > 0 ? String(groups[0].id) : "");
+              setChosenGroupId(groups.length > 0 ? String(groups[0].id) : "");
               setSelectedCategoryId("");
             }}
             style={{
@@ -813,30 +805,15 @@ function EntryForm({ onSuccess }: EntryFormProps) {
   );
 }
 
-interface Props {
-  refresh_token: number;
-  onSuccess: () => void;
-}
-
-export function WebHome({ refresh_token, onSuccess }: Props) {
-  const [cumulative, setCumulative] = useState<DailyCumulativeResponse | null>(null);
+export function WebHome() {
   const ym = currentMonthJST();
   const today = todayJST();
+  const { data: cumulative } = useLocalData(
+    (ledger_data) => loadDailyCumulative(ledger_data, ym, today),
+    [ym, today]
+  );
   const today_day = todayDayJST();
   const days_total = daysInMonth(ym);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getDailyCumulative(ym)
-      .then((res) => {
-        if (!cancelled) setCumulative(res);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [ym, refresh_token]);
 
   const monthly_budget = cumulative?.variable_budget ?? 0;
   const last_actual = cumulative?.days
@@ -998,7 +975,7 @@ export function WebHome({ refresh_token, onSuccess }: Props) {
         />
       </div>
 
-      <EntryForm onSuccess={onSuccess} />
+      <EntryForm />
     </div>
   );
 }

@@ -1,9 +1,7 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
-import { server } from "../../test/server";
+import { screen, waitFor, fireEvent } from "@testing-library/react";
+import { seedPersonalLedger, TestLedgerServer } from "../../test/ledgerFixtures";
+import { renderWithLedger } from "../../test/renderWithLedger";
 import { WebHome } from "./WebHome";
-
-const API_BASE = "http://localhost:8080";
 
 function todayJST(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
@@ -14,33 +12,14 @@ function todayJST(): string {
 // don't require re-selecting the date each time.
 describe("WebHome entry form date retention (#118)", () => {
   it("keeps the entered past date after saving instead of resetting to today", async () => {
-    let created = 0;
-    server.use(
-      http.post(`${API_BASE}/journal-entries`, () => {
-        created += 1;
-        return HttpResponse.json(
-          {
-            id: 1,
-            transaction_date: "2026-06-01",
-            item: null,
-            amount: 1200,
-            category_id: 1,
-            category_name: "スーパー",
-            group_id: 1,
-            group_name: "食費",
-            is_excluded: false,
-            note: null,
-            created_at: "2026-06-01T00:00:00Z",
-          },
-          { status: 201 }
-        );
-      })
-    );
-
-    render(<WebHome refresh_token={0} onSuccess={() => {}} />);
+    const ledger_server = new TestLedgerServer();
+    seedPersonalLedger(ledger_server);
+    const { local_db } = await renderWithLedger(<WebHome />, ledger_server);
 
     // Wait for the master data (group chip button) to load.
-    await waitFor(() => expect(screen.getByRole("button", { name: /食費/ })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: /食費/ })).toBeInTheDocument(), {
+      timeout: 5000,
+    });
 
     const date_input = screen.getByLabelText("日付") as HTMLInputElement;
     const past_date = "2026-06-01";
@@ -60,7 +39,12 @@ describe("WebHome entry form date retention (#118)", () => {
     // Submit.
     fireEvent.click(screen.getByText("＋ 記録する"));
 
-    await waitFor(() => expect(created).toBe(1));
+    // The entry is stored on the device (and queued for push).
+    await waitFor(async () =>
+      expect(await local_db.select("SELECT transaction_date, amount FROM journal_entries")).toEqual(
+        [{ transaction_date: past_date, amount: 1200 }]
+      )
+    );
 
     // The date field must still hold the entered past date, not snap to today.
     await waitFor(() => {

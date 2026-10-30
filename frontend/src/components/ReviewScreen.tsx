@@ -1,19 +1,19 @@
-import { useEffect, useState } from "react";
-import { api } from "../api/client";
-import type { components } from "../api/types";
+import { useState } from "react";
+import { useLedgerData, useLocalData } from "../data/ledgerData";
+import { listMonthlyReviewNotes, saveMonthlyReviewNotes } from "../data/notes";
+import { loadMonthlyBreakdownItems, type MonthlyBreakdownItem } from "../data/spending";
 import { T } from "../theme";
 
-type BreakdownItem = components["schemas"]["MonthlyBreakdownItem"];
-type ReviewNote = components["schemas"]["MonthlyReviewNote"];
+type BreakdownItem = MonthlyBreakdownItem;
 
 interface StatementGroup {
-  statement_type_id: number;
+  statement_type_order: number;
   statement_type_name: string;
   category_groups: CategoryGroup[];
 }
 
 interface CategoryGroup {
-  group_id: number;
+  group_id: string;
   group_name: string;
   categories: BreakdownItem[];
 }
@@ -21,14 +21,14 @@ interface CategoryGroup {
 function buildGrouped(items: BreakdownItem[]): StatementGroup[] {
   const statement_map = new Map<number, StatementGroup>();
   for (const item of items) {
-    if (!statement_map.has(item.statement_type_id)) {
-      statement_map.set(item.statement_type_id, {
-        statement_type_id: item.statement_type_id,
+    if (!statement_map.has(item.statement_type_order)) {
+      statement_map.set(item.statement_type_order, {
+        statement_type_order: item.statement_type_order,
         statement_type_name: item.statement_type_name,
         category_groups: [],
       });
     }
-    const st = statement_map.get(item.statement_type_id)!;
+    const st = statement_map.get(item.statement_type_order)!;
     let cg = st.category_groups.find((g) => g.group_id === item.group_id);
     if (!cg) {
       cg = { group_id: item.group_id, group_name: item.group_name, categories: [] };
@@ -37,7 +37,7 @@ function buildGrouped(items: BreakdownItem[]): StatementGroup[] {
     cg.categories.push(item);
   }
   const result = [...statement_map.values()].sort(
-    (a, b) => a.statement_type_id - b.statement_type_id
+    (a, b) => a.statement_type_order - b.statement_type_order
   );
   for (const st of result) {
     st.category_groups.sort((a, b) => a.group_name.localeCompare(b.group_name));
@@ -74,69 +74,46 @@ const STATEMENT_COLORS: Record<string, string> = {
   対象外: T.excluded,
 };
 
-type FetchState =
-  | { status: "loading" }
-  | { status: "done"; breakdown: BreakdownItem[]; memos: Record<number, string> }
-  | { status: "error"; message: string };
-
 export function ReviewScreen() {
   const [year_month, setYearMonth] = useState(prevMonthJST());
-  const [fetch_state, setFetchState] = useState<FetchState>({ status: "loading" });
-  const [memos, setMemos] = useState<Record<number, string>>({});
-  const [saved_memos, setSavedMemos] = useState<Record<number, string>>({});
+  const ledger_data = useLedgerData();
+  const { data: review_data, error_message: load_error_message } = useLocalData(
+    async (loaded_ledger_data) => ({
+      breakdown: await loadMonthlyBreakdownItems(loaded_ledger_data, year_month),
+      saved_memos: await listMonthlyReviewNotes(loaded_ledger_data, year_month),
+    }),
+    [year_month]
+  );
+  // Unsaved edits per category of the month shown, over the saved notes.
+  const [memo_drafts, setMemoDrafts] = useState<{
+    year_month: string;
+    memos: Record<string, string>;
+  }>({ year_month, memos: {} });
+  const draft_memos = memo_drafts.year_month === year_month ? memo_drafts.memos : {};
+  const saved_memos = review_data?.saved_memos ?? {};
+  const memos: Record<string, string> = { ...saved_memos, ...draft_memos };
+  const setMemos = (
+    updateMemos: (previous_memos: Record<string, string>) => Record<string, string>
+  ) => setMemoDrafts({ year_month, memos: updateMemos(draft_memos) });
   const [saving, setSaving] = useState(false);
   const [save_message, setSaveMessage] = useState<string | null>(null);
   const [collapsed_statements, setCollapsedStatements] = useState<Set<number>>(new Set());
-  const [collapsed_groups, setCollapsedGroups] = useState<Set<number>>(new Set());
+  const [collapsed_groups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const current_month_jst = new Date()
     .toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" })
     .slice(0, 7);
   const is_at_limit = year_month >= addMonths(current_month_jst, -1);
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([api.getMonthlyBreakdown(year_month), api.getMonthlyReviews(year_month)])
-      .then(([breakdown_res, reviews_res]) => {
-        if (cancelled) return;
-        const memo_map: Record<number, string> = {};
-        for (const n of reviews_res.notes) {
-          memo_map[n.category_id] = n.note;
-        }
-        setFetchState({ status: "done", breakdown: breakdown_res.breakdown, memos: memo_map });
-        setMemos(memo_map);
-        setSavedMemos(memo_map);
-        setSaveMessage(null);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled)
-          setFetchState({
-            status: "error",
-            message: err instanceof Error ? err.message : "データ取得に失敗しました",
-          });
-      });
-    return () => {
-      cancelled = true;
-      setFetchState({ status: "loading" });
-    };
-  }, [year_month]);
-
-  const breakdown = fetch_state.status === "done" ? fetch_state.breakdown : [];
+  const breakdown = review_data?.breakdown ?? [];
 
   async function handleSave() {
     setSaving(true);
     setSaveMessage(null);
-    const notes: ReviewNote[] = Object.entries(memos)
-      .filter(([, note]) => note !== "")
-      .map(([id, note]) => ({ category_id: Number(id), note }));
     try {
-      const res = await api.updateMonthlyReviews(year_month, notes);
-      const new_saved: Record<number, string> = {};
-      for (const n of res.notes) {
-        new_saved[n.category_id] = n.note;
-      }
-      setSavedMemos(new_saved);
-      setMemos(new_saved);
+      // An emptied memo is deleted.
+      await saveMonthlyReviewNotes(ledger_data, year_month, draft_memos);
+      setMemoDrafts({ year_month, memos: {} });
       setSaveMessage("保存しました");
     } catch (e) {
       setSaveMessage(e instanceof Error ? e.message : "保存に失敗しました");
@@ -146,7 +123,9 @@ export function ReviewScreen() {
   }
 
   const grouped = buildGrouped(breakdown);
-  const has_unsaved = JSON.stringify(memos) !== JSON.stringify(saved_memos);
+  const has_unsaved = Object.entries(draft_memos).some(
+    ([category_id, draft_memo]) => draft_memo !== (saved_memos[category_id] ?? "")
+  );
 
   return (
     <div>
@@ -267,29 +246,29 @@ export function ReviewScreen() {
         </div>
       </div>
 
-      {fetch_state.status === "loading" && (
+      {review_data === null && !load_error_message && (
         <div style={{ color: T.inkSoft, fontSize: 14 }}>読み込み中...</div>
       )}
-      {fetch_state.status === "error" && (
-        <div style={{ color: T.coralDeep, fontSize: 14 }}>{fetch_state.message}</div>
+      {load_error_message && (
+        <div style={{ color: T.coralDeep, fontSize: 14 }}>{load_error_message}</div>
       )}
-      {fetch_state.status === "done" && breakdown.length === 0 && (
+      {review_data !== null && breakdown.length === 0 && (
         <div style={{ color: T.inkSoft, fontSize: 14, padding: "40px 0", textAlign: "center" }}>
           選択した月の支出データがありません
         </div>
       )}
 
-      {fetch_state.status === "done" &&
+      {review_data !== null &&
         grouped.map((st) => {
           const st_total = st.category_groups
             .flatMap((cg) => cg.categories)
             .reduce((sum, c) => sum + c.total, 0);
-          const st_collapsed = collapsed_statements.has(st.statement_type_id);
+          const st_collapsed = collapsed_statements.has(st.statement_type_order);
           const dotColor = STATEMENT_COLORS[st.statement_type_name] ?? T.inkSoft;
 
           return (
             <div
-              key={st.statement_type_id}
+              key={st.statement_type_order}
               style={{
                 marginBottom: 16,
                 background: T.card,
@@ -303,8 +282,8 @@ export function ReviewScreen() {
                 onClick={() =>
                   setCollapsedStatements((prev) => {
                     const next = new Set(prev);
-                    if (next.has(st.statement_type_id)) next.delete(st.statement_type_id);
-                    else next.add(st.statement_type_id);
+                    if (next.has(st.statement_type_order)) next.delete(st.statement_type_order);
+                    else next.add(st.statement_type_order);
                     return next;
                   })
                 }
@@ -358,12 +337,12 @@ export function ReviewScreen() {
               {!st_collapsed &&
                 st.category_groups.map((cg) => {
                   const cg_total = cg.categories.reduce((sum, c) => sum + c.total, 0);
-                  const cg_key = st.statement_type_id * 100000 + cg.group_id;
+                  const cg_key = `${st.statement_type_order}:${cg.group_id}`;
                   const cg_collapsed = collapsed_groups.has(cg_key);
 
                   return (
                     <div
-                      key={`${st.statement_type_id}-${cg.group_id}`}
+                      key={`${st.statement_type_order}-${cg.group_id}`}
                       style={{ borderTop: `1px solid ${T.hair}` }}
                     >
                       <button

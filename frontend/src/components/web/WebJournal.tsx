@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import { deleteJournalEntry, listJournalDays, type JournalEntryView } from "../../data/journal";
+import { useLedgerData, useLocalData } from "../../data/ledgerData";
+import { listDailyNotes, saveDailyNote } from "../../data/notes";
 import { T } from "../../theme";
 import { useConfirm } from "../dialogContext";
 import { emojiForGroup } from "../mobile/groupEmoji";
-
-type DailyJournalEntries = components["schemas"]["DailyJournalEntries"];
-type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 
@@ -19,25 +17,20 @@ function formatDateParts(date_str: string): { day: number; month: number; weekda
 
 interface Props {
   year_month: string;
-  refresh_token: number;
-  onEditEntry: (entry: JournalEntryResponse) => void;
-  onRefresh: () => void;
+  onEditEntry: (entry: JournalEntryView) => void;
 }
 
-function DailyNoteField({
-  date,
-  initial_note,
-  onSave,
-}: {
-  date: string;
-  initial_note: string;
-  onSave: (date: string, note: string) => void;
-}) {
+function DailyNoteField({ date, initial_note }: { date: string; initial_note: string }) {
+  const ledger_data = useLedgerData();
   const [value, setValue] = useState(initial_note);
   const [saving, setSaving] = useState(false);
   const save_timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const is_focused = useRef(false);
 
+  // Follow changes from a sync, but never while the user is typing: the saved
+  // value would overwrite what they typed after it.
   useEffect(() => {
+    if (is_focused.current) return;
     void Promise.resolve().then(() => setValue(initial_note));
   }, [initial_note]);
 
@@ -46,11 +39,7 @@ function DailyNoteField({
     if (save_timer.current) clearTimeout(save_timer.current);
     save_timer.current = setTimeout(() => {
       setSaving(true);
-      api
-        .updateDailyNote(date, new_val)
-        .then(() => {
-          onSave(date, new_val);
-        })
+      saveDailyNote(ledger_data, date, new_val.trim())
         .catch(() => {})
         .finally(() => setSaving(false));
     }, 800);
@@ -63,6 +52,12 @@ function DailyNoteField({
         type="text"
         value={value}
         onChange={(e) => handle_change(e.target.value)}
+        onFocus={() => {
+          is_focused.current = true;
+        }}
+        onBlur={() => {
+          is_focused.current = false;
+        }}
         placeholder="💭 この日のひとことを残す…"
         style={{
           width: "100%",
@@ -96,41 +91,24 @@ function DailyNoteField({
   );
 }
 
-export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }: Props) {
+export function WebJournal({ year_month, onEditEntry }: Props) {
   const confirm = useConfirm();
-  const [entries, setEntries] = useState<DailyJournalEntries[] | null>(null);
-  const [daily_notes, setDailyNotes] = useState<Record<string, string>>({});
-  const [error_msg, setErrorMsg] = useState("");
-  const [deleting_id, setDeletingId] = useState<number | null>(null);
+  const ledger_data = useLedgerData();
+  const { data: journal_data, error_message: load_error_message } = useLocalData(
+    async (loaded_ledger_data) => ({
+      journal_days: await listJournalDays(loaded_ledger_data, year_month),
+      daily_notes: await listDailyNotes(loaded_ledger_data, year_month),
+    }),
+    [year_month]
+  );
+  const entries = journal_data?.journal_days ?? null;
+  const daily_notes = journal_data?.daily_notes ?? {};
+  const [delete_error_message, setDeleteErrorMessage] = useState("");
+  const error_msg = delete_error_message || load_error_message;
+  const [deleting_id, setDeletingId] = useState<string | null>(null);
   const [search_query, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setEntries(null);
-      setErrorMsg("");
-      try {
-        const [entries_res, notes_res] = await Promise.all([
-          api.listJournalEntries(year_month),
-          api.getDailyNotes(year_month),
-        ]);
-        if (cancelled) return;
-        setEntries(entries_res.entries);
-        const notes_map: Record<string, string> = {};
-        for (const n of notes_res.notes) {
-          if (n.note != null) notes_map[n.date] = n.note;
-        }
-        setDailyNotes(notes_map);
-      } catch (err: unknown) {
-        if (!cancelled) setErrorMsg(err instanceof Error ? err.message : "読み込みに失敗しました");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [year_month, refresh_token]);
-
-  const handle_delete = async (id: number) => {
+  const handle_delete = async (id: string) => {
     const confirmed = await confirm({
       title: "削除の確認",
       message: "この仕訳を削除しますか？",
@@ -140,17 +118,12 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
     if (!confirmed) return;
     setDeletingId(id);
     try {
-      await api.deleteJournalEntry(id);
-      setEntries((prev) =>
-        prev
-          ? prev
-              .map((d) => ({ ...d, journal_entries: d.journal_entries.filter((e) => e.id !== id) }))
-              .filter((d) => d.journal_entries.length > 0)
-          : prev
+      setDeleteErrorMessage("");
+      await deleteJournalEntry(ledger_data, id);
+    } catch (delete_error) {
+      setDeleteErrorMessage(
+        delete_error instanceof Error ? delete_error.message : "削除に失敗しました"
       );
-      onRefresh();
-    } catch {
-      // ignore
     } finally {
       setDeletingId(null);
     }
@@ -309,25 +282,13 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
                       </div>
                     </div>
                     <div style={{ marginTop: 8 }}>
-                      <DailyNoteField
-                        date={day.date}
-                        initial_note={note}
-                        onSave={(date, new_note) => {
-                          setDailyNotes((prev) => {
-                            const n = { ...prev };
-                            if (new_note) n[date] = new_note;
-                            else delete n[date];
-                            return n;
-                          });
-                        }}
-                      />
+                      <DailyNoteField date={day.date} initial_note={note} />
                     </div>
                   </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", marginTop: 6 }}>
                   {day.journal_entries.map((e) => {
-                    const entry = e as components["schemas"]["JournalEntryResponse"];
                     const emoji = emojiForGroup(e.group_name ?? "");
                     return (
                       <div
@@ -376,7 +337,7 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
                             >
                               {e.item ?? e.category_name}
                             </span>
-                            {entry.is_recurring && (
+                            {e.is_recurring && (
                               <span
                                 style={{
                                   fontSize: 10,
@@ -427,37 +388,39 @@ export function WebJournal({ year_month, refresh_token, onEditEntry, onRefresh }
                         >
                           {yen(e.amount)}
                         </div>
-                        <div style={{ display: "flex", gap: 6, opacity: 0.5, flexShrink: 0 }}>
-                          <button
-                            type="button"
-                            onClick={() => onEditEntry(e)}
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: 8,
-                              fontSize: 12,
-                              border: "none",
-                              background: "transparent",
-                              cursor: "pointer",
-                            }}
-                          >
-                            ✎
-                          </button>
-                          <button
-                            type="button"
-                            disabled={deleting_id === e.id}
-                            onClick={() => handle_delete(e.id)}
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: 8,
-                              fontSize: 12,
-                              border: "none",
-                              background: "transparent",
-                              cursor: "pointer",
-                            }}
-                          >
-                            🗑
-                          </button>
-                        </div>
+                        {e.can_edit && (
+                          <div style={{ display: "flex", gap: 6, opacity: 0.5, flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              onClick={() => onEditEntry(e)}
+                              style={{
+                                padding: "4px 8px",
+                                borderRadius: 8,
+                                fontSize: 12,
+                                border: "none",
+                                background: "transparent",
+                                cursor: "pointer",
+                              }}
+                            >
+                              ✎
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deleting_id === e.id}
+                              onClick={() => handle_delete(e.id)}
+                              style={{
+                                padding: "4px 8px",
+                                borderRadius: 8,
+                                fontSize: 12,
+                                border: "none",
+                                background: "transparent",
+                                cursor: "pointer",
+                              }}
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
