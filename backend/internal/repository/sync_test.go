@@ -257,6 +257,78 @@ func TestEnsurePersonalLedger_IsStableAndConcurrentSafe(t *testing.T) {
 			t.Fatalf("ledger ids differ: %v", ledger_ids)
 		}
 	}
+	// Racing creations roll back as a whole: one set of default categories.
+	var group_count, category_count int
+	if err := testPool.QueryRow(ctx,
+		`SELECT (SELECT COUNT(*) FROM lf.category_groups WHERE owner_id = $1),
+		        (SELECT COUNT(*) FROM lf.expense_categories WHERE owner_id = $1)`,
+		user.ID,
+	).Scan(&group_count, &category_count); err != nil {
+		t.Fatalf("counting categories: %v", err)
+	}
+	if group_count != 8 || category_count != 44 {
+		t.Fatalf("seeded %d groups and %d categories, want 8 and 44", group_count, category_count)
+	}
+}
+
+func TestEnsurePersonalLedger_SeedsDefaultCategoriesInOrder(t *testing.T) {
+	ctx := context.Background()
+	user, err := testRepo.CreateUserWithDefaults(ctx, fmt.Sprintf("defaults-%d@example.com", time.Now().UnixNano()), nil, "testhash")
+	if err != nil {
+		t.Fatalf("creating user: %v", err)
+	}
+
+	pull_result, err := testRepo.Pull(ctx, user.ID, 0, 500)
+	if err != nil {
+		t.Fatalf("pulling: %v", err)
+	}
+
+	// The first pull delivers the defaults, owned by the user.
+	pulled_group_count := 0
+	for _, pulled_row := range pull_result.Rows {
+		if pulled_row.Collection == "category_groups" {
+			pulled_group_count++
+			if pulled_row.OwnerID != user.ID {
+				t.Fatalf("group owner = %d, want %d", pulled_row.OwnerID, user.ID)
+			}
+		}
+	}
+	if pulled_group_count != 8 {
+		t.Fatalf("pulled %d category groups, want 8", pulled_group_count)
+	}
+
+	// Devices list categories by created_at: it must keep the default order.
+	group_rows, err := testPool.Query(ctx,
+		`SELECT cg.name, cg.statement_type_code,
+		        (SELECT ec.name FROM lf.expense_categories ec WHERE ec.group_id = cg.id ORDER BY ec.created_at LIMIT 1)
+		 FROM lf.category_groups cg WHERE cg.ledger_id = $1::uuid ORDER BY cg.created_at`,
+		pull_result.LedgerID,
+	)
+	if err != nil {
+		t.Fatalf("listing groups: %v", err)
+	}
+	defer group_rows.Close()
+	var listed_groups []string
+	for group_rows.Next() {
+		var group_name, type_code, first_category_name string
+		if err := group_rows.Scan(&group_name, &type_code, &first_category_name); err != nil {
+			t.Fatalf("scanning group: %v", err)
+		}
+		listed_groups = append(listed_groups, group_name+"/"+type_code+"/"+first_category_name)
+	}
+	want_groups := []string{
+		"食費/food/スーパー・自炊",
+		"日用品/other/生活消耗品",
+		"趣味・娯楽/other/遊び・娯楽",
+		"交通・車両費/other/電車・バス",
+		"自己投資/other/書籍（勉強・実用）",
+		"医療・健康/other/医療費・薬",
+		"固定費/fixed/家賃",
+		"経費精算/excluded/経費立替",
+	}
+	if strings.Join(listed_groups, ", ") != strings.Join(want_groups, ", ") {
+		t.Fatalf("groups = %v, want %v", listed_groups, want_groups)
+	}
 }
 
 func TestPush_AppliesAndPullReturnsRow(t *testing.T) {
@@ -614,7 +686,8 @@ func TestPull_Pagination(t *testing.T) {
 		if !pull_result.HasMore {
 			break
 		}
-		if page_number > 20 {
+		// Each page brings at least one row, so it must end within len(all_rows) pages.
+		if page_number > len(all_rows) {
 			t.Fatal("pagination did not terminate")
 		}
 	}

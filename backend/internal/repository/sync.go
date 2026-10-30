@@ -137,6 +137,9 @@ func (r *Repository) createPersonalLedger(ctx context.Context, user_id int64) er
 	); err != nil {
 		return fmt.Errorf("adding ledger owner: %w", err)
 	}
+	if err := insertDefaultLedgerCategories(ctx, seq_allocator, ledger_id, user_id); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 
