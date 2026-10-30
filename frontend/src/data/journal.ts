@@ -12,6 +12,9 @@ import type { LedgerData } from "./ledgerData";
 // same rules as the server, then stored and queued for push.
 
 export interface StatementTypeView {
+  // The legacy statement_types ID, which equals the display order (1 food …
+  // 4 excluded); screens still pick a type by it.
+  id: number;
   type_code: StatementTypeCode;
   statement_type_name: string;
 }
@@ -67,18 +70,22 @@ export interface JournalEntryFields {
   note: string | null;
 }
 
-const STATEMENT_TYPE_NAME_BY_CODE = new Map(
-  STATEMENT_TYPES.map((statement_type) => [
-    statement_type.type_code,
-    statement_type.statement_type_name,
-  ])
+export const STATEMENT_TYPE_VIEWS: readonly StatementTypeView[] = STATEMENT_TYPES.map(
+  (statement_type) => ({
+    id: statement_type.display_order,
+    type_code: statement_type.type_code,
+    statement_type_name: statement_type.statement_type_name,
+  })
 );
 
-function statementTypeView(type_code: StatementTypeCode): StatementTypeView {
-  return {
-    type_code,
-    statement_type_name: STATEMENT_TYPE_NAME_BY_CODE.get(type_code) ?? type_code,
-  };
+export function statementTypeView(type_code: StatementTypeCode): StatementTypeView {
+  return (
+    STATEMENT_TYPE_VIEWS.find((statement_type) => statement_type.type_code === type_code) ?? {
+      id: 99,
+      type_code,
+      statement_type_name: type_code,
+    }
+  );
 }
 
 function textOrNull(raw_value: SqlValue | undefined): string | null {

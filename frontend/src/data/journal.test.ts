@@ -110,7 +110,7 @@ describe("journal data", () => {
       {
         id: expect.any(String),
         group_name: "食費",
-        statement_type: { type_code: "food", statement_type_name: "食費" },
+        statement_type: { id: 1, type_code: "food", statement_type_name: "食費" },
         description: null,
       },
     ]);

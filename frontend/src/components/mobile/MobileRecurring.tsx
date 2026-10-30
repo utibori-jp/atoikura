@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
 import { T } from "../../theme";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import {
+  commandErrorMessage,
+  useCanEditOnline,
+  useLedgerApi,
+  type PendingRecurringView,
+  type RecurringExpenseFields,
+  type RecurringExpenseView,
+} from "../../data/ledgerApi";
+import type { CategoryGroupView, ExpenseCategoryView } from "../../data/journal";
+import { useDataVersion } from "../../session/sessionHooks";
+import { OnlineEditNotice } from "../OnlineEditNotice";
 import { EmojiPicker } from "../EmojiPicker";
 import { useConfirm } from "../dialogContext";
 import { useEntityForm, type UseEntityForm } from "../forms";
 
-type RecurringExpense = components["schemas"]["RecurringExpense"];
-type PendingRecurring = components["schemas"]["PendingRecurring"];
-type ExpenseCategory = components["schemas"]["ExpenseCategory"];
-type CategoryGroup = components["schemas"]["CategoryGroup"];
+type RecurringExpense = RecurringExpenseView;
+type PendingRecurring = PendingRecurringView;
+type ExpenseCategory = ExpenseCategoryView;
+type CategoryGroup = CategoryGroupView;
 
 const FIXED_STATEMENT_TYPE_ID = 3;
 
@@ -26,7 +35,7 @@ const yenSlim = (n: number) => Math.round(n).toLocaleString("ja-JP");
 
 // Form state for create / edit. id=null means "create mode".
 interface RecurringFormState {
-  id: number | null;
+  id: string | null;
   name: string;
   emoji: string;
   billing_day: string;
@@ -310,14 +319,18 @@ function RecurringSheet({ recurring_form, expense_categories }: RecurringSheetPr
 }
 
 export function MobileRecurring({ onBack }: MobileRecurringProps) {
+  const api = useLedgerApi();
+  const data_version = useDataVersion();
+  const can_edit = useCanEditOnline();
+  const [command_error, setCommandError] = useState("");
   const confirm = useConfirm();
   const [recurring, setRecurring] = useState<RecurringExpense[] | null>(null);
   const [pending, setPending] = useState<PendingRecurring[] | null>(null);
   const [expense_categories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [category_groups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   // Map of pending item id → confirm amount string
-  const [confirm_amounts, setConfirmAmounts] = useState<Record<number, string>>({});
-  const [confirming_id, setConfirmingId] = useState<number | null>(null);
+  const [confirm_amounts, setConfirmAmounts] = useState<Record<string, string>>({});
+  const [confirming_id, setConfirmingId] = useState<string | null>(null);
 
   const currentMonthJST = () =>
     new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(0, 7);
@@ -352,7 +365,7 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
     return () => {
       cancelled = true;
     };
-  }, [ym]);
+  }, [ym, api, data_version]);
 
   const fixed_group_id_set = new Set(
     category_groups.filter((g) => g.statement_type.id === FIXED_STATEMENT_TYPE_ID).map((g) => g.id)
@@ -370,7 +383,7 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
       const parsed_billing_day = parseInt(f.billing_day, 10);
       if (isNaN(parsed_billing_day) || parsed_billing_day < 1 || parsed_billing_day > 31)
         return "引落日を1〜31で入力してください";
-      if (isNaN(parseInt(f.category_id, 10))) return "カテゴリを選択してください";
+      if (!f.category_id) return "カテゴリを選択してください";
       if (f.amount.trim() !== "") {
         const parsed_amount = parseInt(f.amount, 10);
         if (isNaN(parsed_amount) || parsed_amount < 0) return "金額を正しく入力してください";
@@ -378,13 +391,13 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
       return null;
     },
     onSubmit: async (f) => {
-      const request_body: components["schemas"]["RecurringExpenseRequest"] = {
+      const request_body: RecurringExpenseFields = {
         name: f.name.trim(),
         emoji: f.emoji.trim() || DEFAULT_RECURRING_EMOJI,
         billing_day: parseInt(f.billing_day, 10),
         amount: f.amount.trim() !== "" ? parseInt(f.amount, 10) : null,
         type: f.type,
-        category_id: parseInt(f.category_id, 10),
+        category_id: f.category_id,
       };
       if (f.id !== null) {
         await api.updateRecurringExpense(f.id, request_body);
@@ -395,7 +408,7 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
     },
   });
 
-  const handle_delete = async (id: number) => {
+  const handle_delete = async (id: string) => {
     const confirmed = await confirm({
       title: "削除の確認",
       message: "この定期支出を削除しますか？",
@@ -403,8 +416,12 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
       danger: true,
     });
     if (!confirmed) return;
-    await api.deleteRecurringExpense(id).catch(() => {});
-    setRecurring((prev) => (prev ? prev.filter((r) => r.id !== id) : prev));
+    setCommandError("");
+    try {
+      await api.deleteRecurringExpense(id);
+    } catch (delete_error) {
+      setCommandError(commandErrorMessage(delete_error, "削除できませんでした"));
+    }
   };
 
   const handle_confirm = async (pending_item: PendingRecurring) => {
@@ -412,6 +429,7 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
     const confirm_amount = parseInt(amount_str ?? "", 10);
     if (isNaN(confirm_amount) || confirm_amount < 1) return;
     setConfirmingId(pending_item.id);
+    setCommandError("");
     try {
       await api.confirmRecurringExpense(pending_item.id, confirm_amount, ym);
       await refresh_lists();
@@ -420,8 +438,8 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
         delete updated[pending_item.id];
         return updated;
       });
-    } catch {
-      // Silently ignore (e.g. 409 already confirmed)
+    } catch (confirm_error) {
+      setCommandError(commandErrorMessage(confirm_error, "確定できませんでした"));
     } finally {
       setConfirmingId(null);
     }
@@ -459,6 +477,10 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
         <div style={{ fontSize: 13, color: T.inkSoft, marginTop: 2 }}>
           毎月の固定・半固定費を管理
         </div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <OnlineEditNotice can_edit={can_edit} command_error={command_error} />
       </div>
 
       {is_loading && (
@@ -586,7 +608,7 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
                   <button
                     type="button"
                     onClick={() => handle_confirm(p)}
-                    disabled={confirming_id === p.id}
+                    disabled={!can_edit || confirming_id === p.id}
                     style={{
                       flex: 1,
                       border: "none",
@@ -701,6 +723,7 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
                           type="button"
                           aria-label="編集"
                           onClick={() => recurring_form.openEdit(r)}
+                          disabled={!can_edit}
                           style={{
                             width: 30,
                             height: 30,
@@ -721,6 +744,7 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
                           type="button"
                           aria-label="削除"
                           onClick={() => handle_delete(r.id)}
+                          disabled={!can_edit}
                           style={{
                             width: 30,
                             height: 30,
@@ -750,6 +774,7 @@ export function MobileRecurring({ onBack }: MobileRecurringProps) {
       <button
         type="button"
         onClick={recurring_form.openCreate}
+        disabled={!can_edit}
         style={{
           width: "100%",
           marginTop: 16,

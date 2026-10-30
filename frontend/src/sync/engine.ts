@@ -39,6 +39,9 @@ export interface SyncEnvironment {
   // Calls the listener when the device comes back online or the app returns
   // to the foreground. Returns the unsubscribe function.
   onWake(listener: () => void): () => void;
+  // Calls the listener when the device loses its connection, so online-only
+  // edits can be disabled right away. Returns the unsubscribe function.
+  onOffline(listener: () => void): () => void;
 }
 
 export function browserSyncEnvironment(): SyncEnvironment {
@@ -57,6 +60,10 @@ export function browserSyncEnvironment(): SyncEnvironment {
         window.removeEventListener("online", listener);
         document.removeEventListener("visibilitychange", onVisibilityChange);
       };
+    },
+    onOffline: (listener) => {
+      window.addEventListener("offline", listener);
+      return () => window.removeEventListener("offline", listener);
     },
   };
 }
@@ -144,6 +151,7 @@ export class SyncEngine {
     });
     this.teardown_callbacks.push(
       this.environment.onWake(() => void this.syncNow()),
+      this.environment.onOffline(() => void this.refreshCounts({ phase: "offline" })),
       this.store.subscribe((change_event) => {
         if (change_event.source !== "local") return;
         this.scheduleSync(this.local_write_debounce_ms);

@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import {
+  commandErrorMessage,
+  useCanEditOnline,
+  useLedgerApi,
+  type PendingRecurringView,
+  type RecurringExpenseFields,
+  type RecurringExpenseView,
+} from "../../data/ledgerApi";
+import type { CategoryGroupView, ExpenseCategoryView } from "../../data/journal";
+import { useDataVersion } from "../../session/sessionHooks";
+import { OnlineEditNotice } from "../OnlineEditNotice";
 import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
 import { Modal } from "../Modal";
@@ -14,10 +23,10 @@ import {
   FormActions,
 } from "../forms";
 
-type RecurringExpense = components["schemas"]["RecurringExpense"];
-type PendingRecurring = components["schemas"]["PendingRecurring"];
-type ExpenseCategory = components["schemas"]["ExpenseCategory"];
-type CategoryGroup = components["schemas"]["CategoryGroup"];
+type RecurringExpense = RecurringExpenseView;
+type PendingRecurring = PendingRecurringView;
+type ExpenseCategory = ExpenseCategoryView;
+type CategoryGroup = CategoryGroupView;
 
 const FIXED_STATEMENT_TYPE_ID = 3;
 
@@ -39,7 +48,7 @@ type FilterType = "fixed" | "variable" | "all";
 
 // Form state for create / edit. id=null means "create mode".
 interface RecurringFormState {
-  id: number | null;
+  id: string | null;
   name: string;
   emoji: string;
   billing_day: string;
@@ -73,12 +82,16 @@ function recurring_to_form(r: RecurringExpense): RecurringFormState {
 }
 
 export function WebRecurring({ onBack }: Props) {
+  const api = useLedgerApi();
+  const data_version = useDataVersion();
+  const can_edit = useCanEditOnline();
+  const [command_error, setCommandError] = useState("");
   const confirm = useConfirm();
   const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
   const [pending, setPending] = useState<PendingRecurring[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
-  const [confirm_amounts, setConfirmAmounts] = useState<Record<number, string>>({});
-  const [confirming_id, setConfirmingId] = useState<number | null>(null);
+  const [confirm_amounts, setConfirmAmounts] = useState<Record<string, string>>({});
+  const [confirming_id, setConfirmingId] = useState<string | null>(null);
   const [expense_categories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [category_groups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const ym = currentMonthJST();
@@ -111,7 +124,7 @@ export function WebRecurring({ onBack }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [ym]);
+  }, [ym, api, data_version]);
 
   const fixed_group_id_set = new Set(
     category_groups.filter((g) => g.statement_type.id === FIXED_STATEMENT_TYPE_ID).map((g) => g.id)
@@ -127,11 +140,12 @@ export function WebRecurring({ onBack }: Props) {
     return true;
   });
 
-  const handle_confirm = async (id: number) => {
+  const handle_confirm = async (id: string) => {
     const amount_str = confirm_amounts[id];
     const amount = parseInt(amount_str ?? "", 10);
     if (isNaN(amount) || amount < 1) return;
     setConfirmingId(id);
+    setCommandError("");
     try {
       await api.confirmRecurringExpense(id, amount, ym);
       const [rec_res, pend_res] = await Promise.all([
@@ -145,14 +159,14 @@ export function WebRecurring({ onBack }: Props) {
         delete n[id];
         return n;
       });
-    } catch {
-      // ignore
+    } catch (confirm_error) {
+      setCommandError(commandErrorMessage(confirm_error, "確定できませんでした"));
     } finally {
       setConfirmingId(null);
     }
   };
 
-  const handle_delete = async (id: number) => {
+  const handle_delete = async (id: string) => {
     const confirmed = await confirm({
       title: "削除の確認",
       message: "この定期支出を削除しますか？",
@@ -160,8 +174,12 @@ export function WebRecurring({ onBack }: Props) {
       danger: true,
     });
     if (!confirmed) return;
-    await api.deleteRecurringExpense(id).catch(() => {});
-    setRecurring((prev) => prev.filter((r) => r.id !== id));
+    setCommandError("");
+    try {
+      await api.deleteRecurringExpense(id);
+    } catch (delete_error) {
+      setCommandError(commandErrorMessage(delete_error, "削除できませんでした"));
+    }
   };
 
   const recurring_form = useEntityForm<RecurringFormState, RecurringExpense>({
@@ -172,7 +190,7 @@ export function WebRecurring({ onBack }: Props) {
       const parsed_billing_day = parseInt(f.billing_day, 10);
       if (isNaN(parsed_billing_day) || parsed_billing_day < 1 || parsed_billing_day > 31)
         return "引落日を1〜31で入力してください";
-      if (isNaN(parseInt(f.category_id, 10))) return "カテゴリを選択してください";
+      if (!f.category_id) return "カテゴリを選択してください";
       if (f.amount.trim() !== "") {
         const parsed_amount = parseInt(f.amount, 10);
         if (isNaN(parsed_amount) || parsed_amount < 0) return "金額を正しく入力してください";
@@ -180,13 +198,13 @@ export function WebRecurring({ onBack }: Props) {
       return null;
     },
     onSubmit: async (f) => {
-      const request_body: components["schemas"]["RecurringExpenseRequest"] = {
+      const request_body: RecurringExpenseFields = {
         name: f.name.trim(),
         emoji: f.emoji.trim() || DEFAULT_RECURRING_EMOJI,
         billing_day: parseInt(f.billing_day, 10),
         amount: f.amount.trim() !== "" ? parseInt(f.amount, 10) : null,
         type: f.type,
-        category_id: parseInt(f.category_id, 10),
+        category_id: f.category_id,
       };
       if (f.id !== null) {
         await api.updateRecurringExpense(f.id, request_body);
@@ -240,6 +258,7 @@ export function WebRecurring({ onBack }: Props) {
         </div>
         <button
           onClick={recurring_form.openCreate}
+          disabled={!can_edit}
           style={{
             border: "none",
             background: T.coral,
@@ -256,6 +275,8 @@ export function WebRecurring({ onBack }: Props) {
           ＋ 定期支出を追加
         </button>
       </div>
+
+      <OnlineEditNotice can_edit={can_edit} command_error={command_error} />
 
       {/* Create / edit form as a centered modal popup (#131) */}
       {recurring_form.form && (
@@ -463,7 +484,7 @@ export function WebRecurring({ onBack }: Props) {
                   />
                   <button
                     onClick={() => handle_confirm(p.id)}
-                    disabled={confirming_id === p.id}
+                    disabled={!can_edit || confirming_id === p.id}
                     style={{
                       flex: 1,
                       border: "none",
@@ -612,46 +633,48 @@ export function WebRecurring({ onBack }: Props) {
                   >
                     {r.amount ? yen(r.amount) : "—"}
                   </div>
-                  <div
-                    style={{ display: "flex", gap: 4, marginTop: 6, justifyContent: "flex-end" }}
-                  >
-                    <span
-                      onClick={() => recurring_form.openEdit(r)}
-                      style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 8,
-                        background: "#fff",
-                        border: `1px solid ${T.hair}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 12,
-                        color: T.inkSoft,
-                        cursor: "pointer",
-                      }}
+                  {can_edit && (
+                    <div
+                      style={{ display: "flex", gap: 4, marginTop: 6, justifyContent: "flex-end" }}
                     >
-                      ✎
-                    </span>
-                    <span
-                      onClick={() => handle_delete(r.id)}
-                      style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 8,
-                        background: "#fff",
-                        border: `1px solid ${T.hair}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 12,
-                        color: T.inkSoft,
-                        cursor: "pointer",
-                      }}
-                    >
-                      🗑
-                    </span>
-                  </div>
+                      <span
+                        onClick={() => recurring_form.openEdit(r)}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          background: "#fff",
+                          border: `1px solid ${T.hair}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 12,
+                          color: T.inkSoft,
+                          cursor: "pointer",
+                        }}
+                      >
+                        ✎
+                      </span>
+                      <span
+                        onClick={() => handle_delete(r.id)}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          background: "#fff",
+                          border: `1px solid ${T.hair}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 12,
+                          color: T.inkSoft,
+                          cursor: "pointer",
+                        }}
+                      >
+                        🗑
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -659,6 +682,7 @@ export function WebRecurring({ onBack }: Props) {
         </div>
         <button
           onClick={recurring_form.openCreate}
+          disabled={!can_edit}
           style={{
             width: "100%",
             marginTop: 16,

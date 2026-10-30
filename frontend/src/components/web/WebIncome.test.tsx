@@ -1,202 +1,108 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import type { ReactElement } from "react";
-import { http, HttpResponse } from "msw";
-import { server } from "../../test/server";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { todayInJst } from "../../logic";
+import {
+  putIncomeRecord,
+  putSavingsGoal,
+  putSurplusAllocation,
+  seedPersonalLedger,
+  TestLedgerServer,
+} from "../../test/ledgerFixtures";
+import { renderWithLedger } from "../../test/renderWithLedger";
 import { WebIncome } from "./WebIncome";
-import { DialogProvider } from "../dialogs";
-import type { components } from "../../api/types";
 
-// WebIncome consumes the confirm dialog via context (#166).
-function renderWithDialogs(ui: ReactElement) {
-  return render(<DialogProvider>{ui}</DialogProvider>);
+const current_month = todayInJst().slice(0, 7);
+
+function incomeLedgerServer({ base_income_amount = 280000 } = {}) {
+  const ledger_server = new TestLedgerServer();
+  seedPersonalLedger(ledger_server, { base_income_amount });
+  return ledger_server;
 }
 
-const API_BASE = "http://localhost:8080";
-
-// --- fixture helpers ---
-
-function makeIncomeRecord(
-  overrides: Partial<components["schemas"]["IncomeRecord"]> = {}
-): components["schemas"]["IncomeRecord"] {
-  return {
-    id: 1,
-    name: "6月給与",
-    emoji: "🏢",
-    amount: 280000,
-    transaction_date: "2026-06-25",
-    income_type: "salary",
-    note: "",
-    ...overrides,
-  };
+async function renderIncome(ledger_server: TestLedgerServer) {
+  const rendered = await renderWithLedger(<WebIncome onBack={() => {}} />, ledger_server);
+  // The subtitle is always rendered; wait for the base income so the data has loaded.
+  expect(
+    await screen.findByText("基準と余剰を分けて管理します", undefined, { timeout: 5000 })
+  ).toBeInTheDocument();
+  return rendered;
 }
-
-function makeIncomeList(
-  items: components["schemas"]["IncomeRecord"][]
-): components["schemas"]["IncomeRecordListResponse"] {
-  return { income_records: items };
-}
-
-const defaultBaseIncome: components["schemas"]["BaseIncomeSetting"] = {
-  amount: 280000,
-};
-
-// Override income-records + base-income for each test
-function useDefaultHandlers(
-  incomeList: components["schemas"]["IncomeRecordListResponse"] = makeIncomeList([])
-) {
-  server.use(
-    http.get(`${API_BASE}/income-records`, () => HttpResponse.json(incomeList)),
-    http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome))
-  );
-}
-
-// Helper: wait until the page subtitle is present (always rendered, unique text).
-async function waitForReady() {
-  await waitFor(() => {
-    expect(screen.getByText("基準と余剰を分けて管理します")).toBeInTheDocument();
-  });
-}
-
-// --- tests ---
 
 describe("WebIncome — create form", () => {
   it("opens the create form when ＋ 収入を記録 is clicked", async () => {
-    useDefaultHandlers();
-
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
+    await renderIncome(incomeLedgerServer());
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
 
-    // Form title "収入を記録" appears inside the inline form
     expect(screen.getByText("収入を記録")).toBeInTheDocument();
-    // Name input placeholder
     expect(screen.getByPlaceholderText("6月給与")).toBeInTheDocument();
   });
 
-  it("calls POST /income-records and refreshes list on submit", async () => {
-    const created_record = makeIncomeRecord({
-      id: 99,
-      name: "副業収入",
-      emoji: "💻",
-      amount: 50000,
-    });
+  it("creates the record with a ledger command and shows it", async () => {
+    const ledger_server = incomeLedgerServer();
+    await renderIncome(ledger_server);
 
-    let post_called = false;
-    server.use(
-      http.get(`${API_BASE}/income-records`, () => {
-        // Return the new record only after POST has been called (simulates refresh)
-        if (post_called) {
-          return HttpResponse.json(makeIncomeList([created_record]));
-        }
-        return HttpResponse.json(makeIncomeList([]));
-      }),
-      http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
-      http.post(`${API_BASE}/income-records`, async () => {
-        post_called = true;
-        return HttpResponse.json(created_record, { status: 201 });
-      })
-    );
-
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
-
-    // Open create form
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
-
-    // Fill required fields
     fireEvent.change(screen.getByPlaceholderText("6月給与"), { target: { value: "副業収入" } });
     fireEvent.change(screen.getByPlaceholderText("🏢"), { target: { value: "💻" } });
     fireEvent.change(screen.getByPlaceholderText("280000"), { target: { value: "50000" } });
-
-    // Submit
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
-    // After save, form heading should close and income record should appear
-    await waitFor(() => {
-      const matches = screen.getAllByText("副業収入");
-      expect(matches.length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.queryByText("収入を記録")).not.toBeInTheDocument());
+    expect((await screen.findAllByText("副業収入")).length).toBeGreaterThan(0);
+    expect(ledger_server.recorded_commands[0]).toMatchObject({
+      method: "POST",
+      path: "income-records",
+      request_body: {
+        name: "副業収入",
+        emoji: "💻",
+        amount: 50000,
+        transaction_date: `${current_month}-01`,
+        income_type: "salary",
+      },
     });
-
-    // Form heading should no longer be visible
-    expect(screen.queryByText("収入を記録")).not.toBeInTheDocument();
   });
 
   it("shows validation error when name is empty", async () => {
-    useDefaultHandlers();
-
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
+    await renderIncome(incomeLedgerServer());
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
-
-    // Submit without filling name
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     expect(screen.getByText("名前を入力してください")).toBeInTheDocument();
   });
 
   it("submits the default emoji when the emoji field is untouched", async () => {
-    let posted_body: components["schemas"]["IncomeRecordRequest"] | null = null;
-    server.use(
-      http.get(`${API_BASE}/income-records`, () => HttpResponse.json(makeIncomeList([]))),
-      http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
-      http.post(`${API_BASE}/income-records`, async ({ request }) => {
-        posted_body = (await request.json()) as components["schemas"]["IncomeRecordRequest"];
-        return HttpResponse.json(makeIncomeRecord(), { status: 201 });
-      })
-    );
-
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
+    const ledger_server = incomeLedgerServer();
+    await renderIncome(ledger_server);
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
-
-    // Fill only the non-emoji required fields, then submit.
     fireEvent.change(screen.getByPlaceholderText("6月給与"), { target: { value: "給与" } });
     fireEvent.change(screen.getByPlaceholderText("280000"), { target: { value: "5000" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
-    await waitFor(() => expect(posted_body).not.toBeNull());
-    expect(posted_body).toMatchObject({ emoji: "🏢" });
+    await waitFor(() => expect(ledger_server.recorded_commands).toHaveLength(1));
+    expect(ledger_server.recorded_commands[0].request_body).toMatchObject({ emoji: "🏢" });
   });
 
   it("lets the user pick a different emoji from the list", async () => {
-    let posted_body: components["schemas"]["IncomeRecordRequest"] | null = null;
-    server.use(
-      http.get(`${API_BASE}/income-records`, () => HttpResponse.json(makeIncomeList([]))),
-      http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
-      http.post(`${API_BASE}/income-records`, async ({ request }) => {
-        posted_body = (await request.json()) as components["schemas"]["IncomeRecordRequest"];
-        return HttpResponse.json(makeIncomeRecord(), { status: 201 });
-      })
-    );
-
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
+    const ledger_server = incomeLedgerServer();
+    await renderIncome(ledger_server);
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
-
     fireEvent.change(screen.getByPlaceholderText("6月給与"), { target: { value: "給与" } });
     fireEvent.change(screen.getByPlaceholderText("280000"), { target: { value: "5000" } });
-    // Choose a non-default emoji from the picker.
     fireEvent.click(screen.getByRole("button", { name: "💼" }));
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
-    await waitFor(() => expect(posted_body).not.toBeNull());
-    expect(posted_body).toMatchObject({ emoji: "💼" });
+    await waitFor(() => expect(ledger_server.recorded_commands).toHaveLength(1));
+    expect(ledger_server.recorded_commands[0].request_body).toMatchObject({ emoji: "💼" });
   });
 
   it("shows validation error when amount is zero or invalid", async () => {
-    useDefaultHandlers();
-
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
+    await renderIncome(incomeLedgerServer());
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
-
     fireEvent.change(screen.getByPlaceholderText("6月給与"), { target: { value: "給与" } });
-    fireEvent.change(screen.getByPlaceholderText("🏢"), { target: { value: "🏢" } });
     fireEvent.change(screen.getByPlaceholderText("280000"), { target: { value: "0" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
@@ -204,10 +110,7 @@ describe("WebIncome — create form", () => {
   });
 
   it("closes the form when キャンセル is clicked", async () => {
-    useDefaultHandlers();
-
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
+    await renderIncome(incomeLedgerServer());
 
     fireEvent.click(screen.getByRole("button", { name: /収入を記録/ }));
     expect(screen.getByText("収入を記録")).toBeInTheDocument();
@@ -217,274 +120,165 @@ describe("WebIncome — create form", () => {
   });
 });
 
-describe("WebIncome — edit form", () => {
-  it("opens the edit form pre-filled when ✎ is clicked", async () => {
-    const existing_record = makeIncomeRecord();
-
-    server.use(
-      http.get(`${API_BASE}/income-records`, () =>
-        HttpResponse.json(makeIncomeList([existing_record]))
-      ),
-      http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome))
-    );
-
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-
-    // Wait for record to render
-    await waitFor(() => {
-      expect(screen.getByText("6月給与")).toBeInTheDocument();
+describe("WebIncome — edit and delete", () => {
+  function ledgerServerWithRecord() {
+    const ledger_server = incomeLedgerServer();
+    const income_id = putIncomeRecord(ledger_server, {
+      transaction_date: `${current_month}-25`,
+      amount: 280000,
+      name: "6月給与",
     });
+    return { ledger_server, income_id };
+  }
 
-    // Click the edit icon (✎) for the income record
-    fireEvent.click(screen.getByText("✎"));
+  it("opens the edit form pre-filled when ✎ is clicked", async () => {
+    await renderIncome(ledgerServerWithRecord().ledger_server);
+
+    fireEvent.click(await screen.findByText("✎"));
 
     expect(screen.getByText("収入記録を編集")).toBeInTheDocument();
-
-    // Name input should be pre-filled with existing value
     expect(screen.getByDisplayValue("6月給与")).toBeInTheDocument();
-    // Amount should be pre-filled
     expect(screen.getByDisplayValue("280000")).toBeInTheDocument();
   });
 
-  it("calls PUT /income-records/:id and refreshes list on submit", async () => {
-    const existing_record = makeIncomeRecord();
-    const updated_record = makeIncomeRecord({ name: "7月給与", amount: 300000 });
+  it("updates the record with a ledger command and shows the new name", async () => {
+    const { ledger_server, income_id } = ledgerServerWithRecord();
+    await renderIncome(ledger_server);
 
-    let put_called = false;
-    server.use(
-      http.get(`${API_BASE}/income-records`, () => {
-        if (put_called) return HttpResponse.json(makeIncomeList([updated_record]));
-        return HttpResponse.json(makeIncomeList([existing_record]));
-      }),
-      http.get(`${API_BASE}/base-income`, () => HttpResponse.json(defaultBaseIncome)),
-      http.put(`${API_BASE}/income-records/1`, async () => {
-        put_called = true;
-        return HttpResponse.json(updated_record);
-      })
-    );
-
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("6月給与")).toBeInTheDocument();
-    });
-
-    // Open edit form
-    fireEvent.click(screen.getByText("✎"));
-
-    await waitFor(() => {
-      expect(screen.getByText("収入記録を編集")).toBeInTheDocument();
-    });
-
-    // Change name via the pre-filled input
-    const name_input = screen.getByDisplayValue("6月給与");
-    fireEvent.change(name_input, { target: { value: "7月給与" } });
-
-    // Submit
+    fireEvent.click(await screen.findByText("✎"));
+    fireEvent.change(screen.getByDisplayValue("6月給与"), { target: { value: "7月給与" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
-    // After save, updated record name should appear and form should close
-    await waitFor(() => {
-      expect(screen.getAllByText("7月給与").length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.queryByText("収入記録を編集")).not.toBeInTheDocument());
+    expect((await screen.findAllByText("7月給与")).length).toBeGreaterThan(0);
+    expect(ledger_server.recorded_commands[0]).toMatchObject({
+      method: "PUT",
+      path: `income-records/${income_id}`,
     });
+  });
 
-    expect(screen.queryByText("収入記録を編集")).not.toBeInTheDocument();
+  it("deletes the record with a ledger command after confirmation", async () => {
+    const { ledger_server, income_id } = ledgerServerWithRecord();
+    await renderIncome(ledger_server);
+
+    fireEvent.click(await screen.findByText("🗑"));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", { name: "削除" })
+    );
+
+    await waitFor(() => expect(screen.queryByText("6月給与")).not.toBeInTheDocument());
+    expect(ledger_server.recorded_commands).toEqual([
+      { method: "DELETE", path: `income-records/${income_id}`, request_body: null },
+    ]);
+  });
+
+  it("hides the edit actions and explains why while offline", async () => {
+    const { app_services } = await renderIncome(ledgerServerWithRecord().ledger_server);
+    expect(await screen.findByText("✎")).toBeInTheDocument();
+
+    app_services.sync_environment.setOnline(false);
+
+    expect(
+      await screen.findByText("オフラインのため閲覧のみです。接続すると編集できます")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("✎")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /収入を記録/ })).toBeDisabled();
+    expect(screen.getByText("6月給与")).toBeInTheDocument();
   });
 });
 
-// ── WebIncome — surplus allocation ───────────────────────────────────────────
-
-const sample_savings_goal: components["schemas"]["SavingsGoal"] = {
-  id: 10,
-  name: "旅行積立",
-  emoji: "✈️",
-  monthly_amount: 20000,
-  target_amount: 250000,
-  accumulated_amount: 170000,
-  deadline: null,
-  memo: "",
-  is_posted_this_month: false,
-};
-
 describe("WebIncome — surplus allocation", () => {
-  function setup_allocation_handlers(
-    income_amount: number,
-    base_amount: number,
-    allocations: components["schemas"]["SurplusAllocation"][] = []
-  ) {
-    server.use(
-      http.get(`${API_BASE}/income-records`, () =>
-        HttpResponse.json(makeIncomeList([makeIncomeRecord({ amount: income_amount })]))
-      ),
-      http.get(`${API_BASE}/base-income`, () => HttpResponse.json({ amount: base_amount })),
-      http.get(`${API_BASE}/savings-goals`, () =>
-        HttpResponse.json({ savings_goals: [sample_savings_goal] })
-      ),
-      http.get(`${API_BASE}/surplus-allocations`, () =>
-        HttpResponse.json({ surplus_allocations: allocations })
-      )
-    );
+  // Income 330,000 over a base of 280,000 leaves a surplus of 50,000.
+  function surplusLedgerServer() {
+    const ledger_server = incomeLedgerServer({ base_income_amount: 280000 });
+    putIncomeRecord(ledger_server, { transaction_date: `${current_month}-25`, amount: 330000 });
+    const goal_id = putSavingsGoal(ledger_server, { name: "旅行積立" });
+    return { ledger_server, goal_id };
   }
 
   it("shows 未振分 badge when there is unallocated surplus", async () => {
-    setup_allocation_handlers(330000, 280000, []);
+    await renderIncome(surplusLedgerServer().ledger_server);
 
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
-
-    expect(screen.getByText("未振分")).toBeInTheDocument();
+    expect(await screen.findByText("未振分")).toBeInTheDocument();
   });
 
   it("hides 未振分 badge when surplus is fully allocated", async () => {
-    setup_allocation_handlers(330000, 280000, [
-      {
-        id: 1,
-        year_month: "2026-06",
-        amount: 50000,
-        destination: "budget",
-        savings_goal_id: null,
-        created_at: "2026-06-13T10:00:00+09:00",
-      },
-    ]);
+    const { ledger_server } = surplusLedgerServer();
+    putSurplusAllocation(ledger_server, {
+      year_month: current_month,
+      amount: 50000,
+      destination: "budget",
+    });
+    await renderIncome(ledger_server);
 
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
-
+    expect((await screen.findAllByText(/330,000/)).length).toBeGreaterThan(0);
     expect(screen.queryByText("未振分")).not.toBeInTheDocument();
   });
 
   it("opens allocation form when 振り分ける → is clicked", async () => {
-    setup_allocation_handlers(330000, 280000, []);
+    await renderIncome(surplusLedgerServer().ledger_server);
 
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
-
-    fireEvent.click(screen.getByRole("button", { name: "振り分ける →" }));
+    fireEvent.click(await screen.findByRole("button", { name: "振り分ける →" }));
 
     expect(screen.getByText("余剰を振り分ける")).toBeInTheDocument();
   });
 
-  it("POSTs with destination:budget when budget is selected", async () => {
-    let posted_body: unknown = null;
-    let alloc_fetched_after = false;
-    server.use(
-      http.get(`${API_BASE}/income-records`, () =>
-        HttpResponse.json(makeIncomeList([makeIncomeRecord({ amount: 330000 })]))
-      ),
-      http.get(`${API_BASE}/base-income`, () => HttpResponse.json({ amount: 280000 })),
-      http.get(`${API_BASE}/savings-goals`, () =>
-        HttpResponse.json({ savings_goals: [sample_savings_goal] })
-      ),
-      http.get(`${API_BASE}/surplus-allocations`, () => {
-        if (alloc_fetched_after) {
-          return HttpResponse.json({
-            surplus_allocations: [
-              {
-                id: 1,
-                year_month: "2026-06",
-                amount: 10000,
-                destination: "budget",
-                savings_goal_id: null,
-                created_at: "2026-06-13T10:00:00+09:00",
-              },
-            ],
-          });
-        }
-        return HttpResponse.json({ surplus_allocations: [] });
-      }),
-      http.post(`${API_BASE}/surplus-allocations`, async ({ request }) => {
-        posted_body = await request.json();
-        alloc_fetched_after = true;
-        return HttpResponse.json(
-          {
-            id: 1,
-            year_month: "2026-06",
-            amount: 10000,
-            destination: "budget",
-            savings_goal_id: null,
-            created_at: "2026-06-13T10:00:00+09:00",
-          },
-          { status: 201 }
-        );
-      })
-    );
+  it("allocates to the budget with a ledger command", async () => {
+    const { ledger_server } = surplusLedgerServer();
+    await renderIncome(ledger_server);
 
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
-
-    fireEvent.click(screen.getByRole("button", { name: "振り分ける →" }));
-    expect(screen.getByText("余剰を振り分ける")).toBeInTheDocument();
-
-    // Enter amount
+    fireEvent.click(await screen.findByRole("button", { name: "振り分ける →" }));
     fireEvent.change(screen.getByPlaceholderText("50000"), { target: { value: "10000" } });
-
-    // Select budget destination
     fireEvent.click(screen.getByRole("button", { name: "今月の予算に追加" }));
-
-    // Submit
     fireEvent.click(screen.getByRole("button", { name: "振り分ける" }));
 
-    await waitFor(() => expect(posted_body).not.toBeNull());
-    expect(posted_body).toMatchObject({
-      year_month: expect.stringMatching(/^\d{4}-\d{2}$/),
-      amount: 10000,
-      destination: "budget",
-    });
-
-    // Form closes after allocation
     await waitFor(() => expect(screen.queryByText("余剰を振り分ける")).not.toBeInTheDocument());
+    expect(ledger_server.recorded_commands).toEqual([
+      {
+        method: "POST",
+        path: "surplus-allocations",
+        request_body: { year_month: current_month, amount: 10000, destination: "budget" },
+      },
+    ]);
   });
 
-  it("POSTs with savings_goal_id when savings destination is selected", async () => {
-    let posted_body: unknown = null;
-    server.use(
-      http.get(`${API_BASE}/income-records`, () =>
-        HttpResponse.json(makeIncomeList([makeIncomeRecord({ amount: 330000 })]))
-      ),
-      http.get(`${API_BASE}/base-income`, () => HttpResponse.json({ amount: 280000 })),
-      http.get(`${API_BASE}/savings-goals`, () =>
-        HttpResponse.json({ savings_goals: [sample_savings_goal] })
-      ),
-      http.get(`${API_BASE}/surplus-allocations`, () =>
-        HttpResponse.json({ surplus_allocations: [] })
-      ),
-      http.post(`${API_BASE}/surplus-allocations`, async ({ request }) => {
-        posted_body = await request.json();
-        return HttpResponse.json(
-          {
-            id: 2,
-            year_month: "2026-06",
-            amount: 20000,
-            destination: "savings",
-            savings_goal_id: 10,
-            created_at: "2026-06-13T10:00:00+09:00",
-          },
-          { status: 201 }
-        );
-      })
-    );
+  it("allocates to a savings goal with its id", async () => {
+    const { ledger_server, goal_id } = surplusLedgerServer();
+    await renderIncome(ledger_server);
 
-    renderWithDialogs(<WebIncome onBack={() => {}} />);
-    await waitForReady();
-
-    fireEvent.click(screen.getByRole("button", { name: "振り分ける →" }));
-
-    // Set amount
+    fireEvent.click(await screen.findByRole("button", { name: "振り分ける →" }));
     fireEvent.change(screen.getByPlaceholderText("50000"), { target: { value: "20000" } });
-
-    // savings is default — select the goal from the dropdown
-    const goal_select = screen.getByRole("combobox");
-    fireEvent.change(goal_select, { target: { value: "10" } });
-
-    // Submit
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: goal_id } });
     fireEvent.click(screen.getByRole("button", { name: "振り分ける" }));
 
-    await waitFor(() => expect(posted_body).not.toBeNull());
-    expect(posted_body).toMatchObject({
-      year_month: expect.stringMatching(/^\d{4}-\d{2}$/),
-      amount: 20000,
-      destination: "savings",
-      savings_goal_id: 10,
+    await waitFor(() => expect(ledger_server.recorded_commands).toHaveLength(1));
+    expect(ledger_server.recorded_commands[0]).toEqual({
+      method: "POST",
+      path: "surplus-allocations",
+      request_body: {
+        year_month: current_month,
+        amount: 20000,
+        destination: "savings",
+        savings_goal_id: goal_id,
+      },
+    });
+  });
+});
+
+describe("WebIncome — base income", () => {
+  it("updates the base income with a ledger command", async () => {
+    const ledger_server = incomeLedgerServer({ base_income_amount: 280000 });
+    await renderIncome(ledger_server);
+
+    fireEvent.click(await screen.findByRole("button", { name: /編集/ }));
+    fireEvent.change(screen.getByDisplayValue("280000"), { target: { value: "300000" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(ledger_server.recorded_commands).toHaveLength(1));
+    expect(ledger_server.recorded_commands[0]).toEqual({
+      method: "PUT",
+      path: "base-income",
+      request_body: { amount: 300000 },
     });
   });
 });

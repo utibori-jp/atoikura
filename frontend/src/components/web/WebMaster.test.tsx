@@ -1,110 +1,139 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import type { ReactElement } from "react";
-import { http, HttpResponse } from "msw";
-import { server } from "../../test/server";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  FOOD_GROUP_ID,
+  seedPersonalLedger,
+  SUPERMARKET_CATEGORY_ID,
+  TestLedgerServer,
+} from "../../test/ledgerFixtures";
+import { renderWithLedger } from "../../test/renderWithLedger";
 import { WebMaster } from "./WebMaster";
-import { DialogProvider } from "../dialogs";
-import type { components } from "../../api/types";
 
-// WebMaster consumes the confirm/alert dialogs via context (#166).
-function renderWithDialogs(ui: ReactElement) {
-  return render(<DialogProvider>{ui}</DialogProvider>);
+function seededLedgerServer() {
+  const ledger_server = new TestLedgerServer();
+  seedPersonalLedger(ledger_server);
+  return ledger_server;
 }
 
-const API_BASE = "http://localhost:8080";
-
-function makeGroups(): components["schemas"]["CategoryGroupListResponse"] {
-  return {
-    category_groups: [
-      {
-        id: 1,
-        group_name: "食費",
-        statement_type: { id: 1, type_code: "food", statement_type_name: "食費（変動費）" },
-        description: null,
-      },
-    ],
-  };
+async function renderMaster(ledger_server: TestLedgerServer = seededLedgerServer()) {
+  const rendered = await renderWithLedger(<WebMaster />, ledger_server);
+  // Wait for the loaded group count, not just the static "大分類（" label.
+  expect(
+    await screen.findByText("大分類（1件）", undefined, { timeout: 5000 })
+  ).toBeInTheDocument();
+  return rendered;
 }
 
-function makeCategories(): components["schemas"]["ExpenseCategoryListResponse"] {
-  return {
-    expense_categories: [
-      {
-        id: 1,
-        category_name: "スーパー",
-        category_code: "food_super",
-        group_id: 1,
-        group_name: "食費",
-        description: null,
-      },
-    ],
-  };
-}
-
-function makeStatementTypes() {
-  return {
-    statement_types: [{ id: 1, type_code: "food", statement_type_name: "食費（変動費）" }],
-  };
-}
-
-function useDefaultHandlers() {
-  server.use(
-    http.get(`${API_BASE}/category-groups`, () => HttpResponse.json(makeGroups())),
-    http.get(`${API_BASE}/expense-categories`, () => HttpResponse.json(makeCategories())),
-    http.get(`${API_BASE}/statement-types`, () => HttpResponse.json(makeStatementTypes()))
-  );
-}
-
-async function waitForReady() {
-  // Wait for the loaded group count, not just the static "大分類（" label, so the
-  // fetched groups/categories have actually rendered before assertions run.
-  await waitFor(() => expect(screen.getByText("大分類（1件）")).toBeInTheDocument());
+function perGroupAddButton(): HTMLElement {
+  const per_group_add = screen
+    .getAllByRole("button")
+    .find((button_element) => button_element.textContent?.trim() === "＋ 追加");
+  if (!per_group_add) throw new Error("no per-group ＋ 追加 button");
+  return per_group_add;
 }
 
 describe("WebMaster — forms as modals (#130)", () => {
   it("no longer renders the redundant top-right ＋ 生活区分を追加 button", async () => {
-    useDefaultHandlers();
-    renderWithDialogs(<WebMaster />);
-    await waitForReady();
+    await renderMaster();
 
-    // Switch to the 生活区分 tab where the removed button used to live.
     fireEvent.click(screen.getByRole("button", { name: "生活区分" }));
 
     expect(screen.queryByRole("button", { name: /生活区分を追加/ })).not.toBeInTheDocument();
-    // The per-group add path still exists.
-    expect(screen.getAllByRole("button").some((b) => b.textContent?.trim() === "＋ 追加")).toBe(
-      true
-    );
+    expect(perGroupAddButton()).toBeInTheDocument();
   });
 
   it("opens the 大分類 create form as a dialog from ＋ 大分類を追加", async () => {
-    useDefaultHandlers();
-    renderWithDialogs(<WebMaster />);
-    await waitForReady();
+    await renderMaster();
 
     fireEvent.click(screen.getByRole("button", { name: /大分類を追加/ }));
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("大分類を追加")).toBeInTheDocument();
-    // Closes via the Modal close button.
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
   it("opens the 生活区分 create form as a dialog from a per-group ＋ 追加", async () => {
-    useDefaultHandlers();
-    renderWithDialogs(<WebMaster />);
-    await waitForReady();
+    await renderMaster();
 
-    // The per-group ＋ 追加 button lives on the 生活区分 tab.
     fireEvent.click(screen.getByRole("button", { name: "生活区分" }));
-    const per_group_add = screen
-      .getAllByRole("button")
-      .find((b) => b.textContent?.trim() === "＋ 追加");
-    expect(per_group_add).toBeDefined();
-    fireEvent.click(per_group_add!);
+    fireEvent.click(perGroupAddButton());
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("生活区分を追加")).toBeInTheDocument();
+  });
+});
+
+describe("WebMaster — ledger commands", () => {
+  it("creates a group with the statement type code for the chosen type", async () => {
+    const ledger_server = seededLedgerServer();
+    await renderMaster(ledger_server);
+
+    fireEvent.click(screen.getByRole("button", { name: /大分類を追加/ }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByPlaceholderText("食費"), { target: { value: "住居" } });
+    fireEvent.change(within(dialog).getByRole("combobox"), { target: { value: "3" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    expect(await screen.findByText("大分類（2件）")).toBeInTheDocument();
+    expect(ledger_server.recorded_commands).toEqual([
+      {
+        method: "POST",
+        path: "category-groups",
+        request_body: { name: "住居", statement_type_code: "fixed", description: null },
+      },
+    ]);
+  });
+
+  it("adds a category to the group without a category code", async () => {
+    const ledger_server = seededLedgerServer();
+    await renderMaster(ledger_server);
+
+    fireEvent.click(screen.getByRole("button", { name: "生活区分" }));
+    fireEvent.click(perGroupAddButton());
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).queryByText("コード")).not.toBeInTheDocument();
+    fireEvent.change(within(dialog).getByPlaceholderText("外食"), { target: { value: "外食" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    expect(await screen.findByText("外食")).toBeInTheDocument();
+    expect(ledger_server.recorded_commands).toEqual([
+      {
+        method: "POST",
+        path: "expense-categories",
+        request_body: { group_id: FOOD_GROUP_ID, name: "外食", description: null },
+      },
+    ]);
+  });
+
+  it("shows the server's reason when a delete is refused", async () => {
+    const ledger_server = seededLedgerServer();
+    await renderMaster(ledger_server);
+    ledger_server.rejectNextCommand(409, "in_use", "使用中の生活区分は削除できません");
+
+    fireEvent.click(screen.getByRole("button", { name: "生活区分" }));
+    fireEvent.click(await screen.findByText("🗑"));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", { name: "削除" })
+    );
+
+    expect(await screen.findByText("使用中の生活区分は削除できません")).toBeInTheDocument();
+    expect(ledger_server.recorded_commands).toEqual([
+      {
+        method: "DELETE",
+        path: `expense-categories/${SUPERMARKET_CATEGORY_ID}`,
+        request_body: null,
+      },
+    ]);
+  });
+
+  it("disables editing while offline", async () => {
+    const { app_services } = await renderMaster();
+
+    app_services.sync_environment.setOnline(false);
+
+    expect(
+      await screen.findByText("オフラインのため閲覧のみです。接続すると編集できます")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /大分類を追加/ })).toBeDisabled();
   });
 });

@@ -1,137 +1,71 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
-import { server } from "../../test/server";
+import { screen } from "@testing-library/react";
+import { todayInJst } from "../../logic";
+import {
+  putIncomeRecord,
+  putJournalEntry,
+  putRecurringExpense,
+  putSavingsGoal,
+  seedFixedCategory,
+  seedPersonalLedger,
+  TestLedgerServer,
+} from "../../test/ledgerFixtures";
+import { renderWithLedger } from "../../test/renderWithLedger";
 import { WebBudget } from "./WebBudget";
-import type { components } from "../../api/types";
 
-const API_BASE = "http://localhost:8080";
+const current_month = todayInJst().slice(0, 7);
 
-function makeBudgetSummary(
-  overrides: Partial<components["schemas"]["BudgetSummaryResponse"]> = {}
-): components["schemas"]["BudgetSummaryResponse"] {
-  const current_ym = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(0, 7);
-  return {
-    income_total: 300000,
-    base_income: 300000,
-    recurring_total: 80000,
-    savings_total: 20000,
-    variable_budget: 200000,
-    daily_budget: 6666,
-    days_remaining: 18,
-    history: [
-      { year_month: "2026-04", budget: 195000, actual: 180000 },
-      { year_month: "2026-05", budget: 198000, actual: 210000 },
-      { year_month: current_ym, budget: 200000, actual: 50000 },
-    ],
-    ...overrides,
-  };
+// Base income 300,000 − fixed recurring 80,000 − savings 20,000 = variable budget 200,000.
+function budgetLedgerServer({ month_spending = 0, base_income_amount = 300000 } = {}) {
+  const ledger_server = new TestLedgerServer();
+  seedPersonalLedger(ledger_server, { base_income_amount });
+  seedFixedCategory(ledger_server);
+  putRecurringExpense(ledger_server, { amount: 80000, type: "fixed" });
+  putSavingsGoal(ledger_server, { monthly_amount: 20000 });
+  if (month_spending > 0) {
+    putJournalEntry(ledger_server, {
+      transaction_date: `${current_month}-01`,
+      amount: month_spending,
+    });
+  }
+  return ledger_server;
 }
 
-const emptyRecurring: components["schemas"]["RecurringExpenseListResponse"] = {
-  recurring_expenses: [],
-};
-const emptyGoals: components["schemas"]["SavingsGoalListResponse"] = { savings_goals: [] };
-const emptyIncome: components["schemas"]["IncomeRecordListResponse"] = { income_records: [] };
+async function renderBudget(ledger_server: TestLedgerServer) {
+  await renderWithLedger(<WebBudget onNavigate={() => {}} />, ledger_server);
+  expect(
+    await screen.findByText("今月の予算プラン", undefined, { timeout: 5000 })
+  ).toBeInTheDocument();
+}
 
-describe("WebBudget — spending data from history", () => {
-  it("shows 消化ペース derived from current-month actual, not 0%", async () => {
-    // With actual=50000 and variable_budget=200000, spent_pct should be 25%
-    server.use(
-      http.get(`${API_BASE}/budget-summary`, () => HttpResponse.json(makeBudgetSummary())),
-      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(emptyRecurring)),
-      http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(emptyGoals)),
-      http.get(`${API_BASE}/income-records`, () => HttpResponse.json(emptyIncome))
-    );
-
-    render(<WebBudget onNavigate={() => {}} />);
-
-    await waitFor(() => {
-      // The component renders the budget plan heading once loaded
-      expect(screen.getByText("今月の予算プラン")).toBeInTheDocument();
-    });
+describe("WebBudget — spending from the local database", () => {
+  it("shows 消化ペース derived from this month's spending", async () => {
+    await renderBudget(budgetLedgerServer({ month_spending: 50000 }));
 
     // spent_pct = round(50000 / 200000 * 100) = 25
     expect(screen.getByText("25%")).toBeInTheDocument();
   });
 
-  it("shows correct 残り (remaining) based on actual spending", async () => {
-    // variable_budget=200000, actual=50000 → remaining=150000
-    server.use(
-      http.get(`${API_BASE}/budget-summary`, () => HttpResponse.json(makeBudgetSummary())),
-      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(emptyRecurring)),
-      http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(emptyGoals)),
-      http.get(`${API_BASE}/income-records`, () => HttpResponse.json(emptyIncome))
-    );
+  it("shows 残り based on this month's spending", async () => {
+    await renderBudget(budgetLedgerServer({ month_spending: 50000 }));
 
-    render(<WebBudget onNavigate={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("今月の予算プラン")).toBeInTheDocument();
-    });
-
-    // remaining = 200000 - 50000 = 150000 → formatted as "¥150,000"
     expect(screen.getByText(/残り ¥150,000/)).toBeInTheDocument();
   });
 
-  it("shows 0% when current month has no actual spending recorded", async () => {
-    const current_ym = new Date()
-      .toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" })
-      .slice(0, 7);
-
-    server.use(
-      http.get(`${API_BASE}/budget-summary`, () =>
-        HttpResponse.json(
-          makeBudgetSummary({
-            history: [{ year_month: current_ym, budget: 200000, actual: 0 }],
-          })
-        )
-      ),
-      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(emptyRecurring)),
-      http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(emptyGoals)),
-      http.get(`${API_BASE}/income-records`, () => HttpResponse.json(emptyIncome))
-    );
-
-    render(<WebBudget onNavigate={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("今月の予算プラン")).toBeInTheDocument();
-    });
+  it("shows 0% when this month has no spending", async () => {
+    await renderBudget(budgetLedgerServer());
 
     expect(screen.getByText("0%")).toBeInTheDocument();
   });
 
-  // #119 follow-up: the budget breakdown must show 基準収入 (base income), not the
-  // actual recorded income (income_total), since the budget is derived from base income.
+  // #119 follow-up: the breakdown shows 基準収入 (base income), not the recorded
+  // income, since the budget is derived from base income.
   it("shows base income (基準収入) in the breakdown, not actual recorded income", async () => {
-    server.use(
-      http.get(`${API_BASE}/budget-summary`, () =>
-        HttpResponse.json(
-          // income_total (actual) deliberately differs from base_income so we can
-          // tell which one the breakdown renders.
-          makeBudgetSummary({
-            income_total: 500000,
-            base_income: 400000,
-            recurring_total: 105000,
-            savings_total: 90000,
-            variable_budget: 205000,
-          })
-        )
-      ),
-      http.get(`${API_BASE}/recurring-expenses`, () => HttpResponse.json(emptyRecurring)),
-      http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(emptyGoals)),
-      http.get(`${API_BASE}/income-records`, () => HttpResponse.json(emptyIncome))
-    );
+    const ledger_server = budgetLedgerServer({ base_income_amount: 400000 });
+    putIncomeRecord(ledger_server, { transaction_date: `${current_month}-01`, amount: 500000 });
+    await renderBudget(ledger_server);
 
-    render(<WebBudget onNavigate={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("今月の予算プラン")).toBeInTheDocument();
-    });
-
-    // The breakdown label and dashed formula use 基準収入 with the base-income amount.
     expect(screen.getByText("基準収入")).toBeInTheDocument();
     expect(screen.getByText("基準収入 ¥400,000")).toBeInTheDocument();
-    // The actual recorded income (¥500,000) must NOT appear in the breakdown.
     expect(screen.queryByText("基準収入 ¥500,000")).not.toBeInTheDocument();
   });
 });

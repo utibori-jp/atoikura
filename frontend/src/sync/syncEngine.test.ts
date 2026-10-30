@@ -512,6 +512,17 @@ describe("SyncEngine.runCommand", () => {
     expect((await device.store.readSyncState()).since).toBe(written_row.seq);
   });
 
+  it("reports offline as soon as the browser loses the connection", async () => {
+    const server = newServer();
+    const device = await createDevice(server, "device-a");
+    await device.engine.syncNow();
+    expect(device.engine.getStatus().phase).toBe("idle");
+
+    device.environment.setOnline(false);
+
+    await vi.waitFor(() => expect(device.engine.getStatus().phase).toBe("offline"));
+  });
+
   it("refuses online-only edits while offline", async () => {
     const server = newServer();
     const device = await createDevice(server, "device-a");

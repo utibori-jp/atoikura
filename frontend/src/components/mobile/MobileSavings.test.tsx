@@ -1,58 +1,35 @@
-import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
-import type { ReactElement } from "react";
-import { http, HttpResponse } from "msw";
-import { server } from "../../test/server";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { todayInJst } from "../../logic";
+import {
+  putSavingsGoal,
+  putSavingsPosting,
+  seedPersonalLedger,
+  TestLedgerServer,
+} from "../../test/ledgerFixtures";
+import { renderWithLedger } from "../../test/renderWithLedger";
 import { MobileSavings } from "./MobileSavings";
-import { DialogProvider } from "../dialogs";
-import type { components } from "../../api/types";
 
-// MobileSavings consumes the confirm dialog via context (#166).
-function renderWithDialogs(ui: ReactElement) {
-  return render(<DialogProvider>{ui}</DialogProvider>);
+const current_month = todayInJst().slice(0, 7);
+
+function ledgerServerWithGoals(add_goals: (ledger_server: TestLedgerServer) => void = () => {}) {
+  const ledger_server = new TestLedgerServer();
+  seedPersonalLedger(ledger_server);
+  add_goals(ledger_server);
+  return ledger_server;
 }
 
-const API_BASE = "http://localhost:8080";
-
-// --- fixture helpers ---
-
-function makeGoal(
-  overrides: Partial<components["schemas"]["SavingsGoal"]> = {}
-): components["schemas"]["SavingsGoal"] {
-  return {
-    id: 1,
-    name: "旅行積立",
-    emoji: "✈️",
-    monthly_amount: 20000,
-    target_amount: 250000,
-    accumulated_amount: 170000,
-    deadline: "2027/03",
-    memo: "北海道旅行",
-    is_posted_this_month: false,
-    ...overrides,
-  };
+async function renderSavings(ledger_server: TestLedgerServer) {
+  const rendered = await renderWithLedger(<MobileSavings onBack={() => {}} />, ledger_server);
+  // The subtitle is always rendered once the ledger has loaded.
+  expect(
+    await screen.findByText("目的別に積み上げる", undefined, { timeout: 5000 })
+  ).toBeInTheDocument();
+  return rendered;
 }
-
-function makeGoalList(
-  goals: components["schemas"]["SavingsGoal"][]
-): components["schemas"]["SavingsGoalListResponse"] {
-  return { savings_goals: goals };
-}
-
-// Helper: wait until the subtitle is rendered (always present after load).
-async function waitForReady() {
-  await waitFor(() => {
-    expect(screen.getByText("目的別に積み上げる")).toBeInTheDocument();
-  });
-}
-
-// --- tests ---
 
 describe("MobileSavings — create form", () => {
   it("opens the create sheet when ＋ 貯金目標を追加 is clicked", async () => {
-    server.use(http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([]))));
-
-    renderWithDialogs(<MobileSavings onBack={() => {}} />);
-    await waitForReady();
+    await renderSavings(ledgerServerWithGoals());
 
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
 
@@ -60,64 +37,37 @@ describe("MobileSavings — create form", () => {
     expect(screen.getByPlaceholderText("例：新しいカメラ")).toBeInTheDocument();
   });
 
-  it("calls POST /savings-goals and refreshes list on submit", async () => {
-    const created_goal = makeGoal({ id: 99, name: "新目標", emoji: "🎯", monthly_amount: 5000 });
+  it("creates the goal with a ledger command and shows it", async () => {
+    const ledger_server = ledgerServerWithGoals();
+    await renderSavings(ledger_server);
 
-    let post_called = false;
-    server.use(
-      http.get(`${API_BASE}/savings-goals`, () => {
-        if (post_called) return HttpResponse.json(makeGoalList([created_goal]));
-        return HttpResponse.json(makeGoalList([]));
-      }),
-      http.post(`${API_BASE}/savings-goals`, async () => {
-        post_called = true;
-        return HttpResponse.json(created_goal, { status: 201 });
-      })
-    );
-
-    renderWithDialogs(<MobileSavings onBack={() => {}} />);
-    await waitForReady();
-
-    // Open create sheet
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
-
-    // Fill required fields
     fireEvent.change(screen.getByPlaceholderText("例：新しいカメラ"), {
       target: { value: "新目標" },
     });
     fireEvent.change(screen.getByPlaceholderText("20000"), { target: { value: "5000" } });
-
-    // Submit
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
 
-    // After save, goal card should appear and sheet should close
-    await waitFor(() => {
-      expect(screen.getByText("新目標")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("貯金目標を追加")).not.toBeInTheDocument());
+    expect(await screen.findByText("新目標")).toBeInTheDocument();
+    expect(ledger_server.recorded_commands[0]).toMatchObject({
+      method: "POST",
+      path: "savings-goals",
+      request_body: { name: "新目標", monthly_amount: 5000 },
     });
-
-    // Sheet title should no longer be visible
-    expect(screen.queryByText("貯金目標を追加")).not.toBeInTheDocument();
   });
 
   it("shows validation error when name is empty", async () => {
-    server.use(http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([]))));
-
-    renderWithDialogs(<MobileSavings onBack={() => {}} />);
-    await waitForReady();
+    await renderSavings(ledgerServerWithGoals());
 
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
-
-    // Submit without filling name
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
 
     expect(screen.getByText("名前を入力してください")).toBeInTheDocument();
   });
 
   it("closes the sheet when ✕ is clicked", async () => {
-    server.use(http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([]))));
-
-    renderWithDialogs(<MobileSavings onBack={() => {}} />);
-    await waitForReady();
+    await renderSavings(ledgerServerWithGoals());
 
     fireEvent.click(screen.getByRole("button", { name: /貯金目標を追加/ }));
     expect(screen.getByText("貯金目標を追加")).toBeInTheDocument();
@@ -129,179 +79,127 @@ describe("MobileSavings — create form", () => {
 
 describe("MobileSavings — edit form", () => {
   it("opens the edit sheet pre-filled when 編集 is clicked", async () => {
-    const existing_goal = makeGoal();
+    await renderSavings(ledgerServerWithGoals((seeded_server) => putSavingsGoal(seeded_server)));
 
-    server.use(
-      http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([existing_goal])))
-    );
-
-    renderWithDialogs(<MobileSavings onBack={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("旅行積立")).toBeInTheDocument();
-    });
-
-    // Click the edit button
-    fireEvent.click(screen.getByRole("button", { name: "編集" }));
+    fireEvent.click(await screen.findByRole("button", { name: "編集" }));
 
     expect(screen.getByText("貯金目標を編集")).toBeInTheDocument();
-    // Name input should be pre-filled
     expect(screen.getByDisplayValue("旅行積立")).toBeInTheDocument();
   });
 
-  it("calls PUT /savings-goals/:id and refreshes list on submit", async () => {
-    const existing_goal = makeGoal();
-    const updated_goal = makeGoal({ name: "更新済み目標", monthly_amount: 30000 });
-
-    let put_called = false;
-    server.use(
-      http.get(`${API_BASE}/savings-goals`, () => {
-        if (put_called) return HttpResponse.json(makeGoalList([updated_goal]));
-        return HttpResponse.json(makeGoalList([existing_goal]));
-      }),
-      http.put(`${API_BASE}/savings-goals/1`, async () => {
-        put_called = true;
-        return HttpResponse.json(updated_goal);
-      })
-    );
-
-    renderWithDialogs(<MobileSavings onBack={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("旅行積立")).toBeInTheDocument();
+  it("updates the goal with a ledger command and shows the new name", async () => {
+    let goal_id = "";
+    const ledger_server = ledgerServerWithGoals((seeded_server) => {
+      goal_id = putSavingsGoal(seeded_server);
     });
+    await renderSavings(ledger_server);
 
-    // Open edit sheet
-    fireEvent.click(screen.getByRole("button", { name: "編集" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("貯金目標を編集")).toBeInTheDocument();
-    });
-
-    // Change name in the pre-filled input
-    const name_input = screen.getByDisplayValue("旅行積立");
-    fireEvent.change(name_input, { target: { value: "更新済み目標" } });
-
-    // Submit
+    fireEvent.click(await screen.findByRole("button", { name: "編集" }));
+    fireEvent.change(screen.getByDisplayValue("旅行積立"), { target: { value: "更新済み目標" } });
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
 
-    // After save, updated name should appear and sheet should close
-    await waitFor(() => {
-      expect(screen.getByText("更新済み目標")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("貯金目標を編集")).not.toBeInTheDocument());
+    expect(await screen.findByText("更新済み目標")).toBeInTheDocument();
+    expect(ledger_server.recorded_commands[0]).toMatchObject({
+      method: "PUT",
+      path: `savings-goals/${goal_id}`,
     });
-
-    expect(screen.queryByText("貯金目標を編集")).not.toBeInTheDocument();
   });
 });
 
 describe("MobileSavings — delete", () => {
-  it("calls DELETE /savings-goals/:id and removes the card after confirmation", async () => {
-    const existing_goal = makeGoal();
-
-    let delete_called = false;
-    server.use(
-      http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([existing_goal]))),
-      http.delete(`${API_BASE}/savings-goals/1`, () => {
-        delete_called = true;
-        return new HttpResponse(null, { status: 204 });
-      })
-    );
-
-    renderWithDialogs(<MobileSavings onBack={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("旅行積立")).toBeInTheDocument();
+  it("deletes the goal with a ledger command after confirmation", async () => {
+    let goal_id = "";
+    const ledger_server = ledgerServerWithGoals((seeded_server) => {
+      goal_id = putSavingsGoal(seeded_server);
     });
+    await renderSavings(ledger_server);
 
     // The 🗑 trigger opens the in-app confirm Modal (#166); confirm inside it.
-    fireEvent.click(screen.getByRole("button", { name: "削除" }));
+    fireEvent.click(await screen.findByRole("button", { name: "削除" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "削除" }));
 
-    await waitFor(() => {
-      expect(delete_called).toBe(true);
-      expect(screen.queryByText("旅行積立")).not.toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.queryByText("旅行積立")).not.toBeInTheDocument());
+    expect(ledger_server.recorded_commands).toEqual([
+      { method: "DELETE", path: `savings-goals/${goal_id}`, request_body: null },
+    ]);
+  });
+
+  it("keeps the goal and shows the reason when the server refuses the delete", async () => {
+    const ledger_server = ledgerServerWithGoals((seeded_server) => putSavingsGoal(seeded_server));
+    await renderSavings(ledger_server);
+    ledger_server.rejectNextCommand(409, "in_use", "この目標は使用中のため削除できません");
+
+    fireEvent.click(await screen.findByRole("button", { name: "削除" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "削除" }));
+
+    expect(await screen.findByText("この目標は使用中のため削除できません")).toBeInTheDocument();
+    expect(screen.getByText("旅行積立")).toBeInTheDocument();
   });
 
   it("does not delete when confirmation is cancelled", async () => {
-    const existing_goal = makeGoal();
+    const ledger_server = ledgerServerWithGoals((seeded_server) => putSavingsGoal(seeded_server));
+    await renderSavings(ledger_server);
 
-    let delete_called = false;
-    server.use(
-      http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([existing_goal]))),
-      http.delete(`${API_BASE}/savings-goals/1`, () => {
-        delete_called = true;
-        return new HttpResponse(null, { status: 204 });
-      })
-    );
-
-    renderWithDialogs(<MobileSavings onBack={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("旅行積立")).toBeInTheDocument();
-    });
-
-    // Open the confirm Modal, then cancel it.
-    fireEvent.click(screen.getByRole("button", { name: "削除" }));
+    fireEvent.click(await screen.findByRole("button", { name: "削除" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
 
-    // Goal card should still be visible since delete was cancelled
-    expect(delete_called).toBe(false);
+    expect(ledger_server.recorded_commands).toEqual([]);
     expect(screen.getByText("旅行積立")).toBeInTheDocument();
   });
 });
 
 describe("MobileSavings — post-monthly", () => {
-  it("shows 今月分を記録する when not yet posted and calls post-monthly on click", async () => {
-    const unposted_goal = makeGoal({ is_posted_this_month: false });
-    const posted_goal = makeGoal({ is_posted_this_month: true });
-
-    let post_monthly_called = false;
-    server.use(
-      http.get(`${API_BASE}/savings-goals`, () => {
-        if (post_monthly_called) return HttpResponse.json(makeGoalList([posted_goal]));
-        return HttpResponse.json(makeGoalList([unposted_goal]));
-      }),
-      http.post(`${API_BASE}/savings-goals/1/post-monthly`, async () => {
-        post_monthly_called = true;
-        return HttpResponse.json(posted_goal);
-      })
-    );
-
-    renderWithDialogs(<MobileSavings onBack={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("旅行積立")).toBeInTheDocument();
+  it("records this month's savings and then shows ✅ 今月済", async () => {
+    let goal_id = "";
+    const ledger_server = ledgerServerWithGoals((seeded_server) => {
+      goal_id = putSavingsGoal(seeded_server);
     });
+    await renderSavings(ledger_server);
 
-    expect(screen.getByRole("button", { name: "今月分を記録する" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "今月分を記録する" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "今月分を記録する" }));
-
-    await waitFor(() => {
-      expect(post_monthly_called).toBe(true);
-      // After refresh, the button should be gone and ✅ 今月済 badge should appear
-      expect(screen.queryByRole("button", { name: "今月分を記録する" })).not.toBeInTheDocument();
-      expect(screen.getByText("✅ 今月済")).toBeInTheDocument();
-    });
+    expect(await screen.findByText("✅ 今月済")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "今月分を記録する" })).not.toBeInTheDocument();
+    expect(ledger_server.recorded_commands).toEqual([
+      {
+        method: "POST",
+        path: `savings-goals/${goal_id}/postings`,
+        request_body: { amount: 20000, year_month: current_month },
+      },
+    ]);
   });
 
   it("does not show 今月分を記録する when already posted", async () => {
-    const posted_goal = makeGoal({ is_posted_this_month: true });
-
-    server.use(
-      http.get(`${API_BASE}/savings-goals`, () => HttpResponse.json(makeGoalList([posted_goal])))
+    await renderSavings(
+      ledgerServerWithGoals((seeded_server) => {
+        const goal_id = putSavingsGoal(seeded_server);
+        putSavingsPosting(seeded_server, { goal_id, year_month: current_month, amount: 20000 });
+      })
     );
 
-    renderWithDialogs(<MobileSavings onBack={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("旅行積立")).toBeInTheDocument();
-    });
-
+    expect(await screen.findByText("✅ 今月済")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "今月分を記録する" })).not.toBeInTheDocument();
-    expect(screen.getByText("✅ 今月済")).toBeInTheDocument();
+  });
+});
+
+describe("MobileSavings — offline", () => {
+  it("disables the edit buttons while offline", async () => {
+    const ledger_server = ledgerServerWithGoals((seeded_server) => putSavingsGoal(seeded_server));
+    const { app_services } = await renderSavings(ledger_server);
+    expect(await screen.findByText("旅行積立")).toBeInTheDocument();
+
+    app_services.sync_environment.setOnline(false);
+
+    expect(
+      await screen.findByText("オフラインのため閲覧のみです。接続すると編集できます")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /貯金目標を追加/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "編集" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "削除" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "今月分を記録する" })).toBeDisabled();
   });
 });
