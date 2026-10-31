@@ -90,6 +90,16 @@ func serveLedgerCommand(w http.ResponseWriter, r *http.Request, success_status i
 		return
 	}
 	written_row, err := run_command(r.Context(), repository.Caller{UserID: user_id, Target: ledger_target})
+	if err != nil {
+		writeCommandError(w, r, err)
+		return
+	}
+	WriteJSON(w, success_status, pulledRowJSON(*written_row))
+}
+
+// writeCommandError maps a command's refusal to its status, or logs an
+// unexpected error and hides it behind a 500.
+func writeCommandError(w http.ResponseWriter, r *http.Request, err error) {
 	var command_error *repository.CommandError
 	if errors.As(err, &command_error) {
 		switch command_error.Kind {
@@ -99,17 +109,15 @@ func serveLedgerCommand(w http.ResponseWriter, r *http.Request, success_status i
 			WriteError(w, http.StatusNotFound, "NOT_FOUND", command_error.Message)
 		case repository.CommandConflict:
 			WriteError(w, http.StatusConflict, "CONFLICT", command_error.Message)
+		case repository.CommandTooManyRequests:
+			WriteError(w, http.StatusTooManyRequests, "TOO_MANY_REQUESTS", command_error.Message)
 		default:
 			WriteError(w, http.StatusBadRequest, "BAD_REQUEST", command_error.Message)
 		}
 		return
 	}
-	if err != nil {
-		slog.Error("running ledger command", "path", r.URL.Path, "error", err)
-		WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
-		return
-	}
-	WriteJSON(w, success_status, pulledRowJSON(*written_row))
+	slog.Error("running command", "path", r.URL.Path, "error", err)
+	WriteError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "予期しないエラーが発生しました")
 }
 
 // serveDeleteCommand runs a delete command for the {id} in the path.

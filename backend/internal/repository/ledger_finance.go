@@ -186,12 +186,33 @@ func (r *Repository) CreateLedgerSurplusAllocation(ctx context.Context, caller C
 			}
 			savings_goal_id = &goal_row.ID
 		}
-		var remaining_surplus int64
-		if err := ledger_tx.tx.QueryRow(ctx, remainingSurplusQuery, ledger_tx.ledger_id, surplus_input.YearMonth).Scan(&remaining_surplus); err != nil {
-			return nil, fmt.Errorf("computing remaining surplus: %w", err)
+		allowance_member, err := ledger_tx.allowanceMember(ctx)
+		if err != nil {
+			return nil, err
 		}
-		if int64(surplus_input.Amount) > remaining_surplus {
-			return nil, newCommandError(CommandInvalid, "指定金額が振り分け可能な余剰を超えています")
+		if allowance_member != nil {
+			// While a household is attached the personal ledger is the allowance:
+			// its income lives in the household, so what can be put aside is the
+			// allowance balance, and only into personal savings (design.md §3).
+			if surplus_input.Destination != "savings" {
+				return nil, newCommandError(CommandInvalid, "お小遣いの残りは貯金目標にだけ振り分けられます")
+			}
+			balance, err := allowanceBalance(ctx, ledger_tx.tx, allowance_member, surplus_input.YearMonth)
+			if err != nil {
+				return nil, err
+			}
+			if int64(surplus_input.Amount) > balance {
+				return nil, newCommandError(CommandInvalid, "指定金額がお小遣いの残高を超えています")
+			}
+			ledger_tx.touchAllowanceMonth(surplus_input.YearMonth)
+		} else {
+			var remaining_surplus int64
+			if err := ledger_tx.tx.QueryRow(ctx, remainingSurplusQuery, ledger_tx.ledger_id, surplus_input.YearMonth).Scan(&remaining_surplus); err != nil {
+				return nil, fmt.Errorf("computing remaining surplus: %w", err)
+			}
+			if int64(surplus_input.Amount) > remaining_surplus {
+				return nil, newCommandError(CommandInvalid, "指定金額が振り分け可能な余剰を超えています")
+			}
 		}
 		allocation_id, err := ledger_tx.insertRow(ctx, "surplus_allocations", []columnValue{
 			{name: "year_month", value: surplus_input.YearMonth, sqlType: "text"},

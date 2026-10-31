@@ -112,6 +112,10 @@ func (r *Repository) PostMonthlyForLedger(ctx context.Context, ledger_id string,
 	if _, err := tx.Exec(ctx, postMonthlySavingsQuery, ledger_id, year_month); err != nil {
 		return fmt.Errorf("posting monthly savings: %w", err)
 	}
+	// Postings in a personal ledger are allowance spending and savings.
+	if err := refreshAllowanceTotals(ctx, seq_allocator, ledger_id, []string{year_month}); err != nil {
+		return err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("committing monthly posting: %w", err)
 	}

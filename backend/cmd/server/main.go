@@ -157,7 +157,8 @@ func registerRoutes(mux *http.ServeMux, repo *repository.Repository, jwt_secret 
 }
 
 // registerLedgerCommandRoutes registers the REST commands for the online-only
-// collections of the local-first clients (#213). Like /sync, they require the
+// collections of the local-first clients (#213) and the household lifecycle
+// commands (#207). Like /sync, they require the
 // client's sync protocol version.
 func registerLedgerCommandRoutes(mux *http.ServeMux, repo *repository.Repository) {
 	ledger_command_routes := map[string]http.HandlerFunc{
@@ -181,6 +182,15 @@ func registerLedgerCommandRoutes(mux *http.ServeMux, repo *repository.Repository
 		"POST /ledger/savings-goals/{id}/postings":     handler.CreateLedgerSavingsPostingHandler(repo),
 		"PUT /ledger/budget":                           handler.PutLedgerBudgetHandler(repo),
 		"POST /ledger/surplus-allocations":             handler.CreateLedgerSurplusAllocationHandler(repo),
+		"POST /household":                              handler.CreateHouseholdHandler(repo),
+		"POST /household/invitations":                  handler.CreateHouseholdInvitationHandler(repo),
+		"GET /household/invitations":                   handler.ListHouseholdInvitationsHandler(repo),
+		"DELETE /household/invitations/{id}":           handler.RevokeHouseholdInvitationHandler(repo),
+		"POST /household/join":                         handler.JoinHouseholdHandler(repo),
+		"POST /household/leave":                        handler.LeaveHouseholdHandler(repo),
+		"POST /household/dissolve":                     handler.DissolveHouseholdHandler(repo),
+		"DELETE /household/members/{user_id}":          handler.RemoveHouseholdMemberHandler(repo),
+		"PUT /household/allowances":                    handler.PutHouseholdAllowanceHandler(repo),
 	}
 	for route_pattern, command_handler := range ledger_command_routes {
 		mux.Handle(route_pattern, handler.RequireSyncProtocol(command_handler))

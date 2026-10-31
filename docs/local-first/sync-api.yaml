@@ -11,7 +11,8 @@ info:
     names a target, `personal` or `household` (design.md D15); `owner_id` and
     `ledger_id` are never accepted in a request.
     Online-only collections are written through the REST commands under `/ledger`,
-    and every device reads them through pull.
+    and every device reads them through pull. Households are created, joined, left
+    and dissolved through `/household` (design.md §6).
 
 servers:
   - url: http://localhost:8080
@@ -430,7 +431,9 @@ paths:
       description: |
         The amount may not exceed the month's unallocated surplus,
         max(0, income − Σ base incomes) − already allocated (400). Allocations are
-        append-only.
+        append-only. In a personal ledger while a household is attached, only `savings`
+        is accepted and the cap is the allowance balance at the end of the month
+        (design.md §3).
       operationId: createSurplusAllocation
       parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SurplusAllocationInput" } } } }
@@ -438,6 +441,161 @@ paths:
         "201": { $ref: "#/components/responses/WrittenRow" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+  /household:
+    post:
+      summary: Create a household with the caller as its owner
+      description: |
+        The household starts with a copy of the caller's live categories, recurring
+        expenses and base income, with new IDs; no history is copied (design.md §6, Q7).
+        409 when the caller already has a household attached.
+      operationId: createHousehold
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/HouseholdInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/HouseholdLedger" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/invitations:
+    post:
+      summary: Invite someone to the caller's household
+      description: |
+        Returns a link token and a short code naming the same invitation, valid for 24
+        hours and usable once (Q8). The token is shown only in this response: the server
+        stores its SHA-256 hash. A household can have at most 10 open invitations (409).
+      operationId: createHouseholdInvitation
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "201":
+          description: The new invitation
+          content: { application/json: { schema: { $ref: "#/components/schemas/Invitation" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    get:
+      summary: List the open invitations of the caller's household
+      operationId: listHouseholdInvitations
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "200":
+          description: Invitations that can still be redeemed, without their tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [invitations]
+                properties:
+                  invitations: { type: array, items: { $ref: "#/components/schemas/Invitation" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/invitations/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }]
+    delete:
+      summary: Revoke an open invitation of the caller's household
+      operationId: revokeHouseholdInvitation
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "204": { description: Revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/join:
+    post:
+      summary: Redeem an invitation
+      description: |
+        Names the invitation by the link's `token` or by the short `code` (case and
+        hyphens are ignored); exactly one of them. The caller's base income is copied into
+        the household (Q10) and their allowance balance starts this month. 404 when the
+        invitation is unknown, used, revoked or expired; after 10 such failures within an
+        hour the caller gets 429 until older failures age out. 409 when the caller already
+        has a household attached.
+      operationId: joinHousehold
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JoinInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/HouseholdLedger" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /household/leave:
+    post:
+      summary: Leave the caller's household
+      description: |
+        Ends the membership, copies the household's journal entries and income records up
+        to today (with the categories they use) into a new read-only archive ledger of the
+        caller, and copies their household base income back to their personal ledger (Q9).
+        The owner can't leave (409): they remove the other members and dissolve instead.
+      operationId: leaveHousehold
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "204": { description: Left }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/members/{user_id}:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    delete:
+      summary: Remove a member (owner only)
+      description: The member is detached as by leave and gets their own archive.
+      operationId: removeHouseholdMember
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "204": { description: Removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/dissolve:
+    post:
+      summary: Dissolve the household (owner only, once alone)
+      description: |
+        The household ledger becomes the owner's archive, its open invitations are
+        revoked and its allowance totals are deleted. The owner's base income is copied
+        back to their personal ledger.
+      operationId: dissolveHousehold
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "204": { description: Dissolved }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/allowances:
+    put:
+      summary: Set a member's allowance from a month on
+      description: |
+        Any member can set the allowance of any active member (design.md Q4). Setting the
+        same month again replaces the amount.
+      operationId: putHouseholdAllowance
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AllowanceInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "426": { $ref: "#/components/responses/UpdateRequired" }
 
@@ -478,6 +636,21 @@ components:
       description: Sent in the `Authorization` header (not a cookie). Access tokens live 1 hour; use /auth/refresh to get a new one.
 
   responses:
+    HouseholdLedger:
+      description: The caller's household; the next pull covers it
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [household_ledger_id]
+            properties:
+              household_ledger_id: { type: string, format: uuid }
+    TooManyRequests:
+      description: Too many failed attempts; try again later (code TOO_MANY_REQUESTS)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     WrittenRow:
       description: The written row, in the shape pull returns it (a tombstone for deletes)
       content:
@@ -611,6 +784,40 @@ components:
         amount: { type: integer, minimum: 1, maximum: 2147483647 }
         destination: { type: string, enum: [budget, savings] }
         savings_goal_id: { type: [string, "null"], format: uuid }
+
+    HouseholdInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50 }
+
+    Invitation:
+      type: object
+      required: [id, short_code, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        token: { type: string, description: Only in the response that creates the invitation }
+        short_code: { type: string, pattern: "^[A-HJ-NP-Z2-9]{8}$" }
+        created_by: { type: integer, description: Only in the list }
+        expires_at: { type: string, format: date-time }
+
+    JoinInput:
+      type: object
+      additionalProperties: false
+      description: Exactly one of `token` and `code`.
+      properties:
+        token: { type: string, minLength: 1, maxLength: 128 }
+        code: { type: string, description: "The short code; case, spaces and hyphens are ignored" }
+
+    AllowanceInput:
+      type: object
+      additionalProperties: false
+      required: [member_id, effective_from, amount]
+      properties:
+        member_id: { type: integer, minimum: 1 }
+        effective_from: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        amount: { type: integer, minimum: 0, maximum: 2147483647 }
 
     TokenPair:
       type: object
