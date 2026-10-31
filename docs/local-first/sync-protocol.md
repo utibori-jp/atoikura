@@ -64,7 +64,9 @@ Each change carries:
 - optionally `deleted_hlc`, which turns the record into a tombstone
 
 There is **no** `owner_id` or `ledger_id` in the request. Both are derived from
-the token.
+the token. A new journal entry instead carries a `ledger` field, `personal` or
+`household`, and the server resolves it to the caller's personal ledger or
+active household (design D15). Notes always go to the personal ledger.
 
 ### 3.1 Validation (in this order; the first failure rejects the change)
 
@@ -74,10 +76,11 @@ the token.
 | every field name is on the collection's allowlist | `UNKNOWN_FIELD` |
 | each change is ≤ 16 KiB as encoded JSON | `TOO_LARGE` |
 | every HLC is well-formed and ≤ server now + 5 min | `CLOCK_SKEW` |
-| the record (`id`) exists and the caller is not allowed to write it: it is not the caller's, and it is not a shared-ledger recurring posting in the caller's ledger | `FORBIDDEN` |
-| the field values pass content validation (formats, positive amounts; `wallet` ∈ {ledger, allowance}, with `allowance` only in household mode; `category_id` belongs to the caller's ledger, and may be deleted) | `INVALID` |
-| `wallet` changes on an existing record (moving an entry between the shared ledger and an allowance) | `IMMUTABLE` |
-| a new record omits a required field (for journal entries: `wallet`, `transaction_date`, `amount`, `is_excluded`, `category_id`) | `INVALID` |
+| the record (`id`) exists and the caller is not allowed to write it: its ledger is not the caller's personal ledger or active household (archives are read-only), or it is not the caller's and not a recurring posting in their household ledger | `FORBIDDEN` |
+| a new journal entry targets `household` and the caller has no active household | `FORBIDDEN` |
+| the field values pass content validation (formats, positive amounts; `ledger` ∈ {personal, household}; `category_id` belongs to the entry's ledger (review notes: the personal ledger or active household), and may be deleted) | `INVALID` |
+| `ledger` on an existing record names a different ledger from the one it is in (an entry cannot move between the personal and the household ledger) | `IMMUTABLE` |
+| a new record omits a required field (for journal entries: `ledger`, `transaction_date`, `amount`, `is_excluded`, `category_id`) | `INVALID` |
 
 String length limits (`item` ≤ 100 characters, notes ≤ 500 characters) are content
 validation, so they return `INVALID` with the same Japanese message as the client.
@@ -87,8 +90,8 @@ A change also carries the UUID `id`; a malformed `id` is `INVALID`.
 
 ### 3.2 Applying a valid change (one transaction per change)
 
-1. If the record is new, insert it with `owner_id` and `ledger_id` taken from
-   the token.
+1. If the record is new, insert it with `owner_id` from the token and the
+   `ledger_id` resolved from its target.
    - If this would create a second daily note (or monthly review note) for the
      same natural key, merge the change into the existing row instead: the
      texts are concatenated, and the result reports `merged_into: <existing
@@ -98,8 +101,8 @@ A change also carries the UUID `id`; a malformed `id` is `INVALID`.
    fields as `superseded`.
 4. For each field, store it if `incoming.hlc > field_hlc[field]`. Otherwise
    report it as `superseded`.
-5. If anything changed, assign a new `seq`. If the change touched an allowance
-   entry, recompute that member's `allowance_totals` for the affected months.
+5. If anything changed, assign a new `seq`. If the change touched a personal
+   journal entry while a household is attached, recompute that member's `allowance_totals` for the affected months.
 
 The result for each change is
 `{ id, status: "applied" | "rejected", seq?, superseded?, merged_into?, reason? }`.
@@ -115,21 +118,23 @@ The result for each change is
 
 `GET /sync/pull?since=<seq>&limit=<n>`
 
-- **Visibility is derived from the token**: the caller's current ledger, and
-  within it, these rows:
-  - every online-only row, except allowance-wallet `recurring_expenses` rows
-    that belong to other members
-  - `journal_entries` where `wallet = 'ledger'`, or the caller is the owner
+- **Visibility is derived from the token**: the caller's personal ledger, their
+  active household ledger, and their archive ledgers. Within those:
+  - every online-only row
+  - every `journal_entries` row (a personal ledger has only its owner as a
+    member, so other members' personal entries are never in scope)
   - notes the caller owns
-  - `allowance_totals` for every member
+  - the household's `allowance_totals` for every member
+  Each row carries its `ledger_id`.
 - The response lists the rows with `since < seq ≤ watermark`, ordered by `seq`.
   Each row is complete (all fields, plus `field_hlc` for offline-writable
   collections). Tombstones are included.
 - The response includes `next_since` and `has_more`. `limit` defaults to 500
   and is capped at 1000.
-- It also includes `ledger_id`. If it differs from the one the device has stored
-  (the user joined or left a household), the device **resets its cursor to 0**,
-  clears the cached data of the old ledger, and pulls again.
+- It also includes `ledger_ids`, the ledgers in scope. If the set differs from
+  the one the device has stored (the user created, joined, left or dissolved a
+  household), the device **resets its cursor to 0**, drops the local rows of
+  ledgers no longer listed, and pulls again.
   Its pending outbox entries are pushed first.
 
 ---
@@ -193,8 +198,8 @@ Retries:
   becomes the field's shadow. A pulled tombstone always wins.
 - **Ledger and user changes.** `_sync_state.user_id` (schema v2) binds the
   database to one user. If another user signs in, everything is wiped. If the
-  ledger changes, the engine pushes the outbox, clears the synced tables and
-  pulls from 0.
+  set of ledgers changes, the engine pushes the outbox, clears the synced
+  tables and pulls from 0 (Step 8 narrows this to the ledgers no longer listed).
 - **Tokens.** The access token stays in memory. The refresh token and the user
   ID are kept in `localStorage`, so the app can sync after a restart without the
   password; the strict CSP is what protects them. Refreshes are serialized
@@ -217,10 +222,16 @@ Retries:
 | B pushes a new record with an `id` already used by A | `FORBIDDEN` |
 | B pushes an entry with a `category_id` from another ledger | `INVALID` |
 | A change that contains `owner_id` or `ledger_id` among its fields | `UNKNOWN_FIELD` (they are not on the allowlist); ownership always comes from the token |
-| A household member pushes into another member's allowance entry | `FORBIDDEN` |
+| A household member pushes into another member's personal entry | `FORBIDDEN` |
+| A member moves an existing entry to the other ledger | `IMMUTABLE` |
+| A user with no household pushes a new entry with `ledger: household` | `FORBIDDEN` |
+| A former member pushes into the household they left, or anyone pushes into an archive | `FORBIDDEN` |
+| A member pushes an entry with a `category_id` from their personal ledger into the household (or the reverse) | `INVALID` |
 | B pulls, where B is not in A's ledger | none of A's rows are returned |
-| A household member pulls | other members' allowance entries and allowance recurring expenses are absent; `allowance_totals` are present |
-| A member left the household | the next pull returns their new ledger only |
+| A household member pulls | other members' personal entries, recurring expenses, categories and notes are absent; `allowance_totals` are present |
+| A user who is not a member uses a household command, or a request names a ledger ID | rejected; the household always comes from the token |
+| An invitation is expired, already used, revoked, or redeemed by a user already in a household | rejected; no membership is created |
+| A member left the household | the next pull returns their personal ledger and the new archive only, with new `ledger_ids` |
 | An oversized value, an unknown field or collection, an HLC far in the future, or invalid contents | rejected with the matching reason |
 | Body too large or too many changes | `413` / `400`; nothing applied |
 | Concurrent writers (push and REST) | no row is skipped by pull (watermark test) |
