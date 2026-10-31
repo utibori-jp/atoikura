@@ -93,7 +93,8 @@ ledger_members (ledger_id, user_id, role: owner | member, joined_at, left_at)
   - Personal savings(m) is what the member puts into their personal savings
     goals that month: monthly savings postings, manual postings and surplus
     allocations. A personal surplus allocation is capped by the current
-    balance.
+    balance. Its destination must be a savings goal: the balance already carries
+    over, so allocating to the budget would mean nothing.
   - **Income is shared** (Q10). While attached, the member's base income and
     income records live in the household ledger; the personal ledger's
     income screens are hidden. Its own base income row is kept for when the
@@ -281,7 +282,10 @@ always resolved from the token; a request never names a ledger ID.
   - It expires after **24 hours** and can be used **once**. Members can revoke
     it before then.
   - The server stores only a hash of the token. Failed code attempts are
-    rate-limited, since a short code can be guessed.
+    rate-limited, since a short code can be guessed: after 10 failed attempts
+    within an hour a user has to wait. A short code is 8 characters from an
+    alphabet without look-alikes (no 0/O, 1/I), and a household has at most 10
+    open invitations.
 - **Join.** A signed-in user with no active household redeems the link or the
   code. The server adds a `ledger_members` row (role `member`). Their
   allowance starts at 0 from the join month until a member sets it. Their
@@ -293,22 +297,32 @@ always resolved from the token; a request never names a ledger ID.
   **archive** ledger owned by the person leaving (Q9). Their household
   `base_incomes` amount is copied back to their personal ledger, and their
   household row is removed, so the household's base income no longer counts
-  it. The archive is read-only and only they can see it.
+  it. The archive is read-only and only they can see it. Archived entries
+  lose their link to a recurring expense: the archive has none, and the
+  posting's unique key stays with the household's row.
   Their personal ledger (the allowance side, its categories and fixed costs)
   carries on in personal mode. The household itself is unchanged for the
   remaining members.
 - **Owner.** The owner cannot leave while other members remain. Once alone,
-  they can dissolve the household: its ledger becomes their archive.
+  they can dissolve the household: its ledger becomes their archive. Its
+  open invitations are revoked and its `allowance_totals` are deleted; the
+  owner's base income is copied back to their personal ledger.
 - **Sync.** A pull returns rows from every ledger the caller can see: their
   personal ledger, their active household, and their archives. The response
   lists those `ledger_ids`. When the list changes (join, leave, dissolve), the
   device resets its cursor to 0, re-pulls, and drops the local rows of ledgers
   that are no longer listed.
 - **Commands.** The existing `/ledger/*` commands take a target,
-  `personal` or `household`, the same way pushes do.
+  `personal` or `household`, the same way pushes do. The lifecycle commands live
+  under `/household` (sync-api.yaml), together with `PUT /household/allowances`,
+  which sets a member's allowance from a month on.
 - **Schema.** These changes ship as a new migration (000022): the `wallet`
   columns are dropped, `ledgers.kind` gains `archive`, and
   `household_invitations` is added. Migrations 000019–000021 are not edited.
+  Migration 000023 adds the members' display names (copied from `users` when a
+  membership starts, so other members can see who is in the household), a
+  unique allowance per member and month, and the table of failed join
+  attempts used for rate limiting.
 
 ---
 

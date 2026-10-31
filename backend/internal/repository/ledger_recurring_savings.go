@@ -135,6 +135,7 @@ func (r *Repository) ConfirmLedgerRecurringExpense(ctx context.Context, caller C
 		if err != nil {
 			return nil, conflictOnUniqueViolation(err, "当月分は既に確定済みです")
 		}
+		ledger_tx.touchAllowanceMonth(year_month)
 		return &writtenRow{collection: "journal_entries", id: entry_id}, nil
 	})
 }
@@ -227,6 +228,7 @@ func (r *Repository) CreateLedgerSavingsPosting(ctx context.Context, caller Call
 		if err != nil {
 			return nil, err
 		}
+		ledger_tx.touchAllowanceMonth(year_month)
 		return &writtenRow{collection: "savings_postings", id: posting_id}, nil
 	})
 }

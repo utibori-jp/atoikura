@@ -31,6 +31,8 @@ const (
 	CommandNotFound
 	// CommandConflict: a uniqueness invariant would break (409).
 	CommandConflict
+	// CommandTooManyRequests: the caller has to wait before trying again (429).
+	CommandTooManyRequests
 )
 
 // CommandError is a refusal with a Japanese message that can be shown to the user.
@@ -61,6 +63,18 @@ type ledgerTx struct {
 	seq_allocator *txAllocator
 	ledger_id     string
 	user_id       int64
+	// caller_ledgers are the caller's memberships, read in this transaction.
+	caller_ledgers *CallerLedgers
+	// allowance_months are the months (YYYY-MM) whose allowance totals the
+	// command changed; they are refreshed before commit.
+	allowance_months []string
+}
+
+// touchAllowanceMonth notes that the command changed allowance spending or
+// personal savings in a month. It only matters in a personal ledger whose
+// owner has a household attached.
+func (ledger_tx *ledgerTx) touchAllowanceMonth(year_month string) {
+	ledger_tx.allowance_months = append(ledger_tx.allowance_months, year_month)
 }
 
 // householdNotAttachedMessage refuses a household command from a user who is
@@ -93,11 +107,22 @@ func (r *Repository) runLedgerCommand(ctx context.Context, caller Caller, comman
 	if !is_attached {
 		return nil, newCommandError(CommandForbidden, householdNotAttachedMessage)
 	}
-	ledger_tx := &ledgerTx{tx: tx, seq_allocator: &txAllocator{tx: tx}, ledger_id: target_ledger_id, user_id: caller.UserID}
+	ledger_tx := &ledgerTx{
+		tx:             tx,
+		seq_allocator:  &txAllocator{tx: tx},
+		ledger_id:      target_ledger_id,
+		user_id:        caller.UserID,
+		caller_ledgers: caller_ledgers,
+	}
 
 	written_row_ref, err := command(ctx, ledger_tx)
 	if err != nil {
 		return nil, err
+	}
+	if caller.Target == TargetPersonal {
+		if err := refreshAllowanceTotals(ctx, ledger_tx.seq_allocator, ledger_tx.ledger_id, ledger_tx.allowance_months); err != nil {
+			return nil, err
+		}
 	}
 	written_row, err := ledger_tx.readRow(ctx, written_row_ref.collection, written_row_ref.id)
 	if err != nil {

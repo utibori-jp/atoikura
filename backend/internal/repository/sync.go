@@ -89,8 +89,8 @@ func (r *Repository) createPersonalLedger(ctx context.Context, user_id int64) er
 		return err
 	}
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO lf.ledger_members (id, ledger_id, owner_id, seq, user_id, role, ledger_kind)
-		 VALUES (gen_random_uuid(), $1::uuid, $2, $3, $2, 'owner', 'personal')`,
+		`INSERT INTO lf.ledger_members (id, ledger_id, owner_id, seq, user_id, role, ledger_kind, display_name)
+		 SELECT gen_random_uuid(), $1::uuid, $2, $3, $2, 'owner', 'personal', u.display_name FROM users u WHERE u.id = $2`,
 		ledger_id, user_id, member_seq,
 	); err != nil {
 		return fmt.Errorf("adding ledger owner: %w", err)
@@ -286,6 +286,17 @@ func (r *Repository) pushChange(ctx context.Context, user_id int64, collection_s
 	}
 	if err != nil {
 		return PushResult{}, err
+	}
+	if collection_spec.Name == "journal_entries" && ledger_id == caller_ledgers.PersonalID && caller_ledgers.HouseholdID != "" {
+		// A personal entry is allowance spending: the month it left and the month
+		// it is in now both change.
+		touched_months := []string{monthOfDate(merge_result.Candidate["transaction_date"])}
+		if stored_record != nil {
+			touched_months = append(touched_months, monthOfDate(stored_record.Values["transaction_date"]))
+		}
+		if err := refreshAllowanceTotals(ctx, seq_allocator, ledger_id, touched_months); err != nil {
+			return PushResult{}, err
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return PushResult{}, fmt.Errorf("committing push: %w", err)

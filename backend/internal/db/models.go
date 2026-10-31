@@ -229,6 +229,12 @@ type LfHouseholdInvitation struct {
 	RevokedAt *time.Time  `json:"revoked_at"`
 }
 
+type LfHouseholdJoinFailure struct {
+	ID       int64     `json:"id"`
+	UserID   int32     `json:"user_id"`
+	FailedAt time.Time `json:"failed_at"`
+}
+
 type LfIncomeRecord struct {
 	ID              pgtype.UUID `json:"id"`
 	LedgerID        pgtype.UUID `json:"ledger_id"`
@@ -281,19 +287,20 @@ type LfLedger struct {
 }
 
 type LfLedgerMember struct {
-	ID         pgtype.UUID `json:"id"`
-	LedgerID   pgtype.UUID `json:"ledger_id"`
-	OwnerID    int32       `json:"owner_id"`
-	Seq        int64       `json:"seq"`
-	Deleted    bool        `json:"deleted"`
-	DeletedAt  *time.Time  `json:"deleted_at"`
-	CreatedAt  time.Time   `json:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
-	UserID     int32       `json:"user_id"`
-	Role       string      `json:"role"`
-	JoinedAt   time.Time   `json:"joined_at"`
-	LeftAt     *time.Time  `json:"left_at"`
-	LedgerKind string      `json:"ledger_kind"`
+	ID          pgtype.UUID `json:"id"`
+	LedgerID    pgtype.UUID `json:"ledger_id"`
+	OwnerID     int32       `json:"owner_id"`
+	Seq         int64       `json:"seq"`
+	Deleted     bool        `json:"deleted"`
+	DeletedAt   *time.Time  `json:"deleted_at"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+	UserID      int32       `json:"user_id"`
+	Role        string      `json:"role"`
+	JoinedAt    time.Time   `json:"joined_at"`
+	LeftAt      *time.Time  `json:"left_at"`
+	LedgerKind  string      `json:"ledger_kind"`
+	DisplayName *string     `json:"display_name"`
 }
 
 type LfMonthlyReviewNote struct {

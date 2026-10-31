@@ -230,6 +230,7 @@ func TestLedgerCommandHandlers_MapCommandErrors(t *testing.T) {
 		{repository.CommandForbidden, http.StatusForbidden, "FORBIDDEN"},
 		{repository.CommandNotFound, http.StatusNotFound, "NOT_FOUND"},
 		{repository.CommandConflict, http.StatusConflict, "CONFLICT"},
+		{repository.CommandTooManyRequests, http.StatusTooManyRequests, "TOO_MANY_REQUESTS"},
 	}
 	for _, test_case := range test_cases {
 		command_repo := &fakeLedgerCommandRepo{command_err: &repository.CommandError{Kind: test_case.command_kind, Message: "メッセージ"}}
