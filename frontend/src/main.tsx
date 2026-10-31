@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
+import { deleteLegacyApiCaches } from "./pwa/appUpdate";
 
 async function bootstrap() {
   // Demo build only: start MSW in the browser and seed a session so the app
@@ -14,6 +15,9 @@ async function bootstrap() {
       onUnhandledRequest: "bypass",
     });
     seedDemoSession();
+  } else {
+    // The earlier service worker cached API responses; data is local now (#202).
+    void deleteLegacyApiCaches();
   }
 
   createRoot(document.getElementById("root")!).render(

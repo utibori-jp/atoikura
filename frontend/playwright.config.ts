@@ -11,13 +11,19 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: /demo\.spec\.ts/,
+      testIgnore: /(demo|pwa)\.spec\.ts/,
     },
     {
       // The static demo build, served by its own dev server with no backend.
       name: "demo",
       use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:3001/atoikura/" },
       testMatch: /demo\.spec\.ts/,
+    },
+    {
+      // The production build with its service worker, served by vite preview.
+      name: "pwa",
+      use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:4173" },
+      testMatch: /pwa\.spec\.ts/,
     },
   ],
   webServer: [
@@ -43,6 +49,12 @@ export default defineConfig({
       command: "npx vite --mode demo --port 3001 --strictPort",
       url: "http://localhost:3001/atoikura/",
       timeout: 120_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: "npm run build && npx vite preview --port 4173 --strictPort",
+      url: "http://localhost:4173",
+      timeout: 300_000,
       reuseExistingServer: !process.env.CI,
     },
   ],

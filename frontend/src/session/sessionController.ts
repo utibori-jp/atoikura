@@ -1,4 +1,4 @@
-import { api, AuthError, clearRuntimeCaches, setApiAccessTokenProvider } from "../api/client";
+import { api, AuthError, setApiAccessTokenProvider } from "../api/client";
 import type { components } from "../api/types";
 import { LocalDbBusyError, LocalDbInitError, openLocalDb, type LocalDb } from "../db/client";
 import { AuthSession, type KeyValueStorage } from "../sync/authSession";
@@ -162,7 +162,6 @@ export class SessionController {
   private async signOut(notice: string | null): Promise<void> {
     await this.services.auth_session.logout();
     this.services.profile_storage.removeItem(PROFILE_STORAGE_KEY);
-    void clearRuntimeCaches();
     this.setState({ status: "anonymous", notice });
   }
 
