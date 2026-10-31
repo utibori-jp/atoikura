@@ -3,6 +3,7 @@ import { deleteJournalEntry, listJournalDays, type JournalEntryView } from "../.
 import { useLedgerData, useLocalData } from "../../data/ledgerData";
 import { listDailyNotes, saveDailyNote } from "../../data/notes";
 import { T } from "../../theme";
+import { MonthSwitcher } from "../MonthSwitcher";
 import { useConfirm } from "../dialogContext";
 import { emojiForGroup } from "../mobile/groupEmoji";
 
@@ -17,6 +18,7 @@ function formatDateParts(date_str: string): { day: number; month: number; weekda
 
 interface Props {
   year_month: string;
+  onYearMonthChange: (year_month: string) => void;
   onEditEntry: (entry: JournalEntryView) => void;
 }
 
@@ -91,7 +93,7 @@ function DailyNoteField({ date, initial_note }: { date: string; initial_note: st
   );
 }
 
-export function WebJournal({ year_month, onEditEntry }: Props) {
+export function WebJournal({ year_month, onYearMonthChange, onEditEntry }: Props) {
   const confirm = useConfirm();
   const ledger_data = useLedgerData();
   const { data: journal_data, error_message: load_error_message } = useLocalData(
@@ -162,13 +164,19 @@ export function WebJournal({ year_month, onEditEntry }: Props) {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "flex-end" }}>
+      <div
+        style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "space-between" }}
+      >
+        <MonthSwitcher year_month={year_month} onYearMonthChange={onYearMonthChange} />
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
-            padding: "10px 14px",
+            // Same height as the month switcher next to it.
+            height: 32,
+            boxSizing: "border-box",
+            padding: "0 14px",
             borderRadius: 999,
             background: "#fff",
             border: `1.5px solid ${T.hair}`,
@@ -186,6 +194,7 @@ export function WebJournal({ year_month, onEditEntry }: Props) {
               border: "none",
               outline: "none",
               background: "transparent",
+              padding: 0,
               fontFamily: "inherit",
               fontSize: 13,
               color: T.ink,

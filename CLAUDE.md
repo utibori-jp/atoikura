@@ -92,6 +92,8 @@ cd frontend && npm run test:e2e
 ```
 
 The `webServer` config in `playwright.config.ts` automatically boots the Go backend (`make -C ../backend run` on `:8080`) and the Vite dev server (`npm run dev` on `:3000`) before running tests, and shuts them down after. No manual startup is needed.
+The `demo` project (`e2e/demo.spec.ts`) runs against the demo build on `:3001`
+(`vite --mode demo`), which needs no backend.
 
 **Prerequisites before first run:**
 - The backend DB must be migrated so the signup endpoint works:
