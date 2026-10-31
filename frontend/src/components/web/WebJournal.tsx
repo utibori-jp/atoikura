@@ -164,13 +164,19 @@ export function WebJournal({ year_month, onYearMonthChange, onEditEntry }: Props
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "flex-end" }}>
+      <div
+        style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "space-between" }}
+      >
+        <MonthSwitcher year_month={year_month} onYearMonthChange={onYearMonthChange} />
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
-            padding: "10px 14px",
+            // Same height as the month switcher next to it.
+            height: 32,
+            boxSizing: "border-box",
+            padding: "0 14px",
             borderRadius: 999,
             background: "#fff",
             border: `1.5px solid ${T.hair}`,
@@ -188,6 +194,7 @@ export function WebJournal({ year_month, onYearMonthChange, onEditEntry }: Props
               border: "none",
               outline: "none",
               background: "transparent",
+              padding: 0,
               fontFamily: "inherit",
               fontSize: 13,
               color: T.ink,
@@ -196,8 +203,6 @@ export function WebJournal({ year_month, onYearMonthChange, onEditEntry }: Props
           />
         </div>
       </div>
-
-      <MonthSwitcher year_month={year_month} onYearMonthChange={onYearMonthChange} />
 
       {error_msg && <div style={{ color: T.coralDeep, fontSize: 13 }}>{error_msg}</div>}
 
