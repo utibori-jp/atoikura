@@ -178,6 +178,7 @@ export function MobileJournal({ year_month, onEditEntry }: Props) {
                       border: `1px dashed ${T.mustard}`,
                       fontSize: 12,
                       color: T.ink,
+                      whiteSpace: "pre-wrap",
                     }}
                   >
                     💬 {note}
