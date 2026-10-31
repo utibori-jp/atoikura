@@ -4,6 +4,7 @@ import { useLedgerData, useLocalData } from "../../data/ledgerData";
 import { listDailyNotes, saveDailyNote } from "../../data/notes";
 import { T } from "../../theme";
 import { useAlert, useConfirm } from "../dialogContext";
+import { JournalCsvButton } from "../JournalCsvButton";
 import { emojiForGroup } from "./groupEmoji";
 
 const COLORS = {
@@ -82,6 +83,9 @@ export function MobileJournal({ year_month, onEditEntry }: Props) {
 
   return (
     <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <JournalCsvButton year_month={year_month} journal_days={entries} />
+      </div>
       {is_loading && (
         <p style={{ color: T.inkSoft, fontSize: 14, textAlign: "center" }}>読み込み中…</p>
       )}

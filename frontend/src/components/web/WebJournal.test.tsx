@@ -72,3 +72,46 @@ describe("WebJournal on the local database", () => {
     expect((newest_day_note as HTMLInputElement).value).toBe("よく買った");
   });
 });
+
+describe("WebJournal CSV export", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("saves the month's entries on the device as a CSV file", async () => {
+    const saved_blobs: Blob[] = [];
+    URL.createObjectURL = vi.fn((saved_blob: Blob) => {
+      saved_blobs.push(saved_blob);
+      return "blob:journal-csv";
+    });
+    URL.revokeObjectURL = vi.fn();
+    const saved_file_names: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement
+    ) {
+      saved_file_names.push(this.download);
+    });
+    await renderWithLedger(
+      <WebJournal year_month="2026-10" onYearMonthChange={() => {}} onEditEntry={() => {}} />,
+      serveJournal()
+    );
+    await screen.findByText("パン", undefined, INITIAL_LOAD);
+
+    fireEvent.click(screen.getByRole("button", { name: "⬇ CSV" }));
+
+    expect(saved_file_names).toEqual(["atoikura-journal-2026-10.csv"]);
+    const csv_text = await saved_blobs[0].text();
+    expect(csv_text).toContain(",家族の買い物,3400,");
+    expect(csv_text).toContain(",パン,1200,");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:journal-csv");
+  });
+
+  it("is disabled for a month without entries", async () => {
+    await renderWithLedger(
+      <WebJournal year_month="2026-09" onYearMonthChange={() => {}} onEditEntry={() => {}} />,
+      serveJournal()
+    );
+    await screen.findByText("この月の仕訳はありません", undefined, INITIAL_LOAD);
+    expect(screen.getByRole("button", { name: "⬇ CSV" })).toBeDisabled();
+  });
+});
