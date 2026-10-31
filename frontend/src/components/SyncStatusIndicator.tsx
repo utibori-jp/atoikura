@@ -3,6 +3,7 @@ import type React from "react";
 import { useAppSession, useSyncStatus } from "../session/sessionHooks";
 import type { SyncPhase, SyncStatus } from "../sync/engine";
 import type { SyncRejection } from "../sync/store";
+import { checkForAppUpdate } from "../pwa/appUpdate";
 import { T, btnGhost, btnPrimary } from "../theme";
 import { Modal } from "./Modal";
 
@@ -66,6 +67,12 @@ export function SyncStatusIndicator({ is_mobile = false }: { is_mobile?: boolean
   const show_details =
     details_requested ||
     (sync_status.rejection_count > 0 && sync_status.rejection_count !== seen_rejection_count);
+  // The server needs a newer app: look for it now, so the update prompt appears
+  // as soon as the new version is installed.
+  const is_update_required = sync_status.phase === "update_required";
+  useEffect(() => {
+    if (is_update_required) checkForAppUpdate();
+  }, [is_update_required]);
 
   return (
     <>

@@ -23,6 +23,7 @@ import { MonthSwitcher } from "./components/MonthSwitcher";
 import { SyncStatusIndicator } from "./components/SyncStatusIndicator";
 import type { JournalEntryView } from "./data/journal";
 import { LedgerDataProvider } from "./data/LedgerDataProvider";
+import { UpdateNotice } from "./pwa/UpdateNotice";
 import { SessionProvider } from "./session/SessionContext";
 import {
   createBrowserAppServices,
@@ -703,6 +704,7 @@ export default function App({ services }: { services?: AppServices }) {
   return (
     <DialogProvider is_mobile={is_mobile}>
       <AppContent is_mobile={is_mobile} session_controller={session_controller} />
+      <UpdateNotice is_mobile={is_mobile} />
     </DialogProvider>
   );
 }
