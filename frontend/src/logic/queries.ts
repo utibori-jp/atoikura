@@ -1,14 +1,17 @@
 import type { SqlDatabase } from "../db/types";
 import {
+  allowanceBalances,
   allowanceInEffect,
   computeLedgerBudget,
   dailyBudget,
   daysRemaining,
+  variableBudget,
   type AllowanceHistoryEntry,
+  type AllowanceMonth,
   type LedgerBudget,
   type LedgerBudgetInput,
 } from "./budget";
-import { addMonths } from "./calendar";
+import { addMonths, todayInJst } from "./calendar";
 import type { DailySums } from "./forecast";
 import { STATEMENT_TYPES, type StatementTypeCode } from "./statementTypes";
 
@@ -321,4 +324,204 @@ export function listPostedRecurringIds(
     [ledger_id, year_month]
   );
   return new Set(posted_rows.map((posted_row) => String(posted_row.recurring_expense_id)));
+}
+
+// --- Allowance (a personal ledger while a household is attached, design.md §3) ---
+
+// The first month a member's allowance covers: the JST month they joined the
+// household, or null when they are not a current member.
+export function householdJoinMonth(
+  sql_db: SqlDatabase,
+  household_ledger_id: string,
+  user_id: number
+): string | null {
+  const [member_row] = sql_db.selectRows(
+    `SELECT joined_at FROM ledger_members
+     WHERE ledger_id = ? AND user_id = ? AND deleted = 0 AND left_at IS NULL`,
+    [household_ledger_id, user_id]
+  );
+  if (!member_row || member_row.joined_at === null) return null;
+  return todayInJst(new Date(String(member_row.joined_at))).slice(0, 7);
+}
+
+// What the viewer put into personal savings per month: savings postings plus
+// surplus allocated to savings, as the server's allowance_totals.saved.
+export function listOwnAllowanceSavings(
+  sql_db: SqlDatabase,
+  personal_ledger_id: string
+): Record<string, number> {
+  const savings_rows = sql_db.selectRows(
+    `SELECT year_month, SUM(amount) AS total FROM (
+       SELECT year_month, amount FROM savings_postings WHERE ledger_id = ? AND deleted = 0
+       UNION ALL
+       SELECT year_month, amount FROM surplus_allocations
+       WHERE ledger_id = ? AND deleted = 0 AND destination = 'savings'
+     )
+     GROUP BY year_month`,
+    [personal_ledger_id, personal_ledger_id]
+  );
+  return Object.fromEntries(
+    savings_rows.map((savings_row) => [
+      String(savings_row.year_month),
+      sumAsNumber(savings_row.total),
+    ])
+  );
+}
+
+// The viewer's allowance months from their join month through target_month,
+// computed from their own personal ledger.
+function ownAllowanceMonths(
+  sql_db: SqlDatabase,
+  personal_ledger_id: string,
+  household_ledger_id: string,
+  user_id: number,
+  target_month: string
+): AllowanceMonth[] {
+  const join_month = householdJoinMonth(sql_db, household_ledger_id, user_id);
+  if (join_month === null) return [];
+  const allowance_history = listAllowanceHistories(sql_db, household_ledger_id).get(user_id) ?? [];
+  return allowanceBalances(
+    allowance_history,
+    listOwnAllowanceSpending(sql_db, personal_ledger_id),
+    join_month,
+    target_month,
+    listOwnAllowanceSavings(sql_db, personal_ledger_id)
+  );
+}
+
+export interface AllowanceSummary {
+  // Allowance in effect for the month.
+  allowance: number;
+  // Balance carried over from the previous months (negative after overspending).
+  carried_in: number;
+  // Balance at the end of the month so far: carried_in + allowance − spent − saved.
+  balance: number;
+  recurring_total: number;
+  savings_total: number;
+  // carried_in + allowance minus the personal ledger's fixed costs and savings:
+  // what the member may spend on variable costs this month.
+  variable_budget: number;
+  variable_spending: number;
+  remaining: number;
+  daily_budget: number;
+  days_remaining: number;
+  history: BudgetHistoryItem[];
+}
+
+function allowanceVariableBudget(
+  sql_db: SqlDatabase,
+  personal_ledger_id: string,
+  allowance_month: AllowanceMonth | undefined,
+  year_month: string
+): { ledger_budget_input: LedgerBudgetInput; variable_budget: number } {
+  const ledger_budget_input = loadLedgerBudgetInput(sql_db, personal_ledger_id, year_month);
+  // Before the member joined there is no allowance to budget from.
+  if (!allowance_month) return { ledger_budget_input, variable_budget: 0 };
+  return {
+    ledger_budget_input,
+    variable_budget: variableBudget(
+      allowance_month.carried_in + allowance_month.allowance,
+      ledger_budget_input.ledger_recurring_fixed_total,
+      ledger_budget_input.savings_monthly_total,
+      ledger_budget_input.savings_allocated
+    ),
+  };
+}
+
+// The allowance view's budget summary: the personal ledger budgeted from the
+// allowance and carry-over instead of income.
+export function computeAllowanceSummary(
+  sql_db: SqlDatabase,
+  personal_ledger_id: string,
+  household_ledger_id: string,
+  user_id: number,
+  year_month: string,
+  today_jst: string
+): AllowanceSummary {
+  const allowance_months = ownAllowanceMonths(
+    sql_db,
+    personal_ledger_id,
+    household_ledger_id,
+    user_id,
+    year_month
+  );
+  const allowance_by_month = new Map(
+    allowance_months.map((allowance_month) => [allowance_month.year_month, allowance_month])
+  );
+  const target_allowance_month = allowance_by_month.get(year_month);
+  const { ledger_budget_input, variable_budget } = allowanceVariableBudget(
+    sql_db,
+    personal_ledger_id,
+    target_allowance_month,
+    year_month
+  );
+  const variable_spending = sumVariableSpending(sql_db, personal_ledger_id, year_month);
+  const history: BudgetHistoryItem[] = [-2, -1, 0].map((month_offset) => {
+    const history_month = addMonths(year_month, month_offset);
+    return {
+      year_month: history_month,
+      budget: allowanceVariableBudget(
+        sql_db,
+        personal_ledger_id,
+        allowance_by_month.get(history_month),
+        history_month
+      ).variable_budget,
+      actual: sumVariableSpending(sql_db, personal_ledger_id, history_month),
+    };
+  });
+  return {
+    allowance: target_allowance_month?.allowance ?? 0,
+    carried_in: target_allowance_month?.carried_in ?? 0,
+    balance: target_allowance_month?.balance ?? 0,
+    recurring_total: ledger_budget_input.ledger_recurring_fixed_total,
+    savings_total: ledger_budget_input.savings_monthly_total,
+    variable_budget,
+    variable_spending,
+    remaining: variable_budget - variable_spending,
+    daily_budget: dailyBudget(variable_budget, year_month),
+    days_remaining: daysRemaining(year_month, today_jst),
+    history,
+  };
+}
+
+export interface HouseholdMember {
+  user_id: number;
+  display_name: string;
+  role: "owner" | "member";
+  // Allowance in effect for the month.
+  allowance: number;
+  // The member's allowance spending and personal savings this month, from the
+  // server-computed totals: the only view members have of each other's allowance.
+  spent: number;
+  saved: number;
+}
+
+// Current members of the household with their allowance for year_month, owner first.
+export function listHouseholdMembers(
+  sql_db: SqlDatabase,
+  household_ledger_id: string,
+  year_month: string
+): HouseholdMember[] {
+  const member_rows = sql_db.selectRows(
+    `SELECT lm.user_id, lm.display_name, lm.role,
+            COALESCE(at.spent, 0) AS spent, COALESCE(at.saved, 0) AS saved
+     FROM ledger_members lm
+     LEFT JOIN allowance_totals at
+       ON at.ledger_id = lm.ledger_id AND at.member_id = lm.user_id AND at.year_month = ?
+     WHERE lm.ledger_id = ? AND lm.deleted = 0 AND lm.left_at IS NULL
+     ORDER BY lm.role = 'owner' DESC, lm.joined_at, lm.user_id`,
+    [year_month, household_ledger_id]
+  );
+  const histories_by_member = listAllowanceHistories(sql_db, household_ledger_id);
+  return member_rows.map((member_row) => {
+    const member_id = Number(member_row.user_id);
+    return {
+      user_id: member_id,
+      display_name: member_row.display_name === null ? "" : String(member_row.display_name),
+      role: member_row.role === "owner" ? "owner" : "member",
+      allowance: allowanceInEffect(histories_by_member.get(member_id) ?? [], year_month),
+      spent: Number(member_row.spent),
+      saved: Number(member_row.saved),
+    };
+  });
 }

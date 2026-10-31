@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { T } from "../../theme";
-import { useLedgerApi, type BudgetSummaryView } from "../../data/ledgerApi";
+import { budgetSource, useLedgerApi, type BudgetSummaryView } from "../../data/ledgerApi";
 import { useDataVersion } from "../../session/sessionHooks";
 
 type BudgetSummary = BudgetSummaryView;
@@ -56,8 +56,12 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
     return <p style={{ color: T.inkSoft, fontSize: 14, textAlign: "center" }}>読み込み中…</p>;
   }
 
+  const source = budgetSource(summary);
+  // A tile without a screen is informational: income lives in the household
+  // while it is attached, and allowances are set in the account settings.
   const tiles: Array<{
-    screen: BudgetSubScreen;
+    key: string;
+    screen: BudgetSubScreen | null;
     sign: string;
     emoji: string;
     title: string;
@@ -66,15 +70,17 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
     tone: { bg: string; fg: string; signBg: string };
   }> = [
     {
-      screen: "income",
+      key: "source",
+      screen: summary.allowance ? null : "income",
       sign: "+",
-      emoji: "💼",
-      title: "基準収入",
-      sub: "毎月の見込み収入",
-      amount: summary.base_income,
+      emoji: summary.allowance ? "👛" : "💼",
+      title: source.label,
+      sub: source.description,
+      amount: source.amount,
       tone: { bg: T.sageSoft, fg: T.sageDeep, signBg: "rgba(123,196,164,0.18)" },
     },
     {
+      key: "recurring",
       screen: "recurring",
       sign: "−",
       emoji: "🔁",
@@ -84,6 +90,7 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
       tone: { bg: "#E5EEF7", fg: "#3F6B91", signBg: "rgba(166,201,226,0.18)" },
     },
     {
+      key: "savings",
       screen: "savings",
       sign: "−",
       emoji: "💰",
@@ -92,6 +99,20 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
       amount: summary.savings_total,
       tone: { bg: T.mustardSoft, fg: T.mustardDeep, signBg: "rgba(255,194,71,0.18)" },
     },
+    ...(summary.allowance_total > 0
+      ? [
+          {
+            key: "allowances",
+            screen: null,
+            sign: "−",
+            emoji: "👛",
+            title: "お小遣い",
+            sub: "メンバーのお小遣いの合計",
+            amount: summary.allowance_total,
+            tone: { bg: "#F6E6F0", fg: "#A0507E", signBg: "rgba(160,80,126,0.12)" },
+          },
+        ]
+      : []),
   ];
 
   const currentMonth = currentMonthJST();
@@ -111,7 +132,9 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
         >
           今月の予算プラン
         </div>
-        <div style={{ fontSize: 13, color: T.inkSoft, marginTop: 2 }}>基準収入から自動で算出</div>
+        <div style={{ fontSize: 13, color: T.inkSoft, marginTop: 2 }}>
+          {summary.allowance ? "お小遣い（繰越込み）から自動で算出" : "基準収入から自動で算出"}
+        </div>
       </div>
 
       {/* Hero card */}
@@ -245,16 +268,18 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {tiles.map((tile) => (
           <button
-            key={tile.screen}
+            key={tile.key}
             type="button"
-            onClick={() => onNavigate(tile.screen)}
+            disabled={!tile.screen}
+            onClick={tile.screen ? () => onNavigate(tile.screen as BudgetSubScreen) : undefined}
             style={{
               background: T.card,
               borderRadius: 28,
               padding: "14px 16px",
               boxShadow: T.cardShadow,
               border: "none",
-              cursor: "pointer",
+              cursor: tile.screen ? "pointer" : "default",
+              color: "inherit",
               textAlign: "left",
               fontFamily: "inherit",
               width: "100%",
@@ -327,9 +352,11 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
                 </div>
                 <div style={{ fontSize: 10, color: T.inkSoft, fontWeight: 600 }}>今月の合計</div>
               </div>
-              <span style={{ color: T.coralDeep, fontSize: 22, fontWeight: 700, marginLeft: 2 }}>
-                ›
-              </span>
+              {tile.screen && (
+                <span style={{ color: T.coralDeep, fontSize: 22, fontWeight: 700, marginLeft: 2 }}>
+                  ›
+                </span>
+              )}
             </div>
           </button>
         ))}
@@ -353,11 +380,17 @@ export function MobileBudget({ onNavigate }: MobileBudgetProps) {
           fontFamily: "'DM Sans', sans-serif",
         }}
       >
-        <span style={{ color: T.sageDeep }}>基準収入</span>
+        <span style={{ color: T.sageDeep }}>{source.label}</span>
         <span>−</span>
         <span style={{ color: "#3F6B91" }}>定期支出</span>
         <span>−</span>
         <span style={{ color: T.mustardDeep }}>貯金</span>
+        {summary.allowance_total > 0 && (
+          <>
+            <span>−</span>
+            <span style={{ color: "#A0507E" }}>お小遣い</span>
+          </>
+        )}
         <span style={{ color: T.ink, fontWeight: 700 }}>= 今月の予算</span>
       </div>
 

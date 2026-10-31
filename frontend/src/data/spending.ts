@@ -6,11 +6,41 @@ import type { LedgerData } from "./ledgerData";
 
 export interface DailyCumulative {
   year_month: string;
-  // The shared living budget (in personal mode: income − fixed − savings).
+  // The shared living budget (in solo mode: income − fixed − savings; in
+  // allowance mode: allowance + carry-over − fixed − savings).
   variable_budget: number;
   daily_budget: number;
   // Every day of the month: actual cumulative spending, then the forecast.
   days: DailyEntry[];
+}
+
+// The month's variable budget of the ledger the screens show. In allowance mode
+// it comes from the allowance and carry-over instead of income.
+async function loadMonthBudget(
+  ledger_data: LedgerData,
+  year_month: string,
+  today_jst: string
+): Promise<{ variable_budget: number; daily_budget: number }> {
+  if (ledger_data.mode === "allowance" && ledger_data.household_ledger_id) {
+    return ledger_data.local_db.query(
+      "computeAllowanceSummary",
+      ledger_data.personal_ledger_id,
+      ledger_data.household_ledger_id,
+      ledger_data.user_id,
+      year_month,
+      today_jst
+    );
+  }
+  const ledger_summary = await ledger_data.local_db.query(
+    "computeLedgerSummary",
+    ledger_data.ledger_id,
+    year_month,
+    today_jst
+  );
+  return {
+    variable_budget: ledger_summary.shared_living_budget,
+    daily_budget: ledger_summary.daily_budget,
+  };
 }
 
 export async function loadDailyCumulative(
@@ -18,19 +48,14 @@ export async function loadDailyCumulative(
   year_month: string,
   today_jst: string
 ): Promise<DailyCumulative> {
-  const [ledger_summary, daily_sums] = await Promise.all([
-    ledger_data.local_db.query(
-      "computeLedgerSummary",
-      ledger_data.ledger_id,
-      year_month,
-      today_jst
-    ),
+  const [month_budget, daily_sums] = await Promise.all([
+    loadMonthBudget(ledger_data, year_month, today_jst),
     ledger_data.local_db.query("listDailyVariableSums", ledger_data.ledger_id, year_month),
   ]);
   return {
     year_month,
-    variable_budget: ledger_summary.shared_living_budget,
-    daily_budget: ledger_summary.daily_budget,
+    variable_budget: month_budget.variable_budget,
+    daily_budget: month_budget.daily_budget,
     days: buildDailyEntries(daily_sums, year_month, today_jst),
   };
 }

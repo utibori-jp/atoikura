@@ -219,7 +219,7 @@ function entryColumnValues(entry_fields: JournalEntryFields): Record<string, Sql
   };
 }
 
-// Records an entry in the personal ledger and returns its ID.
+// Records an entry in the ledger the screens show and returns its ID.
 export async function createJournalEntry(
   ledger_data: LedgerData,
   entry_fields: JournalEntryFields
@@ -228,7 +228,7 @@ export async function createJournalEntry(
   return ledger_data.store.createRecord(
     "journal_entries",
     entryColumnValues(entry_fields),
-    "personal"
+    ledger_data.ledger_target
   );
 }
 

@@ -1,9 +1,12 @@
+import type { LedgerTarget } from "./store";
 import type { CommandMethod } from "./transport";
 import type { PulledRow } from "./wire";
 
 // Typed wrappers for the online-only ledger commands (sync-api.yaml, /ledger/*).
-// The ledger and the author always come from the token, so no request carries a
-// ledger_id or owner_id. Each command resolves with the row it wrote.
+// The author always comes from the token, and the ledger is only named as
+// personal or household (?ledger=), which the server resolves from the token too,
+// so no request carries a ledger_id or owner_id. Each command resolves with the
+// row it wrote.
 
 export type CommandSender = (
   method: CommandMethod,
@@ -73,7 +76,16 @@ function idPath(collection_path: string, record_id: string, action_suffix = ""):
   return `/ledger/${collection_path}/${encodeURIComponent(record_id)}${action_suffix}`;
 }
 
-export function createLedgerCommands(send: CommandSender) {
+export function createLedgerCommands(
+  send_to_ledger: CommandSender,
+  ledger_target: LedgerTarget = "personal"
+) {
+  const send: CommandSender = (method, path, request_body) =>
+    send_to_ledger(
+      method,
+      ledger_target === "household" ? `${path}?ledger=household` : path,
+      request_body
+    );
   return {
     createCategoryGroup: (group_input: CategoryGroupInput) =>
       send("POST", "/ledger/category-groups", group_input),

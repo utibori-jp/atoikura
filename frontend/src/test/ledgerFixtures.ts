@@ -6,6 +6,8 @@ import { TEST_API_BASE } from "./appServices";
 import { TEST_LEDGER_ID } from "./handlers";
 
 export const TEST_USER_ID = 1;
+export const TEST_HOUSEHOLD_ID = "01920000-0000-7000-8000-0000000000bb";
+export const TEST_PARTNER_ID = 2;
 
 export interface RecordedCommand {
   method: string;
@@ -29,18 +31,23 @@ export class TestLedgerServer {
   private next_command_row_number = 1;
   readonly recorded_commands: RecordedCommand[] = [];
   private command_rejection: { http_status: number; code: string; message: string } | null = null;
+  // The attached household, as pull reports it.
+  household_ledger_id: string | null = null;
+  readonly recorded_household_commands: RecordedCommand[] = [];
+  private open_invitation_ids: string[] = [];
 
   // Adds or replaces a row; the next pull after it delivers the new version.
   putRow(
     collection: string,
     id: string,
     data: Record<string, unknown>,
-    owner_id: number = TEST_USER_ID
+    owner_id: number = TEST_USER_ID,
+    ledger_id: string = this.rows_by_id.get(id)?.ledger_id ?? TEST_LEDGER_ID
   ): PulledRow {
     const pulled_row: PulledRow = {
       collection,
       id,
-      ledger_id: TEST_LEDGER_ID,
+      ledger_id,
       owner_id,
       seq: this.next_seq++,
       deleted: false,
@@ -73,16 +80,27 @@ export class TestLedgerServer {
   // and writes the row the way the server would, without its validation.
   commandHandler() {
     return http.all(`${TEST_API_BASE}/ledger/*`, async ({ request }) => {
-      const command_path = new URL(request.url).pathname.replace(/^\/ledger\//, "");
+      const request_url = new URL(request.url);
+      const command_path = request_url.pathname.replace(/^\/ledger\//, "");
+      const is_household_command = request_url.searchParams.get("ledger") === "household";
       const request_body =
         request.method === "DELETE" ? null : ((await request.json()) as Record<string, unknown>);
-      this.recorded_commands.push({ method: request.method, path: command_path, request_body });
+      this.recorded_commands.push({
+        method: request.method,
+        path: is_household_command ? `${command_path}?ledger=household` : command_path,
+        request_body,
+      });
       if (this.command_rejection) {
         const { http_status, code, message } = this.command_rejection;
         this.command_rejection = null;
         return HttpResponse.json({ code, message }, { status: http_status });
       }
-      const written_row = this.writeCommandRow(request.method, command_path, request_body ?? {});
+      const written_row = this.writeCommandRow(
+        request.method,
+        command_path,
+        request_body ?? {},
+        is_household_command && this.household_ledger_id ? this.household_ledger_id : TEST_LEDGER_ID
+      );
       if (!written_row)
         return HttpResponse.json({ code: "not_found", message: "not found" }, { status: 404 });
       return HttpResponse.json(written_row, { status: request.method === "POST" ? 201 : 200 });
@@ -96,7 +114,8 @@ export class TestLedgerServer {
   private writeCommandRow(
     method: string,
     command_path: string,
-    request_body: Record<string, unknown>
+    request_body: Record<string, unknown>,
+    target_ledger_id: string
   ): PulledRow | undefined {
     if (command_path === "base-income") {
       const base_income_row = [...this.rows_by_id.values()].find(
@@ -135,7 +154,13 @@ export class TestLedgerServer {
     if (!collection) return undefined;
     if (method === "POST") {
       const extra_fields = collection === "income_records" ? { earner_id: TEST_USER_ID } : {};
-      return this.putRow(collection, this.newCommandRowId(), { ...extra_fields, ...request_body });
+      return this.putRow(
+        collection,
+        this.newCommandRowId(),
+        { ...extra_fields, ...request_body },
+        TEST_USER_ID,
+        target_ledger_id
+      );
     }
     const existing_row = this.rows_by_id.get(record_id);
     if (!existing_row) return undefined;
@@ -145,21 +170,184 @@ export class TestLedgerServer {
     return this.deleteRow(record_id);
   }
 
+  // The household lifecycle (sync-api.yaml, /household/*) without its checks:
+  // creating or joining attaches TEST_HOUSEHOLD_ID, leaving or dissolving
+  // detaches it.
+  householdHandler() {
+    return http.all(`${TEST_API_BASE}/household*`, async ({ request }) => {
+      const household_path = new URL(request.url).pathname;
+      const request_body =
+        request.method === "GET" ||
+        request.method === "DELETE" ||
+        request.headers.get("content-type") === null
+          ? null
+          : ((await request.json()) as Record<string, unknown>);
+      this.recorded_household_commands.push({
+        method: request.method,
+        path: household_path,
+        request_body,
+      });
+      const command_key = `${request.method} ${household_path}`;
+      if (command_key === "POST /household") {
+        seedHousehold(this, { name: String(request_body?.name ?? "") });
+        return HttpResponse.json({ household_ledger_id: TEST_HOUSEHOLD_ID }, { status: 201 });
+      }
+      if (command_key === "POST /household/join") {
+        seedHousehold(this, { name: "わが家", role: "member" });
+        return HttpResponse.json({ household_ledger_id: TEST_HOUSEHOLD_ID });
+      }
+      if (command_key === "POST /household/leave" || command_key === "POST /household/dissolve") {
+        this.household_ledger_id = null;
+        return new HttpResponse(null, { status: 204 });
+      }
+      if (command_key === "POST /household/invitations") {
+        const invitation_id = `invitation-${this.open_invitation_ids.length + 1}`;
+        this.open_invitation_ids.push(invitation_id);
+        return HttpResponse.json(
+          { ...testInvitation(invitation_id), token: `token-${invitation_id}` },
+          { status: 201 }
+        );
+      }
+      if (command_key === "GET /household/invitations") {
+        return HttpResponse.json({
+          invitations: this.open_invitation_ids.map((invitation_id) => ({
+            ...testInvitation(invitation_id),
+            created_by: TEST_USER_ID,
+          })),
+        });
+      }
+      if (request.method === "DELETE" && household_path.startsWith("/household/invitations/")) {
+        const revoked_id = household_path.split("/").pop();
+        this.open_invitation_ids = this.open_invitation_ids.filter(
+          (invitation_id) => invitation_id !== revoked_id
+        );
+        return new HttpResponse(null, { status: 204 });
+      }
+      if (request.method === "DELETE" && household_path.startsWith("/household/members/")) {
+        const member_id = Number(household_path.split("/").pop());
+        const member_row = [...this.rows_by_id.values()].find(
+          (pulled_row) =>
+            pulled_row.collection === "ledger_members" &&
+            pulled_row.ledger_id === this.household_ledger_id &&
+            pulled_row.data.user_id === member_id
+        );
+        if (member_row) {
+          this.putRow("ledger_members", member_row.id, {
+            ...member_row.data,
+            left_at: "2026-10-31T00:00:00Z",
+          });
+        }
+        return new HttpResponse(null, { status: 204 });
+      }
+      if (command_key === "PUT /household/allowances" && this.household_ledger_id) {
+        const written_row = this.putRow(
+          "allowances",
+          `allowance-${String(request_body?.member_id)}-${String(request_body?.effective_from)}`,
+          { ...request_body },
+          TEST_USER_ID,
+          this.household_ledger_id
+        );
+        return HttpResponse.json(written_row);
+      }
+      return HttpResponse.json({ code: "NOT_FOUND", message: "not found" }, { status: 404 });
+    });
+  }
+
+  private pulledLedgerIds(): string[] {
+    return this.household_ledger_id ? [TEST_LEDGER_ID, this.household_ledger_id] : [TEST_LEDGER_ID];
+  }
+
   pullHandler() {
     return http.get(`${TEST_API_BASE}/sync/pull`, ({ request }) => {
       const since_seq = Number(new URL(request.url).searchParams.get("since") ?? "0");
+      const pulled_ledger_ids = this.pulledLedgerIds();
       const new_rows = [...this.rows_by_id.values()]
-        .filter((pulled_row) => pulled_row.seq > since_seq)
+        .filter(
+          (pulled_row) =>
+            pulled_row.seq > since_seq && pulled_ledger_ids.includes(pulled_row.ledger_id)
+        )
         .sort((left_row, right_row) => left_row.seq - right_row.seq);
       return HttpResponse.json({
-        ledger_ids: [TEST_LEDGER_ID],
+        ledger_ids: pulled_ledger_ids,
         personal_ledger_id: TEST_LEDGER_ID,
-        household_ledger_id: null,
+        household_ledger_id: this.household_ledger_id,
         rows: new_rows,
         next_since: Math.max(since_seq, ...new_rows.map((pulled_row) => pulled_row.seq)),
         has_more: false,
       });
     });
+  }
+}
+
+function testInvitation(invitation_id: string) {
+  return {
+    id: invitation_id,
+    short_code: `CODE${invitation_id.slice(-1).padStart(4, "2")}`,
+    expires_at: "2026-11-01T00:00:00Z",
+  };
+}
+
+export interface HouseholdMemberSeed {
+  user_id: number;
+  display_name: string;
+  role: "owner" | "member";
+  joined_at?: string;
+  allowance?: number;
+}
+
+// Attaches TEST_HOUSEHOLD_ID to the signed-in user: the household ledger, its
+// members and their allowances from effective_from on.
+export function seedHousehold(
+  ledger_server: TestLedgerServer,
+  {
+    name = "わが家",
+    role = "owner",
+    members,
+    effective_from = "2026-01",
+  }: {
+    name?: string;
+    role?: "owner" | "member";
+    members?: HouseholdMemberSeed[];
+    effective_from?: string;
+  } = {}
+): void {
+  ledger_server.household_ledger_id = TEST_HOUSEHOLD_ID;
+  ledger_server.putRow(
+    "ledgers",
+    TEST_HOUSEHOLD_ID,
+    { kind: "household", name },
+    TEST_USER_ID,
+    TEST_HOUSEHOLD_ID
+  );
+  const household_members = members ?? [{ user_id: TEST_USER_ID, display_name: "Dev User", role }];
+  for (const household_member of household_members) {
+    ledger_server.putRow(
+      "ledger_members",
+      `member-${household_member.user_id}`,
+      {
+        user_id: household_member.user_id,
+        display_name: household_member.display_name,
+        role: household_member.role,
+        ledger_kind: "household",
+        joined_at: household_member.joined_at ?? "2026-01-01T00:00:00Z",
+        left_at: null,
+      },
+      household_member.user_id,
+      TEST_HOUSEHOLD_ID
+    );
+    if (household_member.allowance !== undefined) {
+      ledger_server.putRow(
+        "allowances",
+        `allowance-${household_member.user_id}-${effective_from}`,
+        {
+          member_id: household_member.user_id,
+          effective_from,
+          amount: household_member.allowance,
+        },
+        TEST_USER_ID,
+        TEST_HOUSEHOLD_ID
+      );
+    }
   }
 }
 

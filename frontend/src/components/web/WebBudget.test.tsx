@@ -6,7 +6,11 @@ import {
   putRecurringExpense,
   putSavingsGoal,
   seedFixedCategory,
+  seedHousehold,
   seedPersonalLedger,
+  TEST_HOUSEHOLD_ID,
+  TEST_PARTNER_ID,
+  TEST_USER_ID,
   TestLedgerServer,
 } from "../../test/ledgerFixtures";
 import { renderWithLedger } from "../../test/renderWithLedger";
@@ -67,5 +71,57 @@ describe("WebBudget — spending from the local database", () => {
     expect(screen.getByText("基準収入")).toBeInTheDocument();
     expect(screen.getByText("基準収入 ¥400,000")).toBeInTheDocument();
     expect(screen.queryByText("基準収入 ¥500,000")).not.toBeInTheDocument();
+  });
+});
+
+describe("WebBudget — with a household attached", () => {
+  function attachedLedgerServer() {
+    const ledger_server = budgetLedgerServer();
+    seedHousehold(ledger_server, {
+      effective_from: current_month,
+      members: [
+        {
+          user_id: TEST_USER_ID,
+          display_name: "Dev User",
+          role: "owner",
+          // Joined this month, so nothing carries over yet.
+          joined_at: `${current_month}-01T00:00:00+09:00`,
+          allowance: 150000,
+        },
+        { user_id: TEST_PARTNER_ID, display_name: "Partner", role: "member", allowance: 50000 },
+      ],
+    });
+    ledger_server.putRow(
+      "base_incomes",
+      "household-base-income",
+      { member_id: TEST_USER_ID, amount: 400000 },
+      TEST_USER_ID,
+      TEST_HOUSEHOLD_ID
+    );
+    return ledger_server;
+  }
+
+  it("budgets the allowance view from the allowance instead of income", async () => {
+    await renderWithLedger(<WebBudget onNavigate={() => {}} />, attachedLedgerServer(), {
+      preferred_target: "personal",
+    });
+    expect(
+      await screen.findByText("今月 ¥150,000 + 繰越 ¥0", undefined, { timeout: 5000 })
+    ).toBeInTheDocument();
+
+    // Allowance 150,000 − fixed 80,000 − savings 20,000.
+    expect(screen.getByText("今月の予算 ¥50,000")).toBeInTheDocument();
+    expect(screen.getByText("お小遣い ¥150,000")).toBeInTheDocument();
+    expect(screen.queryByText(/基準収入/)).not.toBeInTheDocument();
+  });
+
+  it("takes the members' allowances out of the household budget", async () => {
+    await renderWithLedger(<WebBudget onNavigate={() => {}} />, attachedLedgerServer());
+    expect(
+      await screen.findByText("基準収入 ¥400,000", undefined, { timeout: 5000 })
+    ).toBeInTheDocument();
+
+    expect(screen.getByText("お小遣い ¥200,000")).toBeInTheDocument();
+    expect(screen.getByText("今月の予算 ¥200,000")).toBeInTheDocument();
   });
 });

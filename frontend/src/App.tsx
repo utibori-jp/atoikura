@@ -23,6 +23,10 @@ import { MonthSwitcher } from "./components/MonthSwitcher";
 import { SyncStatusIndicator } from "./components/SyncStatusIndicator";
 import type { JournalEntryView } from "./data/journal";
 import { LedgerDataProvider } from "./data/LedgerDataProvider";
+import { joinTokenFromHash } from "./data/household";
+import { LedgerViewContext, useLedgerViewState } from "./data/ledgerData";
+import { HouseholdSettings } from "./components/HouseholdSettings";
+import { LedgerViewSwitcher } from "./components/LedgerViewSwitcher";
 import { UpdateNotice } from "./pwa/UpdateNotice";
 import { SessionProvider } from "./session/SessionContext";
 import {
@@ -475,11 +479,40 @@ function AppContent({
     session_controller.subscribe,
     session_controller.getState
   );
-  const [active_tab, setActiveTab] = useState<Tab>("home");
+  // An invitation link lands on the account screen's household settings.
+  const [active_tab, setActiveTab] = useState<Tab>(() =>
+    joinTokenFromHash(window.location.hash) ? "account" : "home"
+  );
   const [budget_sub, setBudgetSub] = useState<BudgetSubScreen>("hub");
   const [list_year_month, setListYearMonth] = useState(currentMonthJST());
   const [show_entry_sheet, setShowEntrySheet] = useState(false);
   const [edit_entry, setEditEntry] = useState<JournalEntryView | null>(null);
+  const ledger_view_state = useLedgerViewState();
+  // An invitation link opens the app with #join=<token>. The token is taken out
+  // of the URL right away so it doesn't linger in history, and the household
+  // settings ask before joining.
+  const [pending_join_token, setPendingJoinToken] = useState<string | null>(() =>
+    joinTokenFromHash(window.location.hash)
+  );
+  useEffect(() => {
+    const clearJoinHash = () =>
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${window.location.search}`
+      );
+    if (joinTokenFromHash(window.location.hash)) clearJoinHash();
+    // A link opened in a tab that already shows the app only changes the hash.
+    const handle_hashchange = () => {
+      const join_token = joinTokenFromHash(window.location.hash);
+      if (!join_token) return;
+      clearJoinHash();
+      setPendingJoinToken(join_token);
+      setActiveTab("account");
+    };
+    window.addEventListener("hashchange", handle_hashchange);
+    return () => window.removeEventListener("hashchange", handle_hashchange);
+  }, []);
 
   // ── In-app history (#165) ──────────────────────────────────────────────────
   // Screen navigation is React state, not URL routes, so without History API
@@ -559,135 +592,146 @@ function AppContent({
 
   return (
     <SessionProvider session={session}>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          minHeight: "100vh",
-          background: T.bg,
-          overflowX: "hidden",
-        }}
-      >
-        {is_mobile ? (
-          <MobileHeader user={session.user} onAvatarClick={() => navigate({ tab: "account" })} />
-        ) : (
-          <NavBar
-            active={active_tab}
-            // Tapping a nav button always lands on a tab's top-level view, so
-            // reset the budget sub-screen to the hub (#134) — otherwise the
-            // header "予算" button leaves you stranded on income/recurring.
-            onChange={(tab) => navigate({ tab, sub: "hub" })}
-            user={session.user}
-          />
-        )}
-
-        <main
+      <LedgerViewContext.Provider value={ledger_view_state}>
+        <div
           style={{
-            flex: 1,
-            padding: is_mobile ? "16px 20px 96px" : "32px 36px",
-            maxWidth: is_mobile ? undefined : 1280,
-            width: "100%",
-            margin: "0 auto",
-            alignSelf: "stretch",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: "100vh",
+            background: T.bg,
             overflowX: "hidden",
           }}
         >
-          {/* The account screen works before the first sync, so sign-out is always
-              reachable; every other screen waits for the ledger's data. */}
-          {active_tab === "account" ? (
-            <UserInfo user={session.user} onLogout={handleLogout} />
+          {is_mobile ? (
+            <MobileHeader user={session.user} onAvatarClick={() => navigate({ tab: "account" })} />
           ) : (
-            <LedgerDataProvider>
-              {/* Month navigation for list tab on mobile */}
-              {is_mobile && active_tab === "list" && (
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
-                  <MonthSwitcher
-                    year_month={list_year_month}
-                    onYearMonthChange={setListYearMonth}
-                    is_mobile
-                  />
-                </div>
-              )}
-
-              {active_tab === "home" &&
-                (is_mobile ? (
-                  <MobileHome onShowList={() => navigate({ tab: "list" })} />
-                ) : (
-                  <WebHome />
-                ))}
-
-              {active_tab === "list" &&
-                (is_mobile ? (
-                  <MobileJournal
-                    year_month={list_year_month}
-                    onEditEntry={(entry) => {
-                      setEditEntry(entry);
-                      setShowEntrySheet(true);
-                    }}
-                  />
-                ) : (
-                  <WebJournal
-                    year_month={list_year_month}
-                    onYearMonthChange={setListYearMonth}
-                    onEditEntry={(entry) => {
-                      setEditEntry(entry);
-                      setShowEntrySheet(true);
-                    }}
-                  />
-                ))}
-
-              {active_tab === "review" && (is_mobile ? <ReviewScreen /> : <WebReview />)}
-
-              {active_tab === "budget" &&
-                (() => {
-                  if (is_mobile) {
-                    if (budget_sub === "income")
-                      return <MobileIncome onBack={() => navigate({ sub: "hub" })} />;
-                    if (budget_sub === "recurring")
-                      return <MobileRecurring onBack={() => navigate({ sub: "hub" })} />;
-                    if (budget_sub === "savings")
-                      return <MobileSavings onBack={() => navigate({ sub: "hub" })} />;
-                    return <MobileBudget onNavigate={(s) => navigate({ sub: s })} />;
-                  }
-                  if (budget_sub === "income")
-                    return <WebIncome onBack={() => navigate({ sub: "hub" })} />;
-                  if (budget_sub === "recurring")
-                    return <WebRecurring onBack={() => navigate({ sub: "hub" })} />;
-                  if (budget_sub === "savings")
-                    return <WebSavings onBack={() => navigate({ sub: "hub" })} />;
-                  return <WebBudget onNavigate={(s) => navigate({ sub: s })} />;
-                })()}
-
-              {active_tab === "master" && <WebMaster />}
-            </LedgerDataProvider>
+            <NavBar
+              active={active_tab}
+              // Tapping a nav button always lands on a tab's top-level view, so
+              // reset the budget sub-screen to the hub (#134) — otherwise the
+              // header "予算" button leaves you stranded on income/recurring.
+              onChange={(tab) => navigate({ tab, sub: "hub" })}
+              user={session.user}
+            />
           )}
-        </main>
 
-        {is_mobile && (
-          <MobileTabBar
-            active={active_tab}
-            // Always return to the budget hub on a tab tap, including when the
-            // tapped tab is "予算" itself (#134).
-            onChange={(tab) => navigate({ tab, sub: "hub" })}
-            onPlusClick={() => {
-              setEditEntry(null);
-              setShowEntrySheet(true);
+          <main
+            style={{
+              flex: 1,
+              padding: is_mobile ? "16px 20px 96px" : "32px 36px",
+              maxWidth: is_mobile ? undefined : 1280,
+              width: "100%",
+              margin: "0 auto",
+              alignSelf: "stretch",
+              overflowX: "hidden",
             }}
-            addTone={active_tab === "budget" && budget_sub === "income" ? "sage" : "coral"}
-          />
-        )}
+          >
+            {/* The account screen works before the first sync, so sign-out is always
+              reachable; every other screen waits for the ledger's data. */}
+            {active_tab === "account" ? (
+              <>
+                <UserInfo user={session.user} onLogout={handleLogout} />
+                <LedgerDataProvider>
+                  <HouseholdSettings
+                    pending_join_token={pending_join_token}
+                    onJoinTokenHandled={() => setPendingJoinToken(null)}
+                  />
+                </LedgerDataProvider>
+              </>
+            ) : (
+              <LedgerDataProvider>
+                <LedgerViewSwitcher />
+                {/* Month navigation for list tab on mobile */}
+                {is_mobile && active_tab === "list" && (
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+                    <MonthSwitcher
+                      year_month={list_year_month}
+                      onYearMonthChange={setListYearMonth}
+                      is_mobile
+                    />
+                  </div>
+                )}
 
-        {show_entry_sheet && (
-          <EntrySheet
-            onClose={() => {
-              setShowEntrySheet(false);
-              setEditEntry(null);
-            }}
-            edit_entry={edit_entry}
-            is_mobile={is_mobile}
-          />
-        )}
-      </div>
+                {active_tab === "home" &&
+                  (is_mobile ? (
+                    <MobileHome onShowList={() => navigate({ tab: "list" })} />
+                  ) : (
+                    <WebHome />
+                  ))}
+
+                {active_tab === "list" &&
+                  (is_mobile ? (
+                    <MobileJournal
+                      year_month={list_year_month}
+                      onEditEntry={(entry) => {
+                        setEditEntry(entry);
+                        setShowEntrySheet(true);
+                      }}
+                    />
+                  ) : (
+                    <WebJournal
+                      year_month={list_year_month}
+                      onYearMonthChange={setListYearMonth}
+                      onEditEntry={(entry) => {
+                        setEditEntry(entry);
+                        setShowEntrySheet(true);
+                      }}
+                    />
+                  ))}
+
+                {active_tab === "review" && (is_mobile ? <ReviewScreen /> : <WebReview />)}
+
+                {active_tab === "budget" &&
+                  (() => {
+                    if (is_mobile) {
+                      if (budget_sub === "income")
+                        return <MobileIncome onBack={() => navigate({ sub: "hub" })} />;
+                      if (budget_sub === "recurring")
+                        return <MobileRecurring onBack={() => navigate({ sub: "hub" })} />;
+                      if (budget_sub === "savings")
+                        return <MobileSavings onBack={() => navigate({ sub: "hub" })} />;
+                      return <MobileBudget onNavigate={(s) => navigate({ sub: s })} />;
+                    }
+                    if (budget_sub === "income")
+                      return <WebIncome onBack={() => navigate({ sub: "hub" })} />;
+                    if (budget_sub === "recurring")
+                      return <WebRecurring onBack={() => navigate({ sub: "hub" })} />;
+                    if (budget_sub === "savings")
+                      return <WebSavings onBack={() => navigate({ sub: "hub" })} />;
+                    return <WebBudget onNavigate={(s) => navigate({ sub: s })} />;
+                  })()}
+
+                {active_tab === "master" && <WebMaster />}
+              </LedgerDataProvider>
+            )}
+          </main>
+
+          {is_mobile && (
+            <MobileTabBar
+              active={active_tab}
+              // Always return to the budget hub on a tab tap, including when the
+              // tapped tab is "予算" itself (#134).
+              onChange={(tab) => navigate({ tab, sub: "hub" })}
+              onPlusClick={() => {
+                setEditEntry(null);
+                setShowEntrySheet(true);
+              }}
+              addTone={active_tab === "budget" && budget_sub === "income" ? "sage" : "coral"}
+            />
+          )}
+
+          {show_entry_sheet && (
+            <EntrySheet
+              onClose={() => {
+                setShowEntrySheet(false);
+                setEditEntry(null);
+              }}
+              edit_entry={edit_entry}
+              is_mobile={is_mobile}
+            />
+          )}
+        </div>
+      </LedgerViewContext.Provider>
     </SessionProvider>
   );
 }

@@ -7,8 +7,11 @@ import { MIGRATIONS } from "../db/migrations";
 import { wrapOo1Database } from "../db/oo1Adapter";
 import type { SqlDatabase, SqlValue } from "../db/types";
 import {
+  computeAllowanceSummary,
   computeLedgerSummary,
+  householdJoinMonth,
   listDailyVariableSums,
+  listHouseholdMembers,
   listMemberAllowanceTotals,
   listMonthlyBreakdown,
   listOwnAllowanceSpending,
@@ -303,6 +306,75 @@ describe("allowance spending", () => {
 
   it("reads other members' allowance from the server-computed totals", () => {
     expect(listMemberAllowanceTotals(test_db, LEDGER_ID, MEMBER_B)).toEqual({ "2026-10": 4000 });
+  });
+});
+
+describe("allowance view", () => {
+  beforeEach(() => {
+    // Member A joined on 2026-09-01 JST and owns the household.
+    test_db.exec(
+      "UPDATE ledger_members SET joined_at = ?, role = 'owner', display_name = 'A' WHERE user_id = ?",
+      ["2026-08-31T16:00:00Z", MEMBER_A]
+    );
+    test_db.exec("UPDATE ledger_members SET joined_at = ?, display_name = 'B' WHERE user_id = ?", [
+      "2026-09-10T00:00:00Z",
+      MEMBER_B,
+    ]);
+    insertRow("savings_postings", {
+      ledger_id: PERSONAL_LEDGER_A,
+      goal_id: "personal-goal",
+      year_month: "2026-09",
+      amount: 2000,
+      kind: "manual",
+    });
+  });
+
+  it("takes the join month in Asia/Tokyo", () => {
+    expect(householdJoinMonth(test_db, LEDGER_ID, MEMBER_A)).toBe("2026-09");
+    expect(householdJoinMonth(test_db, LEDGER_ID, FORMER_MEMBER)).toBeNull();
+  });
+
+  it("budgets the personal ledger from the allowance and the carried-over balance", () => {
+    const allowance_summary = computeAllowanceSummary(
+      test_db,
+      PERSONAL_LEDGER_A,
+      LEDGER_ID,
+      MEMBER_A,
+      "2026-10",
+      "2026-10-27"
+    );
+    expect(allowance_summary).toEqual({
+      allowance: 40000,
+      // September: 30000 allowance − 2000 put into personal savings.
+      carried_in: 28000,
+      balance: 66500,
+      recurring_total: 3000,
+      savings_total: 0,
+      variable_budget: 65000,
+      variable_spending: 1500,
+      remaining: 63500,
+      daily_budget: 2096,
+      days_remaining: 5,
+      history: [
+        { year_month: "2026-08", budget: 0, actual: 0 },
+        { year_month: "2026-09", budget: 27000, actual: 0 },
+        { year_month: "2026-10", budget: 65000, actual: 1500 },
+      ],
+    });
+  });
+
+  it("lists current members with their allowance and server-computed totals, owner first", () => {
+    expect(listHouseholdMembers(test_db, LEDGER_ID, "2026-10")).toEqual([
+      { user_id: MEMBER_A, display_name: "A", role: "owner", allowance: 40000, spent: 0, saved: 0 },
+      {
+        user_id: MEMBER_B,
+        display_name: "B",
+        role: "member",
+        allowance: 20000,
+        spent: 4000,
+        saved: 0,
+      },
+    ]);
   });
 });
 

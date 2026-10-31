@@ -316,6 +316,15 @@ always resolved from the token; a request never names a ledger ID.
   `personal` or `household`, the same way pushes do. The lifecycle commands live
   under `/household` (sync-api.yaml), together with `PUT /household/allowances`,
   which sets a member's allowance from a month on.
+- **Screens.** While a household is attached, a 家計 / お小遣い switch picks
+  the ledger every screen shows and writes to (household by default, remembered
+  per device). In the お小遣い view the budget comes from the allowance plus
+  the carried-over balance instead of income; daily and review notes always
+  stay in the personal ledger. The household settings live on the account
+  screen. An invitation link carries its token in the URL fragment
+  (`#join=<token>`), so it never reaches a server log; the app removes it from
+  the address bar on load and asks before joining. Archives are synced but not
+  shown yet.
 - **Schema.** These changes ship as a new migration (000022): the `wallet`
   columns are dropped, `ledgers.kind` gains `archive`, and
   `household_invitations` is added. Migrations 000019–000021 are not edited.

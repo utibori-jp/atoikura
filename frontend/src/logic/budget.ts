@@ -108,28 +108,39 @@ export interface AllowanceMonth {
   carried_in: number;
   allowance: number;
   spent: number;
+  // What went into personal savings goals (postings and surplus allocations).
+  saved: number;
   balance: number;
 }
 
 // Allowance balance with carry-over (design.md §3): starting at 0 in start_month,
-// balance(m) = balance(m-1) + allowance(m) − spending(m). Unused allowance and
-// overspending both carry into the next month. Returns one row per month from
-// start_month through target_month; the last row's balance is the member's
-// "あといくら".
+// balance(m) = balance(m-1) + allowance(m) − spending(m) − personal savings(m).
+// Unused allowance and overspending both carry into the next month. Returns one
+// row per month from start_month through target_month; the last row's balance
+// is the member's "あといくら".
 export function allowanceBalances(
   allowance_history: AllowanceHistoryEntry[],
   spent_by_month: Record<string, number>,
   start_month: string,
-  target_month: string
+  target_month: string,
+  saved_by_month: Record<string, number> = {}
 ): AllowanceMonth[] {
   const allowance_months: AllowanceMonth[] = [];
   let running_balance = 0;
   for (const year_month of monthsBetween(start_month, target_month)) {
     const allowance = allowanceInEffect(allowance_history, year_month);
     const spent = spent_by_month[year_month] ?? 0;
+    const saved = saved_by_month[year_month] ?? 0;
     const carried_in = running_balance;
-    running_balance = carried_in + allowance - spent;
-    allowance_months.push({ year_month, carried_in, allowance, spent, balance: running_balance });
+    running_balance = carried_in + allowance - spent - saved;
+    allowance_months.push({
+      year_month,
+      carried_in,
+      allowance,
+      spent,
+      saved,
+      balance: running_balance,
+    });
   }
   return allowance_months;
 }

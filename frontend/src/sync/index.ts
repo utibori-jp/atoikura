@@ -1,7 +1,8 @@
 import type { LocalDb } from "../db/client";
 import type { AuthSession } from "./authSession";
 import { SyncEngine, type SyncEnvironment } from "./engine";
-import { createLedgerCommands } from "./ledgerCommands";
+import { createHouseholdCommands } from "./householdCommands";
+import { createLedgerCommands, type CommandSender } from "./ledgerCommands";
 import { SyncStore } from "./store";
 import { HttpSyncTransport } from "./transport";
 
@@ -25,10 +26,24 @@ export function createSyncClient(options: SyncClientOptions) {
   });
   const store = new SyncStore(options.local_db);
   const engine = new SyncEngine({ store, transport, environment: options.environment });
-  const ledger_commands = createLedgerCommands((method, path, request_body) =>
-    engine.runCommand(() => transport.sendCommand(method, path, request_body))
+  const send_command: CommandSender = (method, path, request_body) =>
+    engine.runCommand(() => transport.sendCommand(method, path, request_body));
+  const ledger_commands = createLedgerCommands(send_command);
+  const household_ledger_commands = createLedgerCommands(send_command, "household");
+  const household_commands = createHouseholdCommands(
+    (method, path, request_body) =>
+      engine.runOnline(() => transport.sendJson(method, path, request_body)),
+    send_command
   );
-  return { auth_session, transport, store, engine, ledger_commands };
+  return {
+    auth_session,
+    transport,
+    store,
+    engine,
+    ledger_commands,
+    household_ledger_commands,
+    household_commands,
+  };
 }
 
 export type SyncClient = ReturnType<typeof createSyncClient>;

@@ -342,6 +342,10 @@ export class FakeSyncServer {
         requireReachable();
         throw new Error("use writeOnlineRow in tests");
       },
+      sendJson: async () => {
+        requireReachable();
+        throw new Error("household commands are not simulated");
+      },
     };
   }
 }
