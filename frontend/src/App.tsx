@@ -25,6 +25,7 @@ import type { JournalEntryView } from "./data/journal";
 import { LedgerDataProvider } from "./data/LedgerDataProvider";
 import { joinTokenFromHash } from "./data/household";
 import { LedgerViewContext, useLedgerViewState } from "./data/ledgerData";
+import { ArchiveViewer } from "./components/ArchiveViewer";
 import { HouseholdSettings } from "./components/HouseholdSettings";
 import { LedgerViewSwitcher } from "./components/LedgerViewSwitcher";
 import { UpdateNotice } from "./pwa/UpdateNotice";
@@ -42,7 +43,8 @@ type BudgetSubScreen = "hub" | "income" | "recurring" | "savings";
 
 // A point in the in-app navigation, mirrored onto the browser history stack so
 // the native Back button walks screens instead of leaving the SPA (#165).
-type NavLocation = { tab: Tab; sub: BudgetSubScreen };
+// archive is the past household open on the account screen, if any.
+type NavLocation = { tab: Tab; sub: BudgetSubScreen; archive?: string | null };
 
 function useMobile(): boolean {
   const [is_mobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 1023px)").matches);
@@ -484,6 +486,7 @@ function AppContent({
     joinTokenFromHash(window.location.hash) ? "account" : "home"
   );
   const [budget_sub, setBudgetSub] = useState<BudgetSubScreen>("hub");
+  const [archive_ledger_id, setArchiveLedgerId] = useState<string | null>(null);
   const [list_year_month, setListYearMonth] = useState(currentMonthJST());
   const [show_entry_sheet, setShowEntrySheet] = useState(false);
   const [edit_entry, setEditEntry] = useState<JournalEntryView | null>(null);
@@ -509,6 +512,7 @@ function AppContent({
       clearJoinHash();
       setPendingJoinToken(join_token);
       setActiveTab("account");
+      setArchiveLedgerId(null);
     };
     window.addEventListener("hashchange", handle_hashchange);
     return () => window.removeEventListener("hashchange", handle_hashchange);
@@ -521,13 +525,18 @@ function AppContent({
   // history stack; `popstate` restores it. Back then walks budget sub-screen →
   // budget hub → home before the browser finally exits the app.
   const navigate = (patch: Partial<NavLocation>) => {
+    // Any other navigation closes an open archive.
+    const next_archive = patch.archive ?? null;
     const next: NavLocation = {
       tab: patch.tab ?? active_tab,
       sub: patch.sub ?? budget_sub,
+      ...(next_archive ? { archive: next_archive } : {}),
     };
-    if (next.tab === active_tab && next.sub === budget_sub) return;
+    if (next.tab === active_tab && next.sub === budget_sub && next_archive === archive_ledger_id)
+      return;
     setActiveTab(next.tab);
     setBudgetSub(next.sub);
+    setArchiveLedgerId(next_archive);
     window.history.pushState({ nav: next }, "");
   };
 
@@ -543,6 +552,7 @@ function AppContent({
       const nav = (event.state as { nav?: NavLocation } | null)?.nav;
       setActiveTab(nav?.tab ?? "home");
       setBudgetSub(nav?.sub ?? "hub");
+      setArchiveLedgerId(nav?.archive ?? null);
     };
     window.addEventListener("popstate", handle_popstate);
     return () => window.removeEventListener("popstate", handle_popstate);
@@ -554,7 +564,10 @@ function AppContent({
 
   async function handleLogout(options?: { discard_pending_changes?: boolean }) {
     const logout_result = await session_controller.logout(options);
-    if (logout_result.outcome === "signed_out") setActiveTab("home");
+    if (logout_result.outcome === "signed_out") {
+      setActiveTab("home");
+      setArchiveLedgerId(null);
+    }
     return logout_result;
   }
 
@@ -628,13 +641,25 @@ function AppContent({
           >
             {/* The account screen works before the first sync, so sign-out is always
               reachable; every other screen waits for the ledger's data. */}
-            {active_tab === "account" ? (
+            {active_tab === "account" && archive_ledger_id ? (
+              <LedgerDataProvider>
+                <ArchiveViewer
+                  archive_ledger_id={archive_ledger_id}
+                  // Opening pushed a history entry; going back pops it.
+                  onBack={() => window.history.back()}
+                  is_mobile={is_mobile}
+                />
+              </LedgerDataProvider>
+            ) : active_tab === "account" ? (
               <>
                 <UserInfo user={session.user} onLogout={handleLogout} />
                 <LedgerDataProvider>
                   <HouseholdSettings
                     pending_join_token={pending_join_token}
                     onJoinTokenHandled={() => setPendingJoinToken(null)}
+                    onOpenArchive={(opened_archive_id) =>
+                      navigate({ tab: "account", archive: opened_archive_id })
+                    }
                   />
                 </LedgerDataProvider>
               </>

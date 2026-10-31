@@ -2,8 +2,10 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { todayInJst } from "../logic";
 import {
+  seedArchive,
   seedHousehold,
   seedPersonalLedger,
+  TEST_ARCHIVE_ID,
   TEST_PARTNER_ID,
   TEST_USER_ID,
   TestLedgerServer,
@@ -46,6 +48,7 @@ async function renderSettings(
     <HouseholdSettings
       pending_join_token={pending_join_token}
       onJoinTokenHandled={onJoinTokenHandled}
+      onOpenArchive={() => {}}
     />,
     ledger_server
   );
@@ -225,5 +228,44 @@ describe("HouseholdSettings — in a household", () => {
       path: "/household/leave",
       request_body: null,
     });
+  });
+});
+
+describe("HouseholdSettings — past households", () => {
+  it("lists past households and opens one", async () => {
+    const ledger_server = soloLedgerServer();
+    seedArchive(ledger_server, {
+      name: "前の家計",
+      entries: [{ transaction_date: "2026-09-03", amount: 1200 }],
+    });
+    const onOpenArchive = vi.fn();
+    await renderWithLedger(
+      <HouseholdSettings
+        pending_join_token={null}
+        onJoinTokenHandled={() => {}}
+        onOpenArchive={onOpenArchive}
+      />,
+      ledger_server
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /前の家計/ }, { timeout: 5000 }));
+    expect(onOpenArchive).toHaveBeenCalledWith(TEST_ARCHIVE_ID);
+    expect(screen.getByText("2026/09")).toBeInTheDocument();
+  });
+
+  it("points to the past household after leaving", async () => {
+    await renderSettings(householdLedgerServer("member"));
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "家計から抜ける" }, { timeout: 5000 })
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "抜ける" }));
+
+    expect(
+      await screen.findByText("家計の記録は「過去の家計」に残っています", undefined, {
+        timeout: 5000,
+      })
+    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /うちの家計/ })).toBeInTheDocument();
   });
 });

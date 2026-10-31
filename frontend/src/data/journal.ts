@@ -140,8 +140,9 @@ function journalEntryView(entry_row: SqlRow, ledger_data: LedgerData): JournalEn
     is_recurring,
     is_category_deleted: Number(entry_row.category_deleted) === 1,
     can_edit:
-      Number(entry_row.owner_id) === ledger_data.user_id ||
-      (is_recurring && entry_row.ledger_id === ledger_data.household_ledger_id),
+      ledger_data.mode !== "archive" &&
+      (Number(entry_row.owner_id) === ledger_data.user_id ||
+        (is_recurring && entry_row.ledger_id === ledger_data.household_ledger_id)),
   };
 }
 
@@ -199,6 +200,7 @@ async function validateEntryFields(
   ledger_data: LedgerData,
   entry_fields: JournalEntryFields
 ): Promise<void> {
+  requireWritable(ledger_data);
   const validation_result = validateJournalEntry(
     { ...entry_fields },
     {
@@ -219,11 +221,17 @@ function entryColumnValues(entry_fields: JournalEntryFields): Record<string, Sql
   };
 }
 
+// A past household is read-only; the server refuses its writes as well.
+function requireWritable(ledger_data: LedgerData): void {
+  if (ledger_data.mode === "archive") throw new Error("過去の家計は編集できません");
+}
+
 // Records an entry in the ledger the screens show and returns its ID.
 export async function createJournalEntry(
   ledger_data: LedgerData,
   entry_fields: JournalEntryFields
 ): Promise<string> {
+  requireWritable(ledger_data);
   await validateEntryFields(ledger_data, entry_fields);
   return ledger_data.store.createRecord(
     "journal_entries",
@@ -251,5 +259,6 @@ export async function updateJournalEntry(
 }
 
 export async function deleteJournalEntry(ledger_data: LedgerData, entry_id: string): Promise<void> {
+  requireWritable(ledger_data);
   await ledger_data.store.deleteRecord("journal_entries", entry_id);
 }

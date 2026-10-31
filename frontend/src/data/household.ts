@@ -55,3 +55,65 @@ export function joinTokenFromHash(location_hash: string): string | null {
     return null;
   }
 }
+
+// A past household: what is left after leaving or dissolving one (design.md §6).
+export interface ArchiveSummary {
+  ledger_id: string;
+  name: string;
+  // The months its entries and income span (YYYY-MM), or null when it is empty.
+  first_month: string | null;
+  last_month: string | null;
+}
+
+// The user's past households, the most recent first.
+export async function listArchives(ledger_data: LedgerData): Promise<ArchiveSummary[]> {
+  const archive_rows = await ledger_data.local_db.select(
+    `SELECT l.id, l.name,
+            MIN(dated.year_month) AS first_month, MAX(dated.year_month) AS last_month
+     FROM ledgers l
+     LEFT JOIN (
+       SELECT ledger_id, substr(transaction_date, 1, 7) AS year_month
+       FROM journal_entries WHERE deleted = 0
+       UNION ALL
+       SELECT ledger_id, substr(transaction_date, 1, 7) AS year_month
+       FROM income_records WHERE deleted = 0
+     ) dated ON dated.ledger_id = l.id
+     WHERE l.kind = 'archive' AND l.deleted = 0
+     GROUP BY l.id, l.name
+     ORDER BY last_month IS NULL, last_month DESC, l.created_at DESC, l.id`
+  );
+  return archive_rows.map((archive_row) => ({
+    ledger_id: String(archive_row.id),
+    name: archive_row.name === null ? "" : String(archive_row.name),
+    first_month: archive_row.first_month === null ? null : String(archive_row.first_month),
+    last_month: archive_row.last_month === null ? null : String(archive_row.last_month),
+  }));
+}
+
+// The ledger data the archive viewer reads through: the screens' data functions
+// pointed at a past household, in the read-only archive mode.
+export function archiveLedgerData(ledger_data: LedgerData, archive_ledger_id: string): LedgerData {
+  return { ...ledger_data, ledger_id: archive_ledger_id, mode: "archive" };
+}
+
+// The month's income total of a ledger.
+export async function sumMonthlyIncome(
+  ledger_data: LedgerData,
+  year_month: string
+): Promise<number> {
+  const [income_row] = await ledger_data.local_db.select(
+    `SELECT SUM(amount) AS total FROM income_records
+     WHERE ledger_id = ? AND deleted = 0 AND substr(transaction_date, 1, 7) = ?`,
+    [ledger_data.ledger_id, year_month]
+  );
+  return Number(income_row?.total ?? 0);
+}
+
+// "2026/04〜2026/10" for an archive's months, or "記録なし".
+export function formatArchivePeriod(first_month: string | null, last_month: string | null): string {
+  if (!first_month || !last_month) return "記録なし";
+  const formatMonth = (year_month: string) => year_month.replace("-", "/");
+  return first_month === last_month
+    ? formatMonth(first_month)
+    : `${formatMonth(first_month)}〜${formatMonth(last_month)}`;
+}

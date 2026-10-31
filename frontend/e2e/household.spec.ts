@@ -108,7 +108,9 @@ test("members share household entries and keep their allowance apart", async ({ 
   );
 });
 
-test("an invitation link joins after confirming, and members can leave", async ({ browser }) => {
+test("an invitation link joins after confirming, and a member who leaves keeps a read-only copy", async ({
+  browser,
+}) => {
   const owner_page = await openUser(browser, "household-link-owner");
   const partner_page = await openUser(browser, "household-link-partner");
   const { link } = await createHouseholdWithInvitation(owner_page);
@@ -120,8 +122,25 @@ test("an invitation link joins after confirming, and members can leave", async (
   await partner_page.getByRole("button", { name: "参加する" }).click();
   await expect(partner_page.getByText("E2E家計")).toBeVisible();
 
+  // A household entry, on the server (the partner sees it) before the partner leaves.
+  await recordExpense(owner_page, "2300", "E2E家計の夕食");
+  await openTab(partner_page, /仕訳/);
+  await afterSync(partner_page, () =>
+    expect(partner_page.getByText("E2E家計の夕食", { exact: true })).toBeVisible()
+  );
+  await openAccount(partner_page);
+
   await partner_page.getByRole("button", { name: "家計から抜ける" }).click();
   await partner_page.getByRole("button", { name: "抜ける", exact: true }).click();
   await expect(partner_page.getByLabel("招待コード")).toBeVisible();
+  await expect(partner_page.getByText("家計の記録は「過去の家計」に残っています")).toBeVisible();
+  await partner_page.getByRole("button", { name: /E2E家計/ }).click();
+  await expect(partner_page.getByText("閲覧専用")).toBeVisible();
+  await expect(partner_page.getByText("E2E家計の夕食")).toBeVisible();
+  await expect(partner_page.getByRole("button", { name: "✎" })).toHaveCount(0);
+  // Browser Back returns to the account screen.
+  await partner_page.goBack();
+  await expect(partner_page.getByLabel("招待コード")).toBeVisible();
+  await openAccount(owner_page);
   await afterSync(owner_page, () => expect(owner_page.getByText(/オーナー · 1人/)).toBeVisible());
 });

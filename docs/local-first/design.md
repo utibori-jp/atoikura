@@ -91,10 +91,9 @@ ledger_members (ledger_id, user_id, role: owner | member, joined_at, left_at)
     carries over, and so does overspending (a negative balance reduces the
     next month).
   - Personal savings(m) is what the member puts into their personal savings
-    goals that month: monthly savings postings, manual postings and surplus
-    allocations. A personal surplus allocation is capped by the current
-    balance. Its destination must be a savings goal: the balance already carries
-    over, so allocating to the budget would mean nothing.
+    goals that month: monthly savings postings and manual postings.
+  - What is left of the allowance simply carries over: the personal ledger
+    takes no surplus allocations while a household is attached.
   - **Income is shared** (Q10). While attached, the member's base income and
     income records live in the household ledger; the personal ledger's
     income screens are hidden. Its own base income row is kept for when the
@@ -323,8 +322,10 @@ always resolved from the token; a request never names a ledger ID.
   stay in the personal ledger. The household settings live on the account
   screen. An invitation link carries its token in the URL fragment
   (`#join=<token>`), so it never reaches a server log; the app removes it from
-  the address bar on load and asks before joining. Archives are synced but not
-  shown yet.
+  the address bar on load and asks before joining. Past households are listed
+  under the household settings as 過去の家計; each opens a read-only viewer of
+  its journal and monthly category totals (no budget: an archive keeps no
+  settings), and Back returns to the account screen.
 - **Schema.** These changes ship as a new migration (000022): the `wallet`
   columns are dropped, `ledgers.kind` gains `archive`, and
   `household_invitations` is added. Migrations 000019–000021 are not edited.
