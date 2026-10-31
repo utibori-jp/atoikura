@@ -17,7 +17,20 @@ export default defineConfig([
       reactRefresh.configs.vite,
       prettierConfig,
     ],
-    rules: {},
+    rules: {
+      // HTML from strings is never rendered (#208): React escapes everything else.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+          message: 'Do not render HTML from strings (#208).',
+        },
+        {
+          selector: "MemberExpression[property.name=/^(innerHTML|outerHTML)$/]",
+          message: 'Do not write HTML from strings (#208).',
+        },
+      ],
+    },
     languageOptions: {
       globals: globals.browser,
     },

@@ -44,13 +44,45 @@ func RecoverPanic(next http.Handler) http.Handler {
 	})
 }
 
-func AllowCORS(next http.Handler) http.Handler {
-	allowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
-	if allowedOrigin == "" {
-		allowedOrigin = "http://localhost:3000"
-	}
+// SetSecurityHeaders marks every API response as data that is never rendered,
+// framed, sniffed or cached (#208). The app's own pages get their policy from
+// the frontend (frontend/securityHeaders.ts).
+func SetSecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+		response_header := w.Header()
+		response_header.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+		response_header.Set("X-Content-Type-Options", "nosniff")
+		response_header.Set("X-Frame-Options", "DENY")
+		response_header.Set("Referrer-Policy", "no-referrer")
+		// Responses carry the user's data: no shared or browser cache keeps them.
+		response_header.Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// allowedOriginSet parses CORS_ALLOWED_ORIGIN, a comma-separated list of origins.
+func allowedOriginSet(allowed_origins_value string) map[string]bool {
+	if strings.TrimSpace(allowed_origins_value) == "" {
+		allowed_origins_value = "http://localhost:3000"
+	}
+	allowed_origin_set := map[string]bool{}
+	for _, allowed_origin := range strings.Split(allowed_origins_value, ",") {
+		if trimmed_origin := strings.TrimSpace(allowed_origin); trimmed_origin != "" {
+			allowed_origin_set[trimmed_origin] = true
+		}
+	}
+	return allowed_origin_set
+}
+
+// AllowCORS lets the origins in CORS_ALLOWED_ORIGIN (comma-separated) call the
+// API. The response names the caller's origin only when it is allowed.
+func AllowCORS(next http.Handler) http.Handler {
+	allowed_origin_set := allowedOriginSet(os.Getenv("CORS_ALLOWED_ORIGIN"))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Origin")
+		if request_origin := r.Header.Get("Origin"); allowed_origin_set[request_origin] {
+			w.Header().Set("Access-Control-Allow-Origin", request_origin)
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Expose-Headers", SyncProtocolHeader)
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, "+SyncProtocolHeader)
