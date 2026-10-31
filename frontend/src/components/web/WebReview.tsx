@@ -4,6 +4,7 @@ import { listMonthlyReviewNotes, saveMonthlyReviewNotes } from "../../data/notes
 import { loadMonthlyBreakdownItems, type MonthlyBreakdownItem } from "../../data/spending";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
+import { noteRows } from "../noteRows";
 
 type BreakdownItem = MonthlyBreakdownItem;
 
@@ -418,8 +419,8 @@ export function WebReview() {
                                       {yen(c.total)}
                                     </div>
                                     <div style={{ flex: 1 }}>
-                                      <input
-                                        type="text"
+                                      <textarea
+                                        rows={noteRows(memo)}
                                         value={memo}
                                         onChange={(e) =>
                                           setMemos((prev) => ({
@@ -429,6 +430,8 @@ export function WebReview() {
                                         }
                                         placeholder="メモを残す…"
                                         style={{
+                                          display: "block",
+                                          resize: "none",
                                           width: "100%",
                                           padding: "6px 12px",
                                           borderRadius: 12,

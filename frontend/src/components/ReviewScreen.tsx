@@ -3,6 +3,7 @@ import { useLedgerData, useLocalData } from "../data/ledgerData";
 import { listMonthlyReviewNotes, saveMonthlyReviewNotes } from "../data/notes";
 import { loadMonthlyBreakdownItems, type MonthlyBreakdownItem } from "../data/spending";
 import { T } from "../theme";
+import { noteRows } from "./noteRows";
 
 type BreakdownItem = MonthlyBreakdownItem;
 
@@ -411,8 +412,8 @@ export function ReviewScreen() {
                             >
                               {yen(cat.total)}
                             </span>
-                            <input
-                              type="text"
+                            <textarea
+                              rows={noteRows(memos[cat.category_id] ?? "")}
                               placeholder="メモを残す…"
                               value={memos[cat.category_id] ?? ""}
                               onChange={(e) =>
@@ -420,6 +421,7 @@ export function ReviewScreen() {
                               }
                               style={{
                                 flex: 1,
+                                resize: "none",
                                 background: memos[cat.category_id] ? "#FFF6E5" : T.bgSoft,
                                 border: `1px dashed ${memos[cat.category_id] ? T.mustard : T.hair}`,
                                 borderRadius: 10,

@@ -4,6 +4,7 @@ import { useLedgerData, useLocalData } from "../../data/ledgerData";
 import { listDailyNotes, saveDailyNote } from "../../data/notes";
 import { T } from "../../theme";
 import { MonthSwitcher } from "../MonthSwitcher";
+import { noteRows } from "../noteRows";
 import { useConfirm } from "../dialogContext";
 import { emojiForGroup } from "../mobile/groupEmoji";
 
@@ -50,8 +51,8 @@ function DailyNoteField({ date, initial_note }: { date: string; initial_note: st
   const is_filled = value.trim() !== "";
   return (
     <div style={{ position: "relative" }}>
-      <input
-        type="text"
+      <textarea
+        rows={noteRows(value)}
         value={value}
         onChange={(e) => handle_change(e.target.value)}
         onFocus={() => {
@@ -62,6 +63,8 @@ function DailyNoteField({ date, initial_note }: { date: string; initial_note: st
         }}
         placeholder="💭 この日のひとことを残す…"
         style={{
+          display: "block",
+          resize: "none",
           width: "100%",
           padding: "10px 14px",
           borderRadius: 14,
