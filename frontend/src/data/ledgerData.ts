@@ -13,7 +13,8 @@ export type { LedgerTarget };
 // solo: no household attached, the personal ledger is the whole budget.
 // household: the shared household ledger.
 // allowance: the personal ledger while a household is attached (お小遣い).
-export type LedgerMode = "solo" | "household" | "allowance";
+// archive: a past household, read-only (data/household.ts).
+export type LedgerMode = "solo" | "household" | "allowance" | "archive";
 
 export interface LedgerData {
   local_db: LocalDb;

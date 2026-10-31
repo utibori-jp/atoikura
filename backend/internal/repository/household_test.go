@@ -459,22 +459,19 @@ func TestAllowanceTotals_FollowPersonalWrites(t *testing.T) {
 		t.Fatalf("saved after posting = %d, want 3000", saved)
 	}
 
-	// A personal surplus allocation is capped by the allowance balance:
-	// 20000 − 1500 spent − 3000 saved = 15500.
+	// What is left of an allowance carries over by itself: the personal ledger
+	// takes no surplus allocations while a household is attached.
 	mustCommand(t)(testRepo.PutHouseholdAllowance(ctx, owner.UserID, member.UserID, current_month, 20000))
 	_, err := testRepo.CreateLedgerSurplusAllocation(ctx, personal_caller, repository.SurplusAllocationInput{
-		YearMonth: current_month, Amount: 15501, Destination: "savings", SavingsGoalID: &goal_row.ID,
+		YearMonth: current_month, Amount: 100, Destination: "savings", SavingsGoalID: &goal_row.ID,
 	})
 	expectCommandError(t, err, repository.CommandInvalid)
 	_, err = testRepo.CreateLedgerSurplusAllocation(ctx, personal_caller, repository.SurplusAllocationInput{
 		YearMonth: current_month, Amount: 100, Destination: "budget",
 	})
 	expectCommandError(t, err, repository.CommandInvalid)
-	mustCommand(t)(testRepo.CreateLedgerSurplusAllocation(ctx, personal_caller, repository.SurplusAllocationInput{
-		YearMonth: current_month, Amount: 15500, Destination: "savings", SavingsGoalID: &goal_row.ID,
-	}))
-	if spent, saved, _ := memberTotals(); spent != 1500 || saved != 18500 {
-		t.Fatalf("totals after allocation = %d/%d, want 1500/18500", spent, saved)
+	if spent, saved, _ := memberTotals(); spent != 1500 || saved != 3000 {
+		t.Fatalf("totals after refused allocations = %d/%d, want 1500/3000", spent, saved)
 	}
 
 	// Deleting the entry takes it out again.

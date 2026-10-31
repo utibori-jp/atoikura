@@ -431,8 +431,8 @@ paths:
       description: |
         The amount may not exceed the month's unallocated surplus,
         max(0, income − Σ base incomes) − already allocated (400). Allocations are
-        append-only. In a personal ledger while a household is attached, only `savings`
-        is accepted and the cap is the allowance balance at the end of the month
+        append-only. A personal ledger takes no allocations while a household is
+        attached (400): what is left of the allowance carries over to the next month
         (design.md §3).
       operationId: createSurplusAllocation
       parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]

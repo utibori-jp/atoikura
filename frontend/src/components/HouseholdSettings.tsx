@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type React from "react";
 import {
+  formatArchivePeriod,
   invitationLink,
+  listArchives,
   loadHousehold,
   type HouseholdMember,
   type HouseholdView,
@@ -23,6 +25,7 @@ interface HouseholdSettingsProps {
   // A token from an invitation link the app was opened with, until handled.
   pending_join_token: string | null;
   onJoinTokenHandled: () => void;
+  onOpenArchive: (archive_ledger_id: string) => void;
 }
 
 const input_style: React.CSSProperties = {
@@ -69,7 +72,10 @@ async function copyToClipboard(copied_text: string): Promise<boolean> {
 export function HouseholdSettings({
   pending_join_token,
   onJoinTokenHandled,
+  onOpenArchive,
 }: HouseholdSettingsProps) {
+  // Set after leaving or dissolving, to say where the household's records went.
+  const [archive_notice, setArchiveNotice] = useState("");
   const ledger_data = useLedgerData();
   const current_month = todayInJst().slice(0, 7);
   const { data: household, error_message } = useLocalData(
@@ -129,6 +135,7 @@ export function HouseholdSettings({
               current_month={current_month}
               can_edit={can_edit && !is_busy}
               runAction={runAction}
+              onDetached={() => setArchiveNotice("家計の記録は「過去の家計」に残っています")}
             />
           ) : (
             <p style={{ fontSize: 13, color: T.inkSoft }}>家計のデータを取得しています…</p>
@@ -144,6 +151,22 @@ export function HouseholdSettings({
         {is_attached && pending_join_token && (
           <JoinLinkWhileAttached onDismiss={onJoinTokenHandled} />
         )}
+        {archive_notice && !is_attached && (
+          <div
+            role="status"
+            style={{
+              marginTop: 16,
+              padding: "10px 14px",
+              borderRadius: 14,
+              background: T.sageSoft,
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {archive_notice}
+          </div>
+        )}
+        <PastHouseholds onOpenArchive={onOpenArchive} />
       </section>
     </div>
   );
@@ -153,6 +176,50 @@ type RunAction = (
   household_action: () => Promise<unknown>,
   fallback_message: string
 ) => Promise<boolean>;
+
+// The user's past households, each opening the read-only archive viewer.
+function PastHouseholds({ onOpenArchive }: { onOpenArchive: (archive_ledger_id: string) => void }) {
+  const { data: archives } = useLocalData(listArchives, []);
+  if (!archives || archives.length === 0) return null;
+  return (
+    <div style={{ marginTop: 24, borderTop: `1px solid ${T.hair}`, paddingTop: 16 }}>
+      <h3 style={section_title_style}>過去の家計</h3>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {archives.map((archive) => (
+          <li key={archive.ledger_id}>
+            <button
+              type="button"
+              onClick={() => onOpenArchive(archive.ledger_id)}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "12px 0",
+                border: "none",
+                borderBottom: `1px solid ${T.hair}`,
+                background: "transparent",
+                fontFamily: "inherit",
+                textAlign: "left",
+                cursor: "pointer",
+                color: T.ink,
+              }}
+            >
+              <span style={{ fontWeight: 700, fontSize: 15 }}>{archive.name || "過去の家計"}</span>
+              <span style={{ flex: 1, fontSize: 12, color: T.inkSoft }}>
+                {formatArchivePeriod(archive.first_month, archive.last_month)}
+              </span>
+              <span style={{ color: T.coralDeep, fontSize: 20, fontWeight: 700 }}>›</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p style={{ fontSize: 11, color: T.inkSoft, margin: "8px 0 0" }}>
+        抜けたり解散したりした家計の記録です。閲覧のみできます。
+      </p>
+    </div>
+  );
+}
 
 function JoinLinkWhileAttached({ onDismiss }: { onDismiss: () => void }) {
   return (
@@ -291,11 +358,13 @@ function AttachedHousehold({
   current_month,
   can_edit,
   runAction,
+  onDetached,
 }: {
   household: HouseholdView;
   current_month: string;
   can_edit: boolean;
   runAction: RunAction;
+  onDetached: () => void;
 }) {
   const { household_commands } = useAppSession().sync_client;
   const { user_id } = useLedgerData();
@@ -368,10 +437,11 @@ function AttachedHousehold({
                   danger: true,
                 });
                 if (!is_confirmed) return;
-                await runAction(
+                const is_dissolved = await runAction(
                   () => household_commands.dissolveHousehold(),
                   "家計を解散できませんでした"
                 );
+                if (is_dissolved) onDetached();
               }}
             >
               家計を解散
@@ -396,10 +466,11 @@ function AttachedHousehold({
                 danger: true,
               });
               if (!is_confirmed) return;
-              await runAction(
+              const is_left = await runAction(
                 () => household_commands.leaveHousehold(),
                 "家計から抜けられませんでした"
               );
+              if (is_left) onDetached();
             }}
           >
             家計から抜ける

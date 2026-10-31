@@ -33,6 +33,8 @@ export class TestLedgerServer {
   private command_rejection: { http_status: number; code: string; message: string } | null = null;
   // The attached household, as pull reports it.
   household_ledger_id: string | null = null;
+  // Past households (archive ledgers), which pull also delivers.
+  readonly archive_ledger_ids: string[] = [];
   readonly recorded_household_commands: RecordedCommand[] = [];
   private open_invitation_ids: string[] = [];
 
@@ -197,6 +199,15 @@ export class TestLedgerServer {
         return HttpResponse.json({ household_ledger_id: TEST_HOUSEHOLD_ID });
       }
       if (command_key === "POST /household/leave" || command_key === "POST /household/dissolve") {
+        // Like dissolving: the household ledger becomes the user's archive.
+        if (this.household_ledger_id) {
+          const household_row = this.rows_by_id.get(this.household_ledger_id);
+          this.putRow("ledgers", this.household_ledger_id, {
+            ...household_row?.data,
+            kind: "archive",
+          });
+          this.archive_ledger_ids.push(this.household_ledger_id);
+        }
         this.household_ledger_id = null;
         return new HttpResponse(null, { status: 204 });
       }
@@ -254,7 +265,11 @@ export class TestLedgerServer {
   }
 
   private pulledLedgerIds(): string[] {
-    return this.household_ledger_id ? [TEST_LEDGER_ID, this.household_ledger_id] : [TEST_LEDGER_ID];
+    return [
+      TEST_LEDGER_ID,
+      ...(this.household_ledger_id ? [this.household_ledger_id] : []),
+      ...this.archive_ledger_ids,
+    ];
   }
 
   pullHandler() {
@@ -277,6 +292,62 @@ export class TestLedgerServer {
       });
     });
   }
+}
+
+export const TEST_ARCHIVE_ID = "01920000-0000-7000-8000-0000000000cc";
+export const ARCHIVE_GROUP_ID = "01920000-0000-7000-8000-000000000121";
+export const ARCHIVE_CATEGORY_ID = "01920000-0000-7000-8000-000000000221";
+
+// A past household of the signed-in user, with one food category and the given
+// entries and income.
+export function seedArchive(
+  ledger_server: TestLedgerServer,
+  {
+    name = "前の家計",
+    entries = [],
+    incomes = [],
+  }: {
+    name?: string;
+    entries?: { transaction_date: string; amount: number; item?: string }[];
+    incomes?: { transaction_date: string; amount: number }[];
+  } = {}
+): void {
+  ledger_server.archive_ledger_ids.push(TEST_ARCHIVE_ID);
+  const putArchiveRow = (collection: string, id: string, data: Record<string, unknown>) =>
+    ledger_server.putRow(collection, id, data, TEST_USER_ID, TEST_ARCHIVE_ID);
+  putArchiveRow("ledgers", TEST_ARCHIVE_ID, { kind: "archive", name });
+  putArchiveRow("category_groups", ARCHIVE_GROUP_ID, {
+    name: "食費",
+    statement_type_code: "food",
+    description: null,
+  });
+  putArchiveRow("expense_categories", ARCHIVE_CATEGORY_ID, {
+    group_id: ARCHIVE_GROUP_ID,
+    name: "スーパー",
+    category_code: null,
+    description: null,
+  });
+  entries.forEach((entry_values, entry_index) =>
+    putArchiveRow("journal_entries", `archive-entry-${entry_index + 1}`, {
+      item: null,
+      is_excluded: false,
+      note: null,
+      recurring_expense_id: null,
+      recurring_year_month: null,
+      category_id: ARCHIVE_CATEGORY_ID,
+      ...entry_values,
+    })
+  );
+  incomes.forEach((income_values, income_index) =>
+    putArchiveRow("income_records", `archive-income-${income_index + 1}`, {
+      earner_id: TEST_USER_ID,
+      name: "給与",
+      income_type: "salary",
+      emoji: null,
+      note: null,
+      ...income_values,
+    })
+  );
 }
 
 function testInvitation(invitation_id: string) {
