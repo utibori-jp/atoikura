@@ -6,6 +6,7 @@ import {
   SyncNetworkError,
   SyncUpdateRequiredError,
 } from "./errors";
+import { createHouseholdCommands } from "./householdCommands";
 import { createLedgerCommands } from "./ledgerCommands";
 import { HttpSyncTransport } from "./transport";
 
@@ -159,5 +160,90 @@ describe("HttpSyncTransport", () => {
       `${API_BASE_URL}/ledger/savings-goals/..%2Fbudget%3Fx%3D1`
     );
     expect(fetch_fn.mock.calls[0][1]?.method).toBe("DELETE");
+  });
+  it("targets the household ledger with ?ledger=household", async () => {
+    const fetch_fn = vi.fn<typeof fetch>().mockImplementation(async () =>
+      jsonResponse({
+        collection: "base_incomes",
+        id: "b",
+        owner_id: 7,
+        seq: 3,
+        deleted: false,
+        data: {},
+      })
+    );
+    const transport = new HttpSyncTransport({
+      api_base_url: API_BASE_URL,
+      auth: fakeAuth(),
+      fetch_fn,
+    });
+    const household_ledger_commands = createLedgerCommands(
+      (method, path, request_body) => transport.sendCommand(method, path, request_body),
+      "household"
+    );
+
+    await household_ledger_commands.putBaseIncome(300000);
+    await household_ledger_commands.deleteSavingsGoal("g/1");
+
+    expect(fetch_fn.mock.calls[0][0]).toBe(`${API_BASE_URL}/ledger/base-income?ledger=household`);
+    expect(fetch_fn.mock.calls[1][0]).toBe(
+      `${API_BASE_URL}/ledger/savings-goals/g%2F1?ledger=household`
+    );
+  });
+});
+
+describe("household commands", () => {
+  function householdTransport(fetch_fn: typeof fetch) {
+    const transport = new HttpSyncTransport({
+      api_base_url: API_BASE_URL,
+      auth: fakeAuth(),
+      fetch_fn,
+    });
+    return createHouseholdCommands(
+      (method, path, request_body) => transport.sendJson(method, path, request_body),
+      (method, path, request_body) => transport.sendCommand(method, path, request_body)
+    );
+  }
+
+  it("joins by code and returns the household ledger", async () => {
+    const fetch_fn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(jsonResponse({ household_ledger_id: "household-1" }));
+
+    const household_ledger_id = await householdTransport(fetch_fn).joinHousehold({
+      code: "abcd2345",
+    });
+
+    expect(household_ledger_id).toBe("household-1");
+    expect(fetch_fn.mock.calls[0][0]).toBe(`${API_BASE_URL}/household/join`);
+    expect(JSON.parse(String(fetch_fn.mock.calls[0][1]?.body))).toEqual({ code: "abcd2345" });
+    expect(requestHeaders(fetch_fn, 0).Authorization).toBe("Bearer access-1");
+  });
+
+  it("treats 204 as success and encodes path IDs", async () => {
+    const fetch_fn = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }));
+
+    await householdTransport(fetch_fn).revokeInvitation("../leave");
+
+    expect(fetch_fn.mock.calls[0][0]).toBe(`${API_BASE_URL}/household/invitations/..%2Fleave`);
+    expect(fetch_fn.mock.calls[0][1]?.method).toBe("DELETE");
+  });
+
+  it("surfaces the server's refusal", async () => {
+    const fetch_fn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        jsonResponse({ code: "TOO_MANY_REQUESTS", message: "しばらくしてからお試しください" }, 429)
+      );
+
+    const join_error = await householdTransport(fetch_fn)
+      .joinHousehold({ code: "ABCD2345" })
+      .catch((caught_error: unknown) => caught_error);
+
+    expect(join_error).toBeInstanceOf(CommandRejectedError);
+    expect(join_error).toMatchObject({
+      http_status: 429,
+      message: "しばらくしてからお試しください",
+    });
   });
 });

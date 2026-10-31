@@ -1,7 +1,10 @@
 import {
   putJournalEntry,
+  seedHousehold,
   seedPersonalLedger,
   SUPERMARKET_CATEGORY_ID,
+  TEST_HOUSEHOLD_ID,
+  TEST_USER_ID,
   TestLedgerServer,
 } from "../test/ledgerFixtures";
 import { openSyncedSession } from "../test/renderWithLedger";
@@ -183,5 +186,62 @@ describe("journal data", () => {
     expect(
       await local_db.select("SELECT deleted FROM journal_entries WHERE id = ?", [entry_id])
     ).toEqual([{ deleted: 1 }]);
+  });
+});
+
+describe("journal data with a household attached", () => {
+  const HOUSEHOLD_GROUP_ID = "01920000-0000-7000-8000-000000000111";
+  const HOUSEHOLD_CATEGORY_ID = "01920000-0000-7000-8000-000000000211";
+
+  function attachedLedgerServer() {
+    const ledger_server = new TestLedgerServer();
+    seedPersonalLedger(ledger_server);
+    seedHousehold(ledger_server);
+    ledger_server.putRow(
+      "category_groups",
+      HOUSEHOLD_GROUP_ID,
+      { name: "食費", statement_type_code: "food", description: null },
+      TEST_USER_ID,
+      TEST_HOUSEHOLD_ID
+    );
+    ledger_server.putRow(
+      "expense_categories",
+      HOUSEHOLD_CATEGORY_ID,
+      { group_id: HOUSEHOLD_GROUP_ID, name: "スーパー", category_code: null, description: null },
+      TEST_USER_ID,
+      TEST_HOUSEHOLD_ID
+    );
+    return ledger_server;
+  }
+
+  it("records entries in the household view into the household ledger", async () => {
+    const { ledger_data, local_db } = await openSyncedSession(attachedLedgerServer());
+    expect(ledger_data.mode).toBe("household");
+
+    const entry_id = await createJournalEntry(
+      ledger_data,
+      entryFields({ category_id: HOUSEHOLD_CATEGORY_ID })
+    );
+
+    const [entry_row] = await local_db.select(
+      "SELECT ledger_id FROM journal_entries WHERE id = ?",
+      [entry_id]
+    );
+    expect(entry_row.ledger_id).toBe(TEST_HOUSEHOLD_ID);
+  });
+
+  it("rejects the household's categories in the allowance view", async () => {
+    const { ledger_data } = await openSyncedSession(attachedLedgerServer(), "personal");
+    expect(ledger_data.mode).toBe("allowance");
+
+    await expect(
+      createJournalEntry(ledger_data, entryFields({ category_id: HOUSEHOLD_CATEGORY_ID }))
+    ).rejects.toThrow();
+    const entry_id = await createJournalEntry(ledger_data, entryFields());
+    const [entry_row] = await ledger_data.local_db.select(
+      "SELECT ledger_id FROM journal_entries WHERE id = ?",
+      [entry_id]
+    );
+    expect(entry_row.ledger_id).toBe(TEST_LEDGER_ID);
   });
 });

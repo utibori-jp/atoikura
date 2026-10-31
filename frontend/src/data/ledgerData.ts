@@ -1,21 +1,78 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { LocalDb } from "../db/client";
 import { useAppSession, useDataVersion } from "../session/sessionHooks";
-import type { SyncStore } from "../sync/store";
+import type { LedgerTarget, SyncStore } from "../sync/store";
+
+export type { LedgerTarget };
 
 // What screens read and write through (#201): the on-device database of the
 // signed-in user's ledgers. Reads go to the local DB (or a worker query), and
 // writes of offline-writable records go through the sync store, which queues
 // them for push.
 
+// solo: no household attached, the personal ledger is the whole budget.
+// household: the shared household ledger.
+// allowance: the personal ledger while a household is attached (お小遣い).
+export type LedgerMode = "solo" | "household" | "allowance";
+
 export interface LedgerData {
   local_db: LocalDb;
   store: SyncStore;
-  // The personal ledger. Screens show it until the household screens (Step 8).
+  // The ledger the screens show: the household ledger in household mode, else
+  // the personal ledger.
   ledger_id: string;
-  // The attached household ledger, or null in personal mode.
+  ledger_target: LedgerTarget;
+  mode: LedgerMode;
+  personal_ledger_id: string;
+  // The attached household ledger, or null in solo mode.
   household_ledger_id: string | null;
   user_id: number;
+}
+
+// The view the user picked while a household is attached. It sits above every
+// LedgerDataProvider (the screens and the entry sheet), so they all agree.
+export interface LedgerViewState {
+  preferred_target: LedgerTarget;
+  setPreferredTarget: (preferred_target: LedgerTarget) => void;
+}
+
+export const LedgerViewContext = createContext<LedgerViewState>({
+  preferred_target: "household",
+  setPreferredTarget: () => {},
+});
+
+export function useLedgerView(): LedgerViewState {
+  return useContext(LedgerViewContext);
+}
+
+const LEDGER_VIEW_STORAGE_KEY = "atoikura.ledger_view";
+
+function readStoredLedgerView(): LedgerTarget {
+  try {
+    return window.localStorage.getItem(LEDGER_VIEW_STORAGE_KEY) === "personal"
+      ? "personal"
+      : "household";
+  } catch {
+    return "household";
+  }
+}
+
+// The view state for LedgerViewContext, remembered on this device. The household
+// view is the default once one is attached.
+export function useLedgerViewState(): LedgerViewState {
+  const [preferred_target, setPreferredTargetState] = useState<LedgerTarget>(readStoredLedgerView);
+  const setPreferredTarget = useCallback((next_target: LedgerTarget) => {
+    setPreferredTargetState(next_target);
+    try {
+      window.localStorage.setItem(LEDGER_VIEW_STORAGE_KEY, next_target);
+    } catch {
+      // Storage can be unavailable (private mode); the choice then lasts for the session.
+    }
+  }, []);
+  return useMemo(
+    () => ({ preferred_target, setPreferredTarget }),
+    [preferred_target, setPreferredTarget]
+  );
 }
 
 export const LedgerDataContext = createContext<LedgerData | null>(null);
@@ -30,15 +87,31 @@ export function useLedgerData(): LedgerData {
 export async function loadLedgerData(
   local_db: LocalDb,
   store: SyncStore,
-  user_id: number
+  user_id: number,
+  preferred_target: LedgerTarget = "household"
 ): Promise<LedgerData | null> {
   const sync_state = await store.readSyncState();
   if (sync_state.ledger_id === null) return null;
+  const personal_ledger_id = sync_state.ledger_id;
+  const household_ledger_id = sync_state.household_ledger_id;
+  const ledger_target: LedgerTarget =
+    household_ledger_id !== null && preferred_target === "household" ? "household" : "personal";
   return {
     local_db,
     store,
-    ledger_id: sync_state.ledger_id,
-    household_ledger_id: sync_state.household_ledger_id,
+    ledger_id:
+      ledger_target === "household" && household_ledger_id
+        ? household_ledger_id
+        : personal_ledger_id,
+    ledger_target,
+    mode:
+      household_ledger_id === null
+        ? "solo"
+        : ledger_target === "household"
+          ? "household"
+          : "allowance",
+    personal_ledger_id,
+    household_ledger_id,
     user_id,
   };
 }
@@ -92,26 +165,30 @@ export function useLocalData<TData>(
 // while loading, null until the first sync has brought it.
 export function useLoadedLedgerData(): LedgerData | null | undefined {
   const { local_db, sync_client, user } = useAppSession();
+  const { preferred_target } = useLedgerView();
   const data_version = useDataVersion();
   const [ledger_data, setLedgerData] = useState<LedgerData | null | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
-    void loadLedgerData(local_db, sync_client.store, user.id).then((loaded_ledger_data) => {
-      if (cancelled) return;
-      setLedgerData((previous_ledger_data) =>
-        previous_ledger_data &&
-        loaded_ledger_data &&
-        previous_ledger_data.ledger_id === loaded_ledger_data.ledger_id &&
-        previous_ledger_data.household_ledger_id === loaded_ledger_data.household_ledger_id
-          ? previous_ledger_data
-          : loaded_ledger_data
-      );
-    });
+    void loadLedgerData(local_db, sync_client.store, user.id, preferred_target).then(
+      (loaded_ledger_data) => {
+        if (cancelled) return;
+        setLedgerData((previous_ledger_data) =>
+          previous_ledger_data &&
+          loaded_ledger_data &&
+          previous_ledger_data.ledger_id === loaded_ledger_data.ledger_id &&
+          previous_ledger_data.mode === loaded_ledger_data.mode &&
+          previous_ledger_data.household_ledger_id === loaded_ledger_data.household_ledger_id
+            ? previous_ledger_data
+            : loaded_ledger_data
+        );
+      }
+    );
     return () => {
       cancelled = true;
     };
-  }, [local_db, sync_client.store, user.id, data_version]);
+  }, [local_db, sync_client.store, user.id, preferred_target, data_version]);
 
   return ledger_data;
 }

@@ -89,4 +89,12 @@ export const demoHandlers = [
     );
     return HttpResponse.json(command_result.body, { status: command_result.http_status });
   }),
+
+  // Households need real accounts; the demo has a single local user.
+  http.all(`${API_BASE}/household*`, () =>
+    HttpResponse.json(
+      { code: "FORBIDDEN", message: "デモでは家計機能は使えません" },
+      { status: 403 }
+    )
+  ),
 ];

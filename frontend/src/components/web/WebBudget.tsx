@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLedgerApi, type BudgetSummaryView } from "../../data/ledgerApi";
+import { budgetSource, useLedgerApi, type BudgetSummaryView } from "../../data/ledgerApi";
 import { useDataVersion } from "../../session/sessionHooks";
 import { T } from "../../theme";
 
@@ -81,17 +81,31 @@ export function WebBudget({ onNavigate }: Props) {
       ? Math.round((current_month_spent_yen / summary.variable_budget) * 100)
       : 0;
 
-  const tiles = [
+  const source = budgetSource(summary);
+  // A tile without a screen is informational: income lives in the household
+  // while it is attached, and allowances are set in the account settings.
+  const tiles: {
+    key: string;
+    screen: BudgetSubScreen | null;
+    sign: string;
+    emoji: string;
+    title: string;
+    sub: string;
+    amount: number;
+    tone: { bg: string; fg: string; signBg: string };
+  }[] = [
     {
-      screen: "income" as BudgetSubScreen,
+      key: "source",
+      screen: summary.allowance ? null : ("income" as BudgetSubScreen),
       sign: "+",
-      emoji: "💼",
-      title: "基準収入",
-      sub: "毎月の見込み収入",
-      amount: summary.base_income,
+      emoji: summary.allowance ? "👛" : "💼",
+      title: source.label,
+      sub: source.description,
+      amount: source.amount,
       tone: { bg: "#DEF1E6", fg: "#4FA481", signBg: "rgba(79,164,129,0.14)" },
     },
     {
+      key: "recurring",
       screen: "recurring" as BudgetSubScreen,
       sign: "−",
       emoji: "🔁",
@@ -101,6 +115,7 @@ export function WebBudget({ onNavigate }: Props) {
       tone: { bg: "#E5EEF7", fg: "#3F6B91", signBg: "rgba(63,107,145,0.12)" },
     },
     {
+      key: "savings",
       screen: "savings" as BudgetSubScreen,
       sign: "−",
       emoji: "💰",
@@ -109,6 +124,20 @@ export function WebBudget({ onNavigate }: Props) {
       amount: summary.savings_total,
       tone: { bg: "#FFF1CC", fg: "#A3791F", signBg: "rgba(255,194,71,0.18)" },
     },
+    ...(summary.allowance_total > 0
+      ? [
+          {
+            key: "allowances",
+            screen: null,
+            sign: "−",
+            emoji: "👛",
+            title: "お小遣い",
+            sub: "メンバーのお小遣いの合計",
+            amount: summary.allowance_total,
+            tone: { bg: "#F6E6F0", fg: "#A0507E", signBg: "rgba(160,80,126,0.12)" },
+          },
+        ]
+      : []),
   ];
 
   const current_month = currentMonthJST();
@@ -128,7 +157,11 @@ export function WebBudget({ onNavigate }: Props) {
             今月の予算プラン
           </div>
           <div style={{ fontSize: 14, color: T.inkSoft, marginTop: 4 }}>
-            基準収入 − 定期支出 − 貯金 で自動算出されます
+            {summary.allowance
+              ? "お小遣い（繰越込み） − 定期支出 − 貯金 で自動算出されます"
+              : summary.allowance_total > 0
+                ? "基準収入 − 定期支出 − 貯金 − お小遣い で自動算出されます"
+                : "基準収入 − 定期支出 − 貯金 で自動算出されます"}
           </div>
         </div>
         <div
@@ -265,8 +298,8 @@ export function WebBudget({ onNavigate }: Props) {
             },
             { label: "消化ペース", value: `${spent_pct}%`, sub: "進行中" },
             {
-              label: "基準収入 − 固定",
-              value: `¥${yenSlim(summary.base_income - summary.recurring_total)}`,
+              label: `${source.label} − 固定`,
+              value: `¥${yenSlim(source.amount - summary.recurring_total)}`,
               sub: "変動費 + 貯金の元",
             },
           ].map((s, i) => (
@@ -301,19 +334,20 @@ export function WebBudget({ onNavigate }: Props) {
       <div style={{ display: "flex", gap: 16 }}>
         {tiles.map((t) => (
           <div
-            key={t.screen}
-            onClick={() => onNavigate(t.screen)}
+            key={t.key}
+            onClick={t.screen ? () => onNavigate(t.screen as BudgetSubScreen) : undefined}
             style={{
               flex: 1,
               background: T.card,
               borderRadius: 28,
               padding: "22px 24px",
               boxShadow: "0 8px 24px -16px rgba(80,40,10,0.18)",
-              cursor: "pointer",
+              cursor: t.screen ? "pointer" : "default",
               position: "relative",
               transition: "transform 0.1s, box-shadow 0.1s",
             }}
             onMouseEnter={(e) => {
+              if (!t.screen) return;
               (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
               (e.currentTarget as HTMLDivElement).style.boxShadow =
                 "0 12px 32px -12px rgba(80,40,10,0.22)";
@@ -379,18 +413,20 @@ export function WebBudget({ onNavigate }: Props) {
               </span>
             </div>
             <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 3 }}>今月の合計</div>
-            <div
-              style={{
-                position: "absolute",
-                bottom: 18,
-                right: 20,
-                fontSize: 22,
-                color: T.coral,
-                opacity: 0.55,
-              }}
-            >
-              ›
-            </div>
+            {t.screen && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 18,
+                  right: 20,
+                  fontSize: 22,
+                  color: T.coral,
+                  opacity: 0.55,
+                }}
+              >
+                ›
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -412,7 +448,7 @@ export function WebBudget({ onNavigate }: Props) {
         }}
       >
         <span style={{ color: "#4FA481", fontWeight: 700 }}>
-          基準収入 {yen(summary.base_income)}
+          {source.label} {yen(source.amount)}
         </span>
         <span style={{ color: T.inkSoft }}>−</span>
         <span style={{ color: "#3F6B91", fontWeight: 700 }}>
@@ -420,6 +456,14 @@ export function WebBudget({ onNavigate }: Props) {
         </span>
         <span style={{ color: T.inkSoft }}>−</span>
         <span style={{ color: "#A3791F", fontWeight: 700 }}>貯金 {yen(summary.savings_total)}</span>
+        {summary.allowance_total > 0 && (
+          <>
+            <span style={{ color: T.inkSoft }}>−</span>
+            <span style={{ color: "#A0507E", fontWeight: 700 }}>
+              お小遣い {yen(summary.allowance_total)}
+            </span>
+          </>
+        )}
         <span style={{ fontSize: 18, color: T.hair, margin: "0 4px" }}>=</span>
         <span style={{ color: T.coralDeep, fontWeight: 800, fontSize: 15 }}>
           今月の予算 {yen(summary.variable_budget)}

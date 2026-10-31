@@ -111,6 +111,13 @@ export interface SurplusAllocationFields {
   savings_goal_id?: string | null;
 }
 
+// The allowance view's numbers (mode "allowance").
+export interface AllowanceSummaryView {
+  allowance: number;
+  carried_in: number;
+  balance: number;
+}
+
 export interface BudgetSummaryView {
   income_total: number;
   base_income: number;
@@ -120,6 +127,29 @@ export interface BudgetSummaryView {
   daily_budget: number;
   days_remaining: number;
   history: BudgetHistoryItem[];
+  // Allowance in effect for the month summed over the household's members
+  // (household mode), else 0.
+  allowance_total: number;
+  // Set in allowance mode, where the budget comes from the allowance instead of income.
+  allowance: AllowanceSummaryView | null;
+}
+
+// What the month's budget is computed from: the base income, or in allowance
+// mode the allowance plus what carried over from earlier months.
+export function budgetSource(summary: BudgetSummaryView): {
+  label: string;
+  description: string;
+  amount: number;
+} {
+  if (summary.allowance) {
+    const { allowance, carried_in } = summary.allowance;
+    return {
+      label: "お小遣い",
+      description: `今月 ¥${allowance.toLocaleString("ja-JP")} + 繰越 ¥${carried_in.toLocaleString("ja-JP")}`,
+      amount: allowance + carried_in,
+    };
+  }
+  return { label: "基準収入", description: "毎月の見込み収入", amount: summary.base_income };
 }
 
 export interface CategoryGroupFields {
@@ -153,6 +183,32 @@ export function createLedgerApi(ledger_data: LedgerData, ledger_commands: Ledger
   return {
     // --- Budget -------------------------------------------------------------
     async getBudgetSummary(year_month: string): Promise<BudgetSummaryView> {
+      if (ledger_data.mode === "allowance" && ledger_data.household_ledger_id) {
+        const allowance_summary = await local_db.query(
+          "computeAllowanceSummary",
+          ledger_data.personal_ledger_id,
+          ledger_data.household_ledger_id,
+          user_id,
+          year_month,
+          todayInJst()
+        );
+        return {
+          income_total: 0,
+          base_income: 0,
+          recurring_total: allowance_summary.recurring_total,
+          savings_total: allowance_summary.savings_total,
+          variable_budget: allowance_summary.variable_budget,
+          daily_budget: allowance_summary.daily_budget,
+          days_remaining: allowance_summary.days_remaining,
+          history: allowance_summary.history,
+          allowance_total: 0,
+          allowance: {
+            allowance: allowance_summary.allowance,
+            carried_in: allowance_summary.carried_in,
+            balance: allowance_summary.balance,
+          },
+        };
+      }
       const [ledger_summary, [base_income_row]] = await Promise.all([
         local_db.query("computeLedgerSummary", ledger_id, year_month, todayInJst()),
         local_db.select(
@@ -169,6 +225,8 @@ export function createLedgerApi(ledger_data: LedgerData, ledger_commands: Ledger
         daily_budget: ledger_summary.daily_budget,
         days_remaining: ledger_summary.days_remaining,
         history: ledger_summary.history,
+        allowance_total: ledger_summary.allowance_total,
+        allowance: null,
       };
     },
 
@@ -381,10 +439,13 @@ export type LedgerApi = ReturnType<typeof createLedgerApi>;
 
 export function useLedgerApi(): LedgerApi {
   const ledger_data = useLedgerData();
-  const { ledger_commands } = useAppSession().sync_client;
+  const { ledger_commands, household_ledger_commands } = useAppSession().sync_client;
+  // Commands go to the ledger the screens show.
+  const target_ledger_commands =
+    ledger_data.ledger_target === "household" ? household_ledger_commands : ledger_commands;
   return useMemo(
-    () => createLedgerApi(ledger_data, ledger_commands),
-    [ledger_data, ledger_commands]
+    () => createLedgerApi(ledger_data, target_ledger_commands),
+    [ledger_data, target_ledger_commands]
   );
 }
 

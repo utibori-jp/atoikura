@@ -16,12 +16,16 @@ export const SYNC_PROTOCOL_HEADER = "X-Atoikura-Sync-Protocol";
 export const SYNC_PROTOCOL_VERSION = 2;
 
 export type CommandMethod = "POST" | "PUT" | "DELETE";
+export type JsonMethod = CommandMethod | "GET";
 
 export interface SyncTransport {
   push(changes: PushChange[]): Promise<PushResult[]>;
   pull(since: number, limit: number): Promise<PullPage>;
   // Sends a ledger command and returns the row it wrote.
   sendCommand(method: CommandMethod, path: string, request_body?: unknown): Promise<PulledRow>;
+  // Sends an online-only request (the household commands) and returns its JSON
+  // body, or null for 204 No Content.
+  sendJson(method: JsonMethod, path: string, request_body?: unknown): Promise<unknown>;
 }
 
 export interface HttpSyncTransportOptions {
@@ -134,5 +138,15 @@ export class HttpSyncTransport implements SyncTransport {
       throw new CommandRejectedError(response.status, error_body.code, error_body.message);
     }
     return (await response.json()) as PulledRow;
+  }
+
+  async sendJson(method: JsonMethod, path: string, request_body?: unknown): Promise<unknown> {
+    const response = await this.request(method, path, request_body);
+    if (!response.ok) {
+      const error_body = await readErrorBody(response);
+      throw new CommandRejectedError(response.status, error_body.code, error_body.message);
+    }
+    if (response.status === 204) return null;
+    return response.json();
   }
 }

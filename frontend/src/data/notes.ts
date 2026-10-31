@@ -12,7 +12,7 @@ export async function listDailyNotes(
   const note_rows = await ledger_data.local_db.select(
     `SELECT date, note FROM daily_notes
      WHERE ledger_id = ? AND owner_id = ? AND deleted = 0 AND substr(date, 1, 7) = ?`,
-    [ledger_data.ledger_id, ledger_data.user_id, year_month]
+    [ledger_data.personal_ledger_id, ledger_data.user_id, year_month]
   );
   return Object.fromEntries(
     note_rows.map((note_row) => [String(note_row.date), String(note_row.note)])
@@ -29,7 +29,7 @@ export async function saveDailyNote(
   const [existing_row] = await ledger_data.local_db.select(
     `SELECT id FROM daily_notes
      WHERE ledger_id = ? AND owner_id = ? AND deleted = 0 AND date = ?`,
-    [ledger_data.ledger_id, ledger_data.user_id, date]
+    [ledger_data.personal_ledger_id, ledger_data.user_id, date]
   );
   await saveNote(ledger_data, "daily_notes", existing_row ? String(existing_row.id) : null, note, {
     date,
@@ -44,7 +44,7 @@ export async function listMonthlyReviewNotes(
   const note_rows = await ledger_data.local_db.select(
     `SELECT category_id, note FROM monthly_review_notes
      WHERE ledger_id = ? AND owner_id = ? AND deleted = 0 AND year_month = ?`,
-    [ledger_data.ledger_id, ledger_data.user_id, year_month]
+    [ledger_data.personal_ledger_id, ledger_data.user_id, year_month]
   );
   return Object.fromEntries(
     note_rows.map((note_row) => [String(note_row.category_id), String(note_row.note)])
@@ -66,7 +66,7 @@ export async function saveMonthlyReviewNotes(
       await ledger_data.local_db.select(
         `SELECT id, category_id FROM monthly_review_notes
          WHERE ledger_id = ? AND owner_id = ? AND deleted = 0 AND year_month = ?`,
-        [ledger_data.ledger_id, ledger_data.user_id, year_month]
+        [ledger_data.personal_ledger_id, ledger_data.user_id, year_month]
       )
     ).map((note_row) => [String(note_row.category_id), String(note_row.id)])
   );

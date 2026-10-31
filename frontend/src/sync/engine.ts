@@ -311,14 +311,13 @@ export class SyncEngine {
     }
   }
 
-  // Runs an online-only edit (a ledger command), applies the row it returns,
-  // then syncs so the cache catches up with everything the command touched.
-  async runCommand(send: () => Promise<PulledRow>): Promise<PulledRow> {
+  // Sends an online-only request and returns its result. Auth and version
+  // failures update the sync status like a failed sync would.
+  private async sendOnline<TResult>(send: () => Promise<TResult>): Promise<TResult> {
     if (this.status.phase === "update_required") throw new SyncUpdateRequiredError();
     if (!this.environment.isOnline()) throw new OfflineError();
-    let written_row: PulledRow;
     try {
-      written_row = await send();
+      return await send();
     } catch (command_error) {
       if (
         command_error instanceof SyncAuthError ||
@@ -328,8 +327,22 @@ export class SyncEngine {
       }
       throw command_error;
     }
+  }
+
+  // Runs an online-only edit (a ledger command), applies the row it returns,
+  // then syncs so the cache catches up with everything the command touched.
+  async runCommand(send: () => Promise<PulledRow>): Promise<PulledRow> {
+    const written_row = await this.sendOnline(send);
     await this.store.applyCommandRow(written_row);
     await this.syncNow();
     return written_row;
+  }
+
+  // Runs an online-only request that returns no synced row (the household
+  // lifecycle), then syncs so attaching or detaching a ledger reaches the cache.
+  async runOnline<TResult>(send: () => Promise<TResult>): Promise<TResult> {
+    const command_result = await this.sendOnline(send);
+    await this.syncNow();
+    return command_result;
   }
 }

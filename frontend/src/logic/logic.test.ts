@@ -91,9 +91,43 @@ describe("allowance carry-over", () => {
       "2026-10"
     );
     expect(allowance_months).toEqual([
-      { year_month: "2026-08", carried_in: 0, allowance: 30000, spent: 25000, balance: 5000 },
-      { year_month: "2026-09", carried_in: 5000, allowance: 30000, spent: 38000, balance: -3000 },
-      { year_month: "2026-10", carried_in: -3000, allowance: 40000, spent: 10000, balance: 27000 },
+      {
+        year_month: "2026-08",
+        carried_in: 0,
+        allowance: 30000,
+        spent: 25000,
+        saved: 0,
+        balance: 5000,
+      },
+      {
+        year_month: "2026-09",
+        carried_in: 5000,
+        allowance: 30000,
+        spent: 38000,
+        saved: 0,
+        balance: -3000,
+      },
+      {
+        year_month: "2026-10",
+        carried_in: -3000,
+        allowance: 40000,
+        spent: 10000,
+        saved: 0,
+        balance: 27000,
+      },
+    ]);
+  });
+
+  it("takes personal savings out of the balance as well", () => {
+    const allowance_months = allowanceBalances(
+      allowance_history,
+      { "2026-10": 10000 },
+      "2026-10",
+      "2026-11",
+      { "2026-10": 5000, "2026-11": 2000 }
+    );
+    expect(allowance_months.map((allowance_month) => allowance_month.balance)).toEqual([
+      25000, 63000,
     ]);
   });
 });

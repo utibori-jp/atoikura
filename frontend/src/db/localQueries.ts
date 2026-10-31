@@ -1,6 +1,8 @@
 import {
+  computeAllowanceSummary,
   computeLedgerSummary,
   listDailyVariableSums,
+  listHouseholdMembers,
   listMemberAllowanceTotals,
   listMonthlyBreakdown,
   listOwnAllowanceSpending,
@@ -15,8 +17,10 @@ import type { SqlDatabase } from "./types";
 // pulling every row across the worker boundary. Only functions listed here can
 // be called; their results must be structured-cloneable.
 export const LOCAL_QUERIES = {
+  computeAllowanceSummary,
   computeLedgerSummary,
   listDailyVariableSums,
+  listHouseholdMembers,
   listMemberAllowanceTotals,
   listMonthlyBreakdown,
   listOwnAllowanceSpending,

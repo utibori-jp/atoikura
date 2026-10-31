@@ -1,4 +1,6 @@
+import { TEST_LEDGER_ID } from "../test/handlers";
 import {
+  seedHousehold,
   seedPersonalLedger,
   SUPERMARKET_CATEGORY_ID,
   TestLedgerServer,
@@ -96,5 +98,22 @@ describe("monthly review notes", () => {
       })
     ).rejects.toThrow("noteは500文字以内で入力してください");
     expect(await listMonthlyReviewNotes(ledger_data, "2026-09")).toEqual({});
+  });
+});
+
+describe("notes with a household attached", () => {
+  it("keeps the user's notes in their personal ledger in either view", async () => {
+    const { ledger_data, local_db } = await openLedger((ledger_server) =>
+      seedHousehold(ledger_server)
+    );
+    expect(ledger_data.mode).toBe("household");
+
+    await saveDailyNote(ledger_data, "2026-10-05", "家計の日のメモ");
+
+    expect(await listDailyNotes(ledger_data, "2026-10")).toEqual({
+      "2026-10-05": "家計の日のメモ",
+    });
+    const [note_row] = await local_db.select("SELECT ledger_id FROM daily_notes");
+    expect(note_row.ledger_id).toBe(TEST_LEDGER_ID);
   });
 });

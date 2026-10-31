@@ -5,7 +5,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { DialogProvider } from "../components/dialogs";
 import { LedgerDataProvider } from "../data/LedgerDataProvider";
-import { loadLedgerData } from "../data/ledgerData";
+import { LedgerViewContext, loadLedgerData, type LedgerTarget } from "../data/ledgerData";
 import { SessionProvider } from "../session/SessionContext";
 import type { AppSession } from "../session/sessionController";
 import { createSyncClient } from "../sync/index";
@@ -23,8 +23,15 @@ afterEach(async () => {
 });
 
 // A signed-in session whose database has synced the server's rows.
-export async function openSyncedSession(ledger_server: TestLedgerServer) {
-  server.use(ledger_server.pullHandler(), ledger_server.commandHandler());
+export async function openSyncedSession(
+  ledger_server: TestLedgerServer,
+  preferred_target: LedgerTarget = "household"
+) {
+  server.use(
+    ledger_server.pullHandler(),
+    ledger_server.commandHandler(),
+    ledger_server.householdHandler()
+  );
   const app_services = createTestAppServices();
   const local_db: MemorySyncDb = await openMemorySyncDb("test-device");
   const sync_client = createSyncClient({
@@ -46,21 +53,33 @@ export async function openSyncedSession(ledger_server: TestLedgerServer) {
     sync_client,
   };
   running_sessions.push(app_session);
-  const ledger_data = await loadLedgerData(local_db, sync_client.store, TEST_USER_ID);
+  const ledger_data = await loadLedgerData(
+    local_db,
+    sync_client.store,
+    TEST_USER_ID,
+    preferred_target
+  );
   if (!ledger_data) throw new Error("the ledger did not sync");
   return { app_session, local_db, sync_client, ledger_data, app_services };
 }
 
+// preferred_target picks the household or allowance view while a household is
+// attached, as the 家計/お小遣い switch does.
 export async function renderWithLedger(
   screen_element: ReactElement,
-  ledger_server: TestLedgerServer
+  ledger_server: TestLedgerServer,
+  { preferred_target = "household" }: { preferred_target?: LedgerTarget } = {}
 ) {
-  const { app_session, local_db, sync_client, app_services } =
-    await openSyncedSession(ledger_server);
+  const { app_session, local_db, sync_client, app_services } = await openSyncedSession(
+    ledger_server,
+    preferred_target
+  );
   const render_result = render(
     <DialogProvider is_mobile={false}>
       <SessionProvider session={app_session}>
-        <LedgerDataProvider>{screen_element}</LedgerDataProvider>
+        <LedgerViewContext.Provider value={{ preferred_target, setPreferredTarget: () => {} }}>
+          <LedgerDataProvider>{screen_element}</LedgerDataProvider>
+        </LedgerViewContext.Provider>
       </SessionProvider>
     </DialogProvider>
   );
