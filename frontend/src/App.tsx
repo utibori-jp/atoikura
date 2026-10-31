@@ -38,15 +38,19 @@ type BudgetSubScreen = "hub" | "income" | "recurring" | "savings";
 // the native Back button walks screens instead of leaving the SPA (#165).
 type NavLocation = { tab: Tab; sub: BudgetSubScreen };
 
-function useMobile(): boolean {
-  const [is_mobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 1023px)").matches);
+function useMediaQuery(media_query: string): boolean {
+  const [is_matching, setIsMatching] = useState(() => window.matchMedia(media_query).matches);
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 1023px)");
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    const mq = window.matchMedia(media_query);
+    const handler = (e: MediaQueryListEvent) => setIsMatching(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, []);
-  return is_mobile;
+  }, [media_query]);
+  return is_matching;
+}
+
+function useMobile(): boolean {
+  return useMediaQuery("(max-width: 1023px)");
 }
 
 function LogoIcon() {
@@ -179,6 +183,9 @@ interface NavBarProps {
 
 function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: NavBarProps) {
   const isCurrent = listYearMonth >= currentMonthJST();
+  // Narrow desktop widths: drop the wordmark and nav emojis and tighten spacing so the nav,
+  // the journal month switcher and the sync pill stay on one line.
+  const is_compact = useMediaQuery("(max-width: 1279px)");
 
   return (
     <header
@@ -186,7 +193,7 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "14px 36px",
+        padding: is_compact ? "14px 24px" : "14px 36px",
         background: T.card,
         borderBottom: `1px solid ${T.hair}`,
         boxShadow: "0 2px 12px -8px rgba(80,40,10,0.12)",
@@ -197,19 +204,21 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
       }}
     >
       {/* Logo */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
         <LogoIcon />
-        <span
-          style={{
-            fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
-            fontWeight: 900,
-            fontSize: 22,
-            letterSpacing: "-0.01em",
-            color: T.ink,
-          }}
-        >
-          Atoikura
-        </span>
+        {!is_compact && (
+          <span
+            style={{
+              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+              fontWeight: 900,
+              fontSize: 22,
+              letterSpacing: "-0.01em",
+              color: T.ink,
+            }}
+          >
+            Atoikura
+          </span>
+        )}
       </div>
 
       {/* Nav pills */}
@@ -228,7 +237,7 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
             key={item.id}
             onClick={() => onChange(item.id)}
             style={{
-              padding: "10px 18px",
+              padding: is_compact ? "10px 14px" : "10px 18px",
               borderRadius: 999,
               border: "none",
               background: active === item.id ? T.ink : "transparent",
@@ -241,16 +250,17 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
               gap: 6,
               fontFamily: "inherit",
               transition: "background 0.15s",
+              whiteSpace: "nowrap",
             }}
           >
-            <span style={{ fontSize: 14 }}>{item.emoji}</span>
+            {!is_compact && <span style={{ fontSize: 14 }}>{item.emoji}</span>}
             {item.label}
           </button>
         ))}
       </nav>
 
       {/* Right: month nav (list) + user pill */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
         {active === "list" && (
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <button
@@ -280,6 +290,7 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
                 fontSize: 13,
                 fontWeight: 600,
                 color: T.ink,
+                whiteSpace: "nowrap",
               }}
             >
               {formatMonthJP(listYearMonth)}
