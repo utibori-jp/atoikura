@@ -55,13 +55,17 @@ func conflictOnUniqueViolation(err error, message string) error {
 	return err
 }
 
-// ledgerTx is one command's transaction in the caller's ledger.
+// ledgerTx is one command's transaction in the ledger the caller targets.
 type ledgerTx struct {
 	tx            pgx.Tx
 	seq_allocator *txAllocator
-	ledger        *Ledger
+	ledger_id     string
 	user_id       int64
 }
+
+// householdNotAttachedMessage refuses a household command from a user who is
+// not an active member of a household.
+const householdNotAttachedMessage = "家計に参加していません"
 
 // writtenRow names the row a command returns to the client.
 type writtenRow struct {
@@ -69,11 +73,11 @@ type writtenRow struct {
 	id         string
 }
 
-// runLedgerCommand runs command in a transaction in the caller's ledger and
-// returns the written row in the same shape pull returns it.
-func (r *Repository) runLedgerCommand(ctx context.Context, user_id int64, command func(context.Context, *ledgerTx) (*writtenRow, error)) (*PulledRow, error) {
-	caller_ledger, err := r.EnsurePersonalLedger(ctx, user_id)
-	if err != nil {
+// runLedgerCommand runs command in a transaction in the ledger the caller
+// targets and returns the written row in the same shape pull returns it. The
+// ledger is resolved from the caller's memberships inside the transaction.
+func (r *Repository) runLedgerCommand(ctx context.Context, caller Caller, command func(context.Context, *ledgerTx) (*writtenRow, error)) (*PulledRow, error) {
+	if _, err := r.EnsureCallerLedgers(ctx, caller.UserID); err != nil {
 		return nil, err
 	}
 	tx, err := r.pool.Begin(ctx)
@@ -81,7 +85,15 @@ func (r *Repository) runLedgerCommand(ctx context.Context, user_id int64, comman
 		return nil, fmt.Errorf("beginning ledger command: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	ledger_tx := &ledgerTx{tx: tx, seq_allocator: &txAllocator{tx: tx}, ledger: caller_ledger, user_id: user_id}
+	caller_ledgers, err := loadCallerLedgers(ctx, tx, caller.UserID)
+	if err != nil {
+		return nil, err
+	}
+	target_ledger_id, is_attached := caller_ledgers.Resolve(caller.Target)
+	if !is_attached {
+		return nil, newCommandError(CommandForbidden, householdNotAttachedMessage)
+	}
+	ledger_tx := &ledgerTx{tx: tx, seq_allocator: &txAllocator{tx: tx}, ledger_id: target_ledger_id, user_id: caller.UserID}
 
 	written_row_ref, err := command(ctx, ledger_tx)
 	if err != nil {
@@ -123,7 +135,7 @@ func (ledger_tx *ledgerTx) insertRow(ctx context.Context, collection string, col
 	}
 	column_names := []string{"id", "ledger_id", "owner_id", "seq"}
 	placeholders := []string{"gen_random_uuid()", "$1::uuid", "$2", "$3"}
-	insert_values := []any{ledger_tx.ledger.ID, ledger_tx.user_id, next_seq}
+	insert_values := []any{ledger_tx.ledger_id, ledger_tx.user_id, next_seq}
 	for _, column_value := range column_values {
 		insert_values = append(insert_values, column_value.value)
 		column_names = append(column_names, column_value.name)
@@ -201,7 +213,7 @@ func (ledger_tx *ledgerTx) lockLiveRow(ctx context.Context, collection string, r
 	var row_json []byte
 	err := ledger_tx.tx.QueryRow(ctx,
 		"SELECT to_jsonb(t) FROM lf."+collection+" t WHERE t.id = $1::uuid AND t.ledger_id = $2::uuid AND t.deleted = false FOR "+row_lock,
-		row_id, ledger_tx.ledger.ID,
+		row_id, ledger_tx.ledger_id,
 	).Scan(&row_json)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

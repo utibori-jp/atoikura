@@ -15,18 +15,41 @@ type StoredRecord struct {
 	RecurringExpenseID *string
 }
 
-// CanWrite reports whether the caller may change the stored record: records are
-// author-only, except auto-posted recurring entries of the shared ledger wallet,
-// which any member of that ledger may edit (design.md D11).
-func CanWrite(stored_record *StoredRecord, caller_id int64, caller_ledger_id string) bool {
-	if stored_record.LedgerID != caller_ledger_id {
-		return false
+// CanWrite reports whether the caller may change the stored record. Only rows of
+// the caller's personal ledger and attached household (household_ledger_id, ""
+// when none) are writable; archives and other ledgers never are. Records are
+// author-only, except auto-posted recurring entries of the household ledger,
+// which any member may edit (design.md D11).
+func CanWrite(stored_record *StoredRecord, caller_id int64, personal_ledger_id string, household_ledger_id string) bool {
+	switch {
+	case stored_record.LedgerID == personal_ledger_id:
+		return stored_record.OwnerID == caller_id
+	case household_ledger_id != "" && stored_record.LedgerID == household_ledger_id:
+		return stored_record.OwnerID == caller_id || stored_record.RecurringExpenseID != nil
 	}
-	if stored_record.OwnerID == caller_id {
-		return true
+	return false
+}
+
+// SplitTarget takes the target field (design.md D15) out of a change. It returns
+// the change without it and the target text, or "" when none was pushed. A
+// target that is not a string is invalid.
+func SplitTarget(collection_spec *CollectionSpec, change Change) (Change, string, *Rejection) {
+	target_value, has_target := change.Fields[collection_spec.TargetField]
+	if collection_spec.TargetField == "" || !has_target {
+		return change, "", nil
 	}
-	wallet, _ := stored_record.Values["wallet"].(string)
-	return stored_record.RecurringExpenseID != nil && wallet == "ledger"
+	remaining_fields := make(map[string]FieldValue, len(change.Fields)-1)
+	for field_name, field_value := range change.Fields {
+		if field_name != collection_spec.TargetField {
+			remaining_fields[field_name] = field_value
+		}
+	}
+	change.Fields = remaining_fields
+	target_text, is_text := DecodeValue(target_value.Value).(string)
+	if !is_text || target_text == "" {
+		return change, "", reject(ReasonInvalid, collection_spec.TargetField+"はpersonalかhouseholdで指定してください")
+	}
+	return change, target_text, nil
 }
 
 // MergeResult is the outcome of applying a change to a record.

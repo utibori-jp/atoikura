@@ -36,7 +36,7 @@ func (f *fakeSyncRepo) Pull(_ context.Context, _ int64, since int64, limit int) 
 	if f.pull_result != nil {
 		return f.pull_result, nil
 	}
-	return &repository.PullResult{LedgerID: "ledger", Rows: []repository.PulledRow{}, NextSince: since}, nil
+	return &repository.PullResult{Ledgers: repository.CallerLedgers{PersonalID: "ledger"}, Rows: []repository.PulledRow{}, NextSince: since}, nil
 }
 
 func newSyncRequest(t *testing.T, method string, path string, body string, user_id int64) *http.Request {
@@ -65,8 +65,9 @@ func TestRequireSyncProtocol(t *testing.T) {
 		header      string
 		want_status int
 	}{
-		{"current version", "1", http.StatusNoContent},
-		{"newer version", "2", http.StatusNoContent},
+		{"current version", "2", http.StatusNoContent},
+		{"newer version", "3", http.StatusNoContent},
+		{"wallet protocol", "1", http.StatusUpgradeRequired},
 		{"missing", "", http.StatusUpgradeRequired},
 		{"too old", "0", http.StatusUpgradeRequired},
 		{"garbage", "v1", http.StatusUpgradeRequired},
@@ -80,7 +81,7 @@ func TestRequireSyncProtocol(t *testing.T) {
 			w := testutil.NewRecorder()
 			RequireSyncProtocol(next_handler).ServeHTTP(w, protocol_request)
 			testutil.AssertStatus(t, w, test_case.want_status)
-			if w.Header().Get(SyncProtocolHeader) != "1" {
+			if w.Header().Get(SyncProtocolHeader) != "2" {
 				t.Errorf("server protocol header = %q", w.Header().Get(SyncProtocolHeader))
 			}
 			if test_case.want_status == http.StatusUpgradeRequired {
@@ -190,9 +191,9 @@ func TestPullHandler_Parameters(t *testing.T) {
 
 func TestPullHandler_ResponseShape(t *testing.T) {
 	sync_repo := &fakeSyncRepo{pull_result: &repository.PullResult{
-		LedgerID: "ledger-1",
+		Ledgers: repository.CallerLedgers{PersonalID: "personal-1", HouseholdID: "household-1", ArchiveIDs: []string{"archive-1"}},
 		Rows: []repository.PulledRow{{
-			Collection: "journal_entries", ID: "entry-1", OwnerID: 7, Seq: 3,
+			Collection: "journal_entries", ID: "entry-1", LedgerID: "household-1", OwnerID: 7, Seq: 3,
 			Data:     map[string]json.RawMessage{"amount": json.RawMessage("100")},
 			FieldHLC: map[string]string{"amount": "1793000000000-0001-a"},
 		}},
@@ -204,11 +205,15 @@ func TestPullHandler_ResponseShape(t *testing.T) {
 	testutil.AssertStatus(t, w, http.StatusOK)
 	var pull_response map[string]any
 	testutil.DecodeJSON(t, w, &pull_response)
-	if pull_response["ledger_id"] != "ledger-1" || pull_response["next_since"] != float64(3) || pull_response["has_more"] != true {
+	ledger_ids, _ := json.Marshal(pull_response["ledger_ids"])
+	if string(ledger_ids) != `["personal-1","household-1","archive-1"]` || pull_response["personal_ledger_id"] != "personal-1" || pull_response["household_ledger_id"] != "household-1" {
+		t.Fatalf("ledgers = %v", pull_response)
+	}
+	if pull_response["next_since"] != float64(3) || pull_response["has_more"] != true {
 		t.Fatalf("pull response = %v", pull_response)
 	}
 	first_row := pull_response["rows"].([]any)[0].(map[string]any)
-	if first_row["collection"] != "journal_entries" || first_row["data"].(map[string]any)["amount"] != float64(100) {
+	if first_row["collection"] != "journal_entries" || first_row["ledger_id"] != "household-1" || first_row["data"].(map[string]any)["amount"] != float64(100) {
 		t.Fatalf("pulled row = %v", first_row)
 	}
 }

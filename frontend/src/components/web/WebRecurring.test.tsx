@@ -73,7 +73,7 @@ describe("WebRecurring — create form", () => {
     expect(screen.getByText("定期支出を追加")).toBeInTheDocument();
   });
 
-  it("creates the expense in the ledger wallet and shows it", async () => {
+  it("creates the expense with a ledger command and shows it", async () => {
     const ledger_server = recurringLedgerServer();
     await renderRecurring(ledger_server);
 
@@ -93,7 +93,6 @@ describe("WebRecurring — create form", () => {
         amount: null,
         type: "fixed",
         category_id: RENT_CATEGORY_ID,
-        wallet: "ledger",
       },
     });
   });
@@ -251,7 +250,7 @@ describe("WebRecurring — edit form", () => {
     expect(screen.getByDisplayValue("25")).toBeInTheDocument();
   });
 
-  it("updates the expense keeping its wallet and shows the new name", async () => {
+  it("updates the expense and shows the new name", async () => {
     let recurring_id = "";
     const ledger_server = recurringLedgerServer((seeded_server) => {
       recurring_id = putRecurringExpense(seeded_server, { name: "マンション", billing_day: 25 });
@@ -266,7 +265,7 @@ describe("WebRecurring — edit form", () => {
     expect(ledger_server.recorded_commands[0]).toMatchObject({
       method: "PUT",
       path: `recurring-expenses/${recurring_id}`,
-      request_body: { name: "更新済み家賃", wallet: "ledger", category_id: RENT_CATEGORY_ID },
+      request_body: { name: "更新済み家賃", category_id: RENT_CATEGORY_ID },
     });
   });
 

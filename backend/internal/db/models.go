@@ -143,6 +143,7 @@ type LfAllowanceTotal struct {
 	MemberID  int32       `json:"member_id"`
 	YearMonth string      `json:"year_month"`
 	Spent     int32       `json:"spent"`
+	Saved     int32       `json:"saved"`
 }
 
 type LfBaseIncome struct {
@@ -215,6 +216,19 @@ type LfExpenseCategory struct {
 	Description  *string     `json:"description"`
 }
 
+type LfHouseholdInvitation struct {
+	ID        pgtype.UUID `json:"id"`
+	LedgerID  pgtype.UUID `json:"ledger_id"`
+	CreatedBy int32       `json:"created_by"`
+	TokenHash []byte      `json:"token_hash"`
+	ShortCode string      `json:"short_code"`
+	CreatedAt time.Time   `json:"created_at"`
+	ExpiresAt time.Time   `json:"expires_at"`
+	UsedBy    *int32      `json:"used_by"`
+	UsedAt    *time.Time  `json:"used_at"`
+	RevokedAt *time.Time  `json:"revoked_at"`
+}
+
 type LfIncomeRecord struct {
 	ID              pgtype.UUID `json:"id"`
 	LedgerID        pgtype.UUID `json:"ledger_id"`
@@ -243,7 +257,6 @@ type LfJournalEntry struct {
 	CreatedAt          time.Time   `json:"created_at"`
 	UpdatedAt          time.Time   `json:"updated_at"`
 	FieldHlc           []byte      `json:"field_hlc"`
-	Wallet             string      `json:"wallet"`
 	TransactionDate    pgtype.Date `json:"transaction_date"`
 	Item               *string     `json:"item"`
 	Amount             int32       `json:"amount"`
@@ -268,18 +281,19 @@ type LfLedger struct {
 }
 
 type LfLedgerMember struct {
-	ID        pgtype.UUID `json:"id"`
-	LedgerID  pgtype.UUID `json:"ledger_id"`
-	OwnerID   int32       `json:"owner_id"`
-	Seq       int64       `json:"seq"`
-	Deleted   bool        `json:"deleted"`
-	DeletedAt *time.Time  `json:"deleted_at"`
-	CreatedAt time.Time   `json:"created_at"`
-	UpdatedAt time.Time   `json:"updated_at"`
-	UserID    int32       `json:"user_id"`
-	Role      string      `json:"role"`
-	JoinedAt  time.Time   `json:"joined_at"`
-	LeftAt    *time.Time  `json:"left_at"`
+	ID         pgtype.UUID `json:"id"`
+	LedgerID   pgtype.UUID `json:"ledger_id"`
+	OwnerID    int32       `json:"owner_id"`
+	Seq        int64       `json:"seq"`
+	Deleted    bool        `json:"deleted"`
+	DeletedAt  *time.Time  `json:"deleted_at"`
+	CreatedAt  time.Time   `json:"created_at"`
+	UpdatedAt  time.Time   `json:"updated_at"`
+	UserID     int32       `json:"user_id"`
+	Role       string      `json:"role"`
+	JoinedAt   time.Time   `json:"joined_at"`
+	LeftAt     *time.Time  `json:"left_at"`
+	LedgerKind string      `json:"ledger_kind"`
 }
 
 type LfMonthlyReviewNote struct {
@@ -306,7 +320,6 @@ type LfRecurringExpense struct {
 	DeletedAt  *time.Time  `json:"deleted_at"`
 	CreatedAt  time.Time   `json:"created_at"`
 	UpdatedAt  time.Time   `json:"updated_at"`
-	Wallet     string      `json:"wallet"`
 	Name       string      `json:"name"`
 	Emoji      *string     `json:"emoji"`
 	BillingDay int16       `json:"billing_day"`

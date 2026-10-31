@@ -15,7 +15,6 @@ const recurringExpenseNotFoundMessage = "定期支出が見つかりません"
 
 // RecurringExpenseInput is the editable content of a recurring expense.
 type RecurringExpenseInput struct {
-	Wallet     string
 	Name       string
 	Emoji      string
 	BillingDay int16
@@ -35,32 +34,27 @@ func (recurring_input RecurringExpenseInput) columns() []columnValue {
 	}
 }
 
-// lockVisibleRecurring locks a recurring expense the caller may write: any member
-// for the ledger wallet, only its owner for an allowance. Another member's
-// allowance recurring expense is reported as missing, because pull never shows it.
+// lockVisibleRecurring locks a recurring expense of the target ledger. Any member
+// of the ledger may write it (a personal ledger has only its owner).
 func (ledger_tx *ledgerTx) lockVisibleRecurring(ctx context.Context, recurring_id string) (*lockedRow, error) {
 	recurring_row, err := ledger_tx.lockLiveRow(ctx, "recurring_expenses", recurring_id, "UPDATE")
 	if err != nil {
 		return nil, err
 	}
-	if recurring_row == nil || (recurring_row.text("wallet") == "allowance" && recurring_row.OwnerID != ledger_tx.user_id) {
+	if recurring_row == nil {
 		return nil, newCommandError(CommandNotFound, recurringExpenseNotFoundMessage)
 	}
 	return recurring_row, nil
 }
 
-// CreateLedgerRecurringExpense adds a recurring expense. Allowance recurring
-// expenses (personal fixed costs, design.md D8) exist only in a household.
-func (r *Repository) CreateLedgerRecurringExpense(ctx context.Context, user_id int64, recurring_input RecurringExpenseInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
-		if recurring_input.Wallet == "allowance" && ledger_tx.ledger.Kind != "household" {
-			return nil, newCommandError(CommandInvalid, "お小遣いの定期支出は家庭に参加しているときだけ登録できます")
-		}
+// CreateLedgerRecurringExpense adds a recurring expense. Personal fixed costs are
+// recurring expenses of the personal ledger (design.md D8).
+func (r *Repository) CreateLedgerRecurringExpense(ctx context.Context, caller Caller, recurring_input RecurringExpenseInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		if err := ledger_tx.requireLiveCategory(ctx, recurring_input.CategoryID); err != nil {
 			return nil, err
 		}
-		recurring_columns := append(recurring_input.columns(), columnValue{name: "wallet", value: recurring_input.Wallet, sqlType: "text"})
-		recurring_id, err := ledger_tx.insertRow(ctx, "recurring_expenses", recurring_columns)
+		recurring_id, err := ledger_tx.insertRow(ctx, "recurring_expenses", recurring_input.columns())
 		if err != nil {
 			return nil, err
 		}
@@ -68,16 +62,12 @@ func (r *Repository) CreateLedgerRecurringExpense(ctx context.Context, user_id i
 	})
 }
 
-// UpdateLedgerRecurringExpense overwrites a recurring expense. Its wallet can't
-// change, because that would change who can see it.
-func (r *Repository) UpdateLedgerRecurringExpense(ctx context.Context, user_id int64, recurring_id string, recurring_input RecurringExpenseInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+// UpdateLedgerRecurringExpense overwrites a recurring expense.
+func (r *Repository) UpdateLedgerRecurringExpense(ctx context.Context, caller Caller, recurring_id string, recurring_input RecurringExpenseInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		recurring_row, err := ledger_tx.lockVisibleRecurring(ctx, recurring_id)
 		if err != nil {
 			return nil, err
-		}
-		if recurring_input.Wallet != recurring_row.text("wallet") {
-			return nil, newCommandError(CommandInvalid, "walletは変更できません")
 		}
 		// Keeping a category that was deleted meanwhile is fine; choosing one is not.
 		if recurring_input.CategoryID != recurring_row.text("category_id") {
@@ -94,8 +84,8 @@ func (r *Repository) UpdateLedgerRecurringExpense(ctx context.Context, user_id i
 
 // DeleteLedgerRecurringExpense deletes a recurring expense. Entries it already
 // posted stay.
-func (r *Repository) DeleteLedgerRecurringExpense(ctx context.Context, user_id int64, recurring_id string) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) DeleteLedgerRecurringExpense(ctx context.Context, caller Caller, recurring_id string) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		recurring_row, err := ledger_tx.lockVisibleRecurring(ctx, recurring_id)
 		if err != nil {
 			return nil, err
@@ -110,8 +100,8 @@ func (r *Repository) DeleteLedgerRecurringExpense(ctx context.Context, user_id i
 // ConfirmLedgerRecurringExpense posts a recurring expense's amount for a month,
 // typically a variable one (design.md §5.3). It creates a journal entry on the
 // billing day and returns it; a month can be posted only once.
-func (r *Repository) ConfirmLedgerRecurringExpense(ctx context.Context, user_id int64, recurring_id string, amount int32, year_month string) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) ConfirmLedgerRecurringExpense(ctx context.Context, caller Caller, recurring_id string, amount int32, year_month string) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		recurring_row, err := ledger_tx.lockVisibleRecurring(ctx, recurring_id)
 		if err != nil {
 			return nil, err
@@ -123,7 +113,6 @@ func (r *Repository) ConfirmLedgerRecurringExpense(ctx context.Context, user_id 
 			return nil, newCommandError(CommandInvalid, "year_monthはYYYY-MM形式で指定してください")
 		}
 
-		wallet := recurring_row.text("wallet")
 		server_hlc := syncrules.ServerHLC(time.Now())
 		posted_field_hlc := map[string]string{}
 		for _, field_name := range serverPostedEntryFields {
@@ -135,7 +124,6 @@ func (r *Repository) ConfirmLedgerRecurringExpense(ctx context.Context, user_id 
 		}
 		entry_id, err := ledger_tx.insertRow(ctx, "journal_entries", []columnValue{
 			{name: "field_hlc", value: string(encoded_field_hlc), sqlType: "jsonb"},
-			{name: "wallet", value: wallet, sqlType: "text"},
 			{name: "transaction_date", value: transaction_date.Format("2006-01-02"), sqlType: "date"},
 			{name: "item", value: recurring_row.text("name"), sqlType: "text"},
 			{name: "amount", value: amount, sqlType: "integer"},
@@ -146,11 +134,6 @@ func (r *Repository) ConfirmLedgerRecurringExpense(ctx context.Context, user_id 
 		})
 		if err != nil {
 			return nil, conflictOnUniqueViolation(err, "当月分は既に確定済みです")
-		}
-		if wallet == "allowance" {
-			if err := recomputeAllowanceTotals(ctx, ledger_tx.seq_allocator, ledger_tx.ledger.ID, user_id, []string{year_month}); err != nil {
-				return nil, err
-			}
 		}
 		return &writtenRow{collection: "journal_entries", id: entry_id}, nil
 	})
@@ -189,8 +172,8 @@ func (ledger_tx *ledgerTx) lockLiveSavingsGoal(ctx context.Context, goal_id stri
 }
 
 // CreateLedgerSavingsGoal adds a savings goal to the caller's ledger.
-func (r *Repository) CreateLedgerSavingsGoal(ctx context.Context, user_id int64, savings_goal_input SavingsGoalInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) CreateLedgerSavingsGoal(ctx context.Context, caller Caller, savings_goal_input SavingsGoalInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		goal_id, err := ledger_tx.insertRow(ctx, "savings_goals", savings_goal_input.columns())
 		if err != nil {
 			return nil, err
@@ -200,8 +183,8 @@ func (r *Repository) CreateLedgerSavingsGoal(ctx context.Context, user_id int64,
 }
 
 // UpdateLedgerSavingsGoal overwrites a savings goal.
-func (r *Repository) UpdateLedgerSavingsGoal(ctx context.Context, user_id int64, goal_id string, savings_goal_input SavingsGoalInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) UpdateLedgerSavingsGoal(ctx context.Context, caller Caller, goal_id string, savings_goal_input SavingsGoalInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		goal_row, err := ledger_tx.lockLiveSavingsGoal(ctx, goal_id, "UPDATE")
 		if err != nil {
 			return nil, err
@@ -214,8 +197,8 @@ func (r *Repository) UpdateLedgerSavingsGoal(ctx context.Context, user_id int64,
 }
 
 // DeleteLedgerSavingsGoal deletes a savings goal. Its postings stay as history.
-func (r *Repository) DeleteLedgerSavingsGoal(ctx context.Context, user_id int64, goal_id string) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) DeleteLedgerSavingsGoal(ctx context.Context, caller Caller, goal_id string) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		goal_row, err := ledger_tx.lockLiveSavingsGoal(ctx, goal_id, "UPDATE")
 		if err != nil {
 			return nil, err
@@ -229,8 +212,8 @@ func (r *Repository) DeleteLedgerSavingsGoal(ctx context.Context, user_id int64,
 
 // CreateLedgerSavingsPosting records a manual savings posting for a month, like
 // the legacy "post this month" action. The month then gets no automatic posting.
-func (r *Repository) CreateLedgerSavingsPosting(ctx context.Context, user_id int64, goal_id string, amount int32, year_month string) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) CreateLedgerSavingsPosting(ctx context.Context, caller Caller, goal_id string, amount int32, year_month string) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		goal_row, err := ledger_tx.lockLiveSavingsGoal(ctx, goal_id, "SHARE")
 		if err != nil {
 			return nil, err

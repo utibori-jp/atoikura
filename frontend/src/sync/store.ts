@@ -7,6 +7,7 @@ import {
   OFFLINE_COLLECTIONS,
   offlineFieldKind,
   offlineFieldNames,
+  offlineTargetField,
   ONLINE_ONLY_COLLECTIONS,
   toLocalValue,
   toWireValue,
@@ -45,7 +46,11 @@ export interface SyncDb {
 export interface SyncState {
   device_id: string;
   user_id: number | null;
+  // The personal ledger, known after the first pull.
   ledger_id: string | null;
+  household_ledger_id: string | null;
+  // Every ledger the last pull covered; null until a pull binds them.
+  ledger_ids: string[] | null;
   since: number;
   last_synced_at: string | null;
 }
@@ -76,6 +81,9 @@ export interface PushBatch {
 }
 
 export type BindUserOutcome = "unchanged" | "bound" | "reset";
+
+// Which of the user's writable ledgers a new record goes to (design.md D15).
+export type LedgerTarget = "personal" | "household";
 
 const OUTBOX_UPSERT_SQL = `INSERT INTO _outbox (collection, record_id, field, hlc) VALUES (?, ?, ?, ?)
   ON CONFLICT (collection, record_id, field) DO UPDATE SET hlc = excluded.hlc`;
@@ -126,6 +134,24 @@ function chunked<TItem>(items: TItem[], chunk_size: number): TItem[][] {
     item_chunks.push(items.slice(chunk_start, chunk_start + chunk_size));
   }
   return item_chunks;
+}
+
+function parseLedgerIds(ledger_ids_json: SqlValue): string[] | null {
+  if (typeof ledger_ids_json !== "string") return null;
+  try {
+    const parsed_ledger_ids: unknown = JSON.parse(ledger_ids_json);
+    return Array.isArray(parsed_ledger_ids) ? parsed_ledger_ids.map(String) : null;
+  } catch {
+    return null;
+  }
+}
+
+function sameLedgerSet(stored_ledger_ids: string[], pulled_ledger_ids: string[]): boolean {
+  const pulled_set = new Set(pulled_ledger_ids);
+  return (
+    stored_ledger_ids.length === pulled_set.size &&
+    stored_ledger_ids.every((ledger_id) => pulled_set.has(ledger_id))
+  );
 }
 
 function parseFieldHlc(field_hlc_json: SqlValue): Record<string, string> {
@@ -212,13 +238,16 @@ export class SyncStore {
 
   private async loadSyncState(): Promise<SyncState> {
     const [state_row] = await this.db.select(
-      "SELECT device_id, user_id, ledger_id, since, last_synced_at FROM _sync_state WHERE singleton_id = 1"
+      "SELECT device_id, user_id, ledger_id, household_ledger_id, ledger_ids, since, last_synced_at FROM _sync_state WHERE singleton_id = 1"
     );
     if (!state_row) throw new Error("_sync_state is missing; the database was not initialized");
     return {
       device_id: String(state_row.device_id),
       user_id: state_row.user_id === null ? null : Number(state_row.user_id),
       ledger_id: state_row.ledger_id === null ? null : String(state_row.ledger_id),
+      household_ledger_id:
+        state_row.household_ledger_id === null ? null : String(state_row.household_ledger_id),
+      ledger_ids: parseLedgerIds(state_row.ledger_ids),
       since: Number(state_row.since),
       last_synced_at: state_row.last_synced_at === null ? null : String(state_row.last_synced_at),
     };
@@ -239,7 +268,8 @@ export class SyncStore {
         ...this.clearSyncedDataStatements(),
         { sql: "DELETE FROM _sync_rejections" },
         {
-          sql: "UPDATE _sync_state SET user_id = ?, ledger_id = NULL, since = 0, last_synced_at = NULL",
+          sql: `UPDATE _sync_state SET user_id = ?, ledger_id = NULL, household_ledger_id = NULL,
+                ledger_ids = NULL, since = 0, last_synced_at = NULL`,
           bind: [user_id],
         },
       ]);
@@ -248,15 +278,17 @@ export class SyncStore {
     });
   }
 
-  // Starts over in another ledger (the user joined or left a household): the
-  // cached rows belong to the old ledger, and pull restarts from 0. The engine
-  // pushes the outbox before calling this; whatever is still pending was written
-  // against the old ledger and is dropped.
-  resetForLedger(ledger_id: string): Promise<void> {
+  // Starts over when the set of ledgers changes (the user created, joined, left
+  // or dissolved a household): the cache is dropped and pull restarts from 0,
+  // where its first page binds the new set. The engine pushes the outbox before
+  // calling this; whatever is still pending is dropped.
+  resetForLedgers(): Promise<void> {
     return this.mutex.run(async () => {
       await this.db.batch([
         ...this.clearSyncedDataStatements(),
-        { sql: "UPDATE _sync_state SET ledger_id = ?, since = 0", bind: [ledger_id] },
+        {
+          sql: "UPDATE _sync_state SET household_ledger_id = NULL, ledger_ids = NULL, since = 0",
+        },
       ]);
       this.emitChange({ source: "remote", collections: SYNCED_TABLES });
     });
@@ -356,9 +388,14 @@ export class SyncStore {
     return hlc_clock;
   }
 
-  // Creates a record owned by the signed-in user in the current ledger and
-  // returns its ID. Values use the SQLite representation (booleans as 0/1).
-  createRecord(collection_name: string, field_values: Record<string, SqlValue>): Promise<string> {
+  // Creates a record owned by the signed-in user and returns its ID. A journal
+  // entry goes to the target ledger; notes always go to the personal ledger.
+  // Values use the SQLite representation (booleans as 0/1).
+  createRecord(
+    collection_name: string,
+    field_values: Record<string, SqlValue>,
+    ledger_target: LedgerTarget = "personal"
+  ): Promise<string> {
     const offline_collection = requireOfflineCollection(collection_name);
     requireKnownFields(offline_collection, field_values);
     return this.mutex.run(async () => {
@@ -366,6 +403,11 @@ export class SyncStore {
       if (sync_state.user_id === null || sync_state.ledger_id === null) {
         throw new SyncNotReadyError();
       }
+      const target_ledger_id =
+        offlineTargetField(offline_collection) !== undefined && ledger_target === "household"
+          ? sync_state.household_ledger_id
+          : sync_state.ledger_id;
+      if (target_ledger_id === null) throw new Error("家計に参加していません");
       const write_hlc = (await this.getClock()).tick();
       const record_id = this.createId();
       const written_at = this.nowIso();
@@ -377,7 +419,7 @@ export class SyncStore {
         upsertStatement(offline_collection, {
           ...field_values,
           id: record_id,
-          ledger_id: sync_state.ledger_id,
+          ledger_id: target_ledger_id,
           owner_id: sync_state.user_id,
           seq: null,
           deleted: 0,
@@ -524,6 +566,7 @@ export class SyncStore {
         pending_record.hlc_by_field.set(String(outbox_row.field), String(outbox_row.hlc));
       }
 
+      const sync_state = await this.loadSyncState();
       const push_batch: PushBatch = { changes: [], sent_fields_by_id: new Map() };
       const orphan_statements: SqlStatement[] = [];
       const text_encoder = new TextEncoder();
@@ -577,6 +620,7 @@ export class SyncStore {
           sent_fields.set(field_name, { hlc: field_hlc, value: record_row[field_name] });
         }
         if (sent_fields.size === 0) continue;
+        this.addTargetField(push_change, record_row, sync_state);
 
         const change_bytes = text_encoder.encode(JSON.stringify(push_change)).length + 1;
         if (push_batch.changes.length > 0 && batch_bytes + change_bytes > MAX_PUSH_BODY_BYTES)
@@ -588,6 +632,26 @@ export class SyncStore {
       if (orphan_statements.length > 0) await this.db.batch(orphan_statements);
       return push_batch.changes.length > 0 ? push_batch : null;
     });
+  }
+
+  // A record the server hasn't accepted yet (seq is null) names its ledger as a
+  // target. Re-sending it after a lost response is harmless: the server checks
+  // that an existing record is in the ledger the target names.
+  private addTargetField(push_change: PushChange, record_row: SqlRow, sync_state: SyncState): void {
+    const target_field = isOfflineCollection(push_change.collection)
+      ? offlineTargetField(push_change.collection)
+      : undefined;
+    if (target_field === undefined || record_row.seq !== null || push_change.deleted_hlc) return;
+    let ledger_target: LedgerTarget | null = null;
+    if (record_row.ledger_id === sync_state.ledger_id) ledger_target = "personal";
+    else if (record_row.ledger_id === sync_state.household_ledger_id) ledger_target = "household";
+    // A record of a ledger this device no longer writes to goes without a
+    // target; the server rejects it and the rejection rolls it back.
+    if (ledger_target === null) return;
+    const latest_hlc = Object.values(push_change.fields)
+      .map((field_value) => field_value.hlc)
+      .reduce((latest, field_hlc) => (field_hlc > latest ? field_hlc : latest), "");
+    push_change.fields[target_field] = { value: ledger_target, hlc: latest_hlc };
   }
 
   // Applies the server's per-change results. An outbox entry is dropped only if
@@ -799,27 +863,36 @@ export class SyncStore {
   // Pull
 
   // Applies one pull page and advances the cursor in the same transaction. If
-  // the page is for another ledger than the one stored, nothing is applied and
-  // the caller resets (resetForLedger) and pulls again from 0.
+  // the page covers another set of ledgers than the one stored, nothing is
+  // applied and the caller resets (resetForLedgers) and pulls again from 0.
   applyPullPage(pull_page: PullPage): Promise<{ ledger_changed: boolean }> {
     return this.mutex.run(async () => {
       const sync_state = await this.loadSyncState();
-      if (sync_state.ledger_id !== null && sync_state.ledger_id !== pull_page.ledger_id) {
+      if (
+        sync_state.ledger_ids !== null &&
+        !sameLedgerSet(sync_state.ledger_ids, pull_page.ledger_ids)
+      ) {
         return { ledger_changed: true };
       }
-      const page_statements = await this.mergePulledRows(pull_page.ledger_id, pull_page.rows);
+      const page_statements = await this.mergePulledRows(pull_page.rows);
       page_statements.push({
-        sql: "UPDATE _sync_state SET ledger_id = ?, since = ?",
-        bind: [pull_page.ledger_id, Math.max(sync_state.since, pull_page.next_since)],
+        sql: `UPDATE _sync_state SET ledger_id = ?, household_ledger_id = ?, ledger_ids = ?,
+              since = ?`,
+        bind: [
+          pull_page.personal_ledger_id,
+          pull_page.household_ledger_id,
+          JSON.stringify(pull_page.ledger_ids),
+          Math.max(sync_state.since, pull_page.next_since),
+        ],
       });
       await this.db.batch(page_statements);
       this.observePulledHlcs(pull_page.rows);
-      // The first page binds the ledger, which screens wait for even when the
-      // ledger has no rows yet.
+      // The first page binds the ledgers, which screens wait for even when they
+      // have no rows yet.
       this.emitChange({
         source: "remote",
         collections:
-          sync_state.ledger_id === null
+          sync_state.ledger_ids === null
             ? SYNCED_TABLES
             : [...new Set(pull_page.rows.map((pulled_row) => pulled_row.collection))],
       });
@@ -834,7 +907,7 @@ export class SyncStore {
     return this.mutex.run(async () => {
       const sync_state = await this.loadSyncState();
       if (sync_state.ledger_id === null) return;
-      const row_statements = await this.mergePulledRows(sync_state.ledger_id, [pulled_row]);
+      const row_statements = await this.mergePulledRows([pulled_row]);
       await this.db.batch(row_statements);
       this.observePulledHlcs([pulled_row]);
       this.emitChange({ source: "remote", collections: [pulled_row.collection] });
@@ -860,10 +933,7 @@ export class SyncStore {
   }
 
   // The local row a pulled row becomes, before any merge with local changes.
-  private async pulledRowValues(
-    ledger_id: string,
-    pulled_row: PulledRow
-  ): Promise<Record<string, SqlValue>> {
+  private async pulledRowValues(pulled_row: PulledRow): Promise<Record<string, SqlValue>> {
     const table_columns = await this.tableColumns(pulled_row.collection);
     const row_values: Record<string, SqlValue> = {};
     for (const [column_name, wire_value] of Object.entries(pulled_row.data)) {
@@ -872,7 +942,7 @@ export class SyncStore {
     }
     const envelope_values: Record<string, SqlValue> = {
       id: pulled_row.id,
-      ledger_id,
+      ledger_id: pulled_row.ledger_id,
       owner_id: pulled_row.owner_id,
       seq: pulled_row.seq,
       deleted: pulled_row.deleted ? 1 : 0,
@@ -884,10 +954,7 @@ export class SyncStore {
     return row_values;
   }
 
-  private async mergePulledRows(
-    ledger_id: string,
-    pulled_rows: PulledRow[]
-  ): Promise<SqlStatement[]> {
+  private async mergePulledRows(pulled_rows: PulledRow[]): Promise<SqlStatement[]> {
     const merge_statements: SqlStatement[] = [];
     const offline_rows_by_collection = new Map<OfflineCollectionName, PulledRow[]>();
     for (const pulled_row of pulled_rows) {
@@ -899,7 +966,7 @@ export class SyncStore {
       }
       // Unknown collections (a newer server) are skipped rather than failing the page.
       if (!isOnlineOnlyCollection(pulled_row.collection)) continue;
-      const row_values = await this.pulledRowValues(ledger_id, pulled_row);
+      const row_values = await this.pulledRowValues(pulled_row);
       if (pulled_row.deleted && !("deleted" in row_values)) {
         merge_statements.push({
           sql: `DELETE FROM ${pulled_row.collection} WHERE id = ?`,
@@ -910,9 +977,7 @@ export class SyncStore {
       }
     }
     for (const [offline_collection, collection_rows] of offline_rows_by_collection) {
-      merge_statements.push(
-        ...(await this.mergeOfflineRows(ledger_id, offline_collection, collection_rows))
-      );
+      merge_statements.push(...(await this.mergeOfflineRows(offline_collection, collection_rows)));
     }
     return merge_statements;
   }
@@ -920,7 +985,6 @@ export class SyncStore {
   // Field-level LWW against pending local changes: a field keeps its local value
   // only while it has a pending change with a higher HLC than the server's.
   private async mergeOfflineRows(
-    ledger_id: string,
     collection_name: OfflineCollectionName,
     pulled_rows: PulledRow[]
   ): Promise<SqlStatement[]> {
@@ -947,7 +1011,7 @@ export class SyncStore {
 
     const merge_statements: SqlStatement[] = [];
     for (const pulled_row of pulled_rows) {
-      const remote_values = await this.pulledRowValues(ledger_id, pulled_row);
+      const remote_values = await this.pulledRowValues(pulled_row);
       const local_row = local_rows_by_id.get(pulled_row.id);
       const pending_fields = pending_by_id.get(pulled_row.id);
 

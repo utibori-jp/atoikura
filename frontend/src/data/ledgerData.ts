@@ -4,16 +4,18 @@ import { useAppSession, useDataVersion } from "../session/sessionHooks";
 import type { SyncStore } from "../sync/store";
 
 // What screens read and write through (#201): the on-device database of the
-// signed-in user's ledger. Reads go to the local DB (or a worker query), and
+// signed-in user's ledgers. Reads go to the local DB (or a worker query), and
 // writes of offline-writable records go through the sync store, which queues
 // them for push.
 
 export interface LedgerData {
   local_db: LocalDb;
   store: SyncStore;
+  // The personal ledger. Screens show it until the household screens (Step 8).
   ledger_id: string;
+  // The attached household ledger, or null in personal mode.
+  household_ledger_id: string | null;
   user_id: number;
-  is_household: boolean;
 }
 
 export const LedgerDataContext = createContext<LedgerData | null>(null);
@@ -24,7 +26,7 @@ export function useLedgerData(): LedgerData {
   return ledger_data;
 }
 
-// Reads the current ledger, or null before the first sync has brought it.
+// Reads the user's ledgers, or null before the first sync has brought them.
 export async function loadLedgerData(
   local_db: LocalDb,
   store: SyncStore,
@@ -32,15 +34,12 @@ export async function loadLedgerData(
 ): Promise<LedgerData | null> {
   const sync_state = await store.readSyncState();
   if (sync_state.ledger_id === null) return null;
-  const [ledger_row] = await local_db.select("SELECT kind FROM ledgers WHERE id = ?", [
-    sync_state.ledger_id,
-  ]);
   return {
     local_db,
     store,
     ledger_id: sync_state.ledger_id,
+    household_ledger_id: sync_state.household_ledger_id,
     user_id,
-    is_household: ledger_row?.kind === "household",
   };
 }
 
@@ -104,7 +103,7 @@ export function useLoadedLedgerData(): LedgerData | null | undefined {
         previous_ledger_data &&
         loaded_ledger_data &&
         previous_ledger_data.ledger_id === loaded_ledger_data.ledger_id &&
-        previous_ledger_data.is_household === loaded_ledger_data.is_household
+        previous_ledger_data.household_ledger_id === loaded_ledger_data.household_ledger_id
           ? previous_ledger_data
           : loaded_ledger_data
       );

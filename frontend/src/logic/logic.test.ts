@@ -1,5 +1,5 @@
 // Client-only rules that have no server counterpart yet: household formulas,
-// allowance carry-over, wallet and deleted-category handling, notes, recurring dates.
+// allowance carry-over, deleted-category handling, notes, recurring dates.
 import {
   allowanceBalances,
   allowanceInEffect,
@@ -106,27 +106,8 @@ describe("journal entry validation (client-only rules)", () => {
     is_excluded: false,
   };
 
-  it("accepts allowance entries only in household mode", () => {
-    const personal_context = { is_household: false, categoryStatus: () => "active" as const };
-    const household_context = { is_household: true, categoryStatus: () => "active" as const };
-    expect(validateJournalEntry({ ...valid_entry, wallet: "allowance" }, personal_context)).toEqual(
-      {
-        valid: false,
-        message: "お小遣いの仕訳は家庭に参加しているときだけ登録できます",
-      }
-    );
-    expect(
-      validateJournalEntry({ ...valid_entry, wallet: "allowance" }, household_context)
-    ).toEqual({
-      valid: true,
-      warnings: [],
-    });
-  });
-
   it("accepts a deleted category with a warning and rejects an unknown one", () => {
-    expect(
-      validateJournalEntry(valid_entry, { is_household: false, categoryStatus: () => "deleted" })
-    ).toEqual({
+    expect(validateJournalEntry(valid_entry, { categoryStatus: () => "deleted" })).toEqual({
       valid: true,
       warnings: [
         {
@@ -135,9 +116,7 @@ describe("journal entry validation (client-only rules)", () => {
         },
       ],
     });
-    expect(
-      validateJournalEntry(valid_entry, { is_household: false, categoryStatus: () => "unknown" })
-    ).toEqual({
+    expect(validateJournalEntry(valid_entry, { categoryStatus: () => "unknown" })).toEqual({
       valid: false,
       message: "指定されたcategory_idは存在しません",
     });
@@ -145,10 +124,7 @@ describe("journal entry validation (client-only rules)", () => {
 
   it("rejects fractional amounts", () => {
     expect(
-      validateJournalEntry(
-        { ...valid_entry, amount: 1.5 },
-        { is_household: false, categoryStatus: () => "active" }
-      )
+      validateJournalEntry({ ...valid_entry, amount: 1.5 }, { categoryStatus: () => "active" })
     ).toEqual({ valid: false, message: "amountは正の整数である必要があります" });
   });
 });
@@ -193,7 +169,6 @@ describe("recurring postings", () => {
     const recurring_expenses: RecurringExpense[] = [
       {
         id: "rent",
-        wallet: "ledger",
         name: "家賃",
         billing_day: 27,
         amount: 90000,
@@ -202,7 +177,6 @@ describe("recurring postings", () => {
       },
       {
         id: "phone",
-        wallet: "allowance",
         name: "スマホ",
         billing_day: 31,
         amount: 3000,
@@ -211,7 +185,6 @@ describe("recurring postings", () => {
       },
       {
         id: "power",
-        wallet: "ledger",
         name: "電気",
         billing_day: 10,
         amount: null,
@@ -220,7 +193,6 @@ describe("recurring postings", () => {
       },
       {
         id: "net",
-        wallet: "ledger",
         name: "回線",
         billing_day: 1,
         amount: null,
@@ -231,7 +203,6 @@ describe("recurring postings", () => {
     expect(pendingRecurringPostings(recurring_expenses, new Set(["rent"]), "2026-11")).toEqual([
       {
         recurring_expense_id: "phone",
-        wallet: "allowance",
         name: "スマホ",
         amount: 3000,
         category_id: "c2",

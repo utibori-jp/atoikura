@@ -165,7 +165,6 @@ export function buildDemoSeedRows(today_jst: string): DemoSeedRow[] {
     category_id,
   ] of recurring_expenses) {
     addRow("recurring_expenses", recurring_id, {
-      wallet: "ledger",
       name,
       emoji,
       billing_day,
@@ -217,7 +216,6 @@ export function buildDemoSeedRows(today_jst: string): DemoSeedRow[] {
 
   const addJournalEntry = (entry_values: Record<string, unknown>) =>
     addRow("journal_entries", nextRowId(), {
-      wallet: "ledger",
       is_excluded: false,
       note: null,
       recurring_expense_id: null,

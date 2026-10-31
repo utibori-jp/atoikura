@@ -65,7 +65,6 @@ function newServer(): FakeSyncServer {
 }
 
 const LUNCH_ENTRY = {
-  wallet: "ledger",
   transaction_date: "2026-10-05",
   item: "lunch",
   amount: 1200,
@@ -108,8 +107,8 @@ describe("SyncEngine", () => {
     expect(server.findRecord("journal_entries", entry_id)?.values).toMatchObject({
       amount: 1200,
       is_excluded: false,
-      wallet: "ledger",
     });
+    expect(server.findRecord("journal_entries", entry_id)?.ledger_id).toBe(PERSONAL_LEDGER_ID);
     expect(device.engine.getStatus()).toMatchObject({ phase: "idle", pending_count: 0 });
     expect(await selectRows(device, "SELECT COUNT(*) AS outbox_count FROM _outbox")).toEqual([
       { outbox_count: 0 },
@@ -399,13 +398,13 @@ describe("SyncEngine", () => {
     expect((await device.store.readSyncState()).since).toBe(8);
   });
 
-  it("starts over when the user moves to another ledger", async () => {
+  it("starts over with both ledgers when a household is attached, and drops it when detached", async () => {
     const server = newServer();
     const device = await createDevice(server, "device-a");
     await device.store.createRecord("daily_notes", { date: "2026-10-05", note: "personal" });
     await device.engine.syncNow();
 
-    server.setUserLedger(USER_ID, HOUSEHOLD_LEDGER_ID);
+    server.setUserHousehold(USER_ID, HOUSEHOLD_LEDGER_ID);
     server.writeOnlineRow(
       HOUSEHOLD_LEDGER_ID,
       OTHER_USER_ID,
@@ -418,15 +417,60 @@ describe("SyncEngine", () => {
     );
     await device.engine.syncNow();
 
-    expect(await device.store.readSyncState()).toMatchObject({ ledger_id: HOUSEHOLD_LEDGER_ID });
-    expect(
-      await selectRows(device, "SELECT COUNT(*) AS category_count FROM expense_categories")
-    ).toEqual([{ category_count: 0 }]);
+    expect(await device.store.readSyncState()).toMatchObject({
+      ledger_id: PERSONAL_LEDGER_ID,
+      household_ledger_id: HOUSEHOLD_LEDGER_ID,
+      ledger_ids: [PERSONAL_LEDGER_ID, HOUSEHOLD_LEDGER_ID],
+    });
+    expect(await selectRows(device, "SELECT id, ledger_id FROM expense_categories")).toEqual([
+      { id: CATEGORY_ID, ledger_id: PERSONAL_LEDGER_ID },
+    ]);
     expect(await selectRows(device, "SELECT id, ledger_id FROM category_groups")).toEqual([
       { id: "0192-household-group", ledger_id: HOUSEHOLD_LEDGER_ID },
     ]);
-    expect(await selectRows(device, "SELECT COUNT(*) AS note_count FROM daily_notes")).toEqual([
-      { note_count: 0 },
+    expect(await selectRows(device, "SELECT note FROM daily_notes")).toEqual([
+      { note: "personal" },
+    ]);
+
+    server.setUserHousehold(USER_ID, null);
+    await device.engine.syncNow();
+
+    expect(await device.store.readSyncState()).toMatchObject({
+      household_ledger_id: null,
+      ledger_ids: [PERSONAL_LEDGER_ID],
+    });
+    expect(await selectRows(device, "SELECT COUNT(*) AS group_count FROM category_groups")).toEqual(
+      [{ group_count: 0 }]
+    );
+    expect(
+      await selectRows(device, "SELECT COUNT(*) AS category_count FROM expense_categories")
+    ).toEqual([{ category_count: 1 }]);
+  });
+
+  it("pushes a new entry to the ledger it was created in", async () => {
+    const server = newServer();
+    server.setUserHousehold(USER_ID, HOUSEHOLD_LEDGER_ID);
+    const device = await createDevice(server, "device-a");
+
+    const personal_entry_id = await device.store.createRecord("journal_entries", LUNCH_ENTRY);
+    const household_entry_id = await device.store.createRecord(
+      "journal_entries",
+      { ...LUNCH_ENTRY, item: "groceries" },
+      "household"
+    );
+    await device.engine.syncNow();
+
+    expect(server.findRecord("journal_entries", personal_entry_id)?.ledger_id).toBe(
+      PERSONAL_LEDGER_ID
+    );
+    expect(server.findRecord("journal_entries", household_entry_id)?.ledger_id).toBe(
+      HOUSEHOLD_LEDGER_ID
+    );
+    expect(
+      await selectRows(device, "SELECT item, ledger_id FROM journal_entries ORDER BY item")
+    ).toEqual([
+      { item: "groceries", ledger_id: HOUSEHOLD_LEDGER_ID },
+      { item: "lunch", ledger_id: PERSONAL_LEDGER_ID },
     ]);
   });
 

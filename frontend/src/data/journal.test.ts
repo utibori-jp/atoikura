@@ -5,6 +5,7 @@ import {
   TestLedgerServer,
 } from "../test/ledgerFixtures";
 import { openSyncedSession } from "../test/renderWithLedger";
+import { TEST_LEDGER_ID } from "../test/handlers";
 import {
   createJournalEntry,
   deleteJournalEntry,
@@ -78,7 +79,7 @@ describe("journal data", () => {
     });
   });
 
-  it("lets only the author edit an entry, except shared recurring postings", async () => {
+  it("lets only the author edit an entry of the personal ledger, recurring postings included", async () => {
     const ledger_server = new TestLedgerServer();
     seedPersonalLedger(ledger_server);
     putJournalEntry(
@@ -98,7 +99,7 @@ describe("journal data", () => {
     expect(
       journal_days.map((journal_day) => [journal_day.date, journal_day.journal_entries[0].can_edit])
     ).toEqual([
-      ["2026-10-02", true],
+      ["2026-10-02", false],
       ["2026-10-01", false],
     ]);
   });
@@ -119,19 +120,19 @@ describe("journal data", () => {
     ]);
   });
 
-  it("stores a new entry in the ledger wallet and queues it for push", async () => {
+  it("stores a new entry in the personal ledger and queues it for push", async () => {
     const { ledger_data, local_db } = await openLedger();
 
     const entry_id = await createJournalEntry(ledger_data, entryFields());
 
     expect(
       await local_db.select(
-        "SELECT wallet, transaction_date, amount, is_excluded, item, owner_id FROM journal_entries WHERE id = ?",
+        "SELECT ledger_id, transaction_date, amount, is_excluded, item, owner_id FROM journal_entries WHERE id = ?",
         [entry_id]
       )
     ).toEqual([
       {
-        wallet: "ledger",
+        ledger_id: TEST_LEDGER_ID,
         transaction_date: "2026-10-05",
         amount: 1200,
         is_excluded: 0,

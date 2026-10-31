@@ -18,19 +18,11 @@ import { STATEMENT_TYPES, type StatementTypeCode } from "./statementTypes";
 // by type_code, and tombstoned journal entries are skipped. Tombstoned categories
 // are still joined, because past entries may reference them.
 
-// Whose spending to aggregate. The shared ledger wallet is everyone's in a household
-// (and everything in personal mode); an allowance wallet belongs to one member.
-export type SpendingScope = { wallet: "ledger" } | { wallet: "allowance"; owner_id: number };
+// Spending is aggregated per ledger: a household ledger's entries are shared,
+// and a member's personal ledger is their allowance side (design.md D6).
 
 function monthBounds(year_month: string): [string, string] {
   return [`${year_month}-01`, `${addMonths(year_month, 1)}-01`];
-}
-
-function scopeFilter(spending_scope: SpendingScope): { sql: string; bind: (string | number)[] } {
-  if (spending_scope.wallet === "ledger") {
-    return { sql: "je.wallet = 'ledger'", bind: [] };
-  }
-  return { sql: "je.wallet = 'allowance' AND je.owner_id = ?", bind: [spending_scope.owner_id] };
 }
 
 function sumAsNumber(raw_value: unknown): number {
@@ -41,11 +33,9 @@ function sumAsNumber(raw_value: unknown): number {
 export function listDailyVariableSums(
   sql_db: SqlDatabase,
   ledger_id: string,
-  spending_scope: SpendingScope,
   year_month: string
 ): DailySums {
   const [month_start, next_month_start] = monthBounds(year_month);
-  const scope_filter = scopeFilter(spending_scope);
   const sum_rows = sql_db.selectRows(
     `SELECT je.transaction_date AS date, cg.statement_type_code AS type_code, SUM(je.amount) AS daily_sum
      FROM journal_entries je
@@ -54,9 +44,8 @@ export function listDailyVariableSums(
      WHERE je.ledger_id = ? AND je.deleted = 0 AND je.is_excluded = 0
        AND cg.statement_type_code IN ('food', 'other')
        AND je.transaction_date >= ? AND je.transaction_date < ?
-       AND ${scope_filter.sql}
      GROUP BY je.transaction_date, cg.statement_type_code`,
-    [ledger_id, month_start, next_month_start, ...scope_filter.bind]
+    [ledger_id, month_start, next_month_start]
   );
   const daily_sums: DailySums = {};
   for (const sum_row of sum_rows) {
@@ -90,11 +79,9 @@ const STATEMENT_TYPE_BY_CODE = new Map(
 export function listMonthlyBreakdown(
   sql_db: SqlDatabase,
   ledger_id: string,
-  spending_scope: SpendingScope,
   year_month: string
 ): BreakdownRow[] {
   const [month_start, next_month_start] = monthBounds(year_month);
-  const scope_filter = scopeFilter(spending_scope);
   const breakdown_rows = sql_db.selectRows(
     `SELECT je.category_id AS category_id, ec.name AS category_name,
             cg.id AS group_id, cg.name AS group_name,
@@ -105,10 +92,9 @@ export function listMonthlyBreakdown(
      JOIN category_groups cg ON cg.id = ec.group_id
      WHERE je.ledger_id = ? AND je.deleted = 0
        AND je.transaction_date >= ? AND je.transaction_date < ?
-       AND ${scope_filter.sql}
      GROUP BY je.category_id, ec.name, cg.id, cg.name,
               CASE WHEN je.is_excluded = 1 THEN 'excluded' ELSE cg.statement_type_code END`,
-    [ledger_id, month_start, next_month_start, ...scope_filter.bind]
+    [ledger_id, month_start, next_month_start]
   );
   return breakdown_rows
     .map((breakdown_row) => {
@@ -139,11 +125,9 @@ export function listMonthlyBreakdown(
 export function sumVariableSpending(
   sql_db: SqlDatabase,
   ledger_id: string,
-  spending_scope: SpendingScope,
   year_month: string
 ): number {
   const [month_start, next_month_start] = monthBounds(year_month);
-  const scope_filter = scopeFilter(spending_scope);
   const [sum_row] = sql_db.selectRows(
     `SELECT SUM(je.amount) AS total
      FROM journal_entries je
@@ -151,9 +135,8 @@ export function sumVariableSpending(
      JOIN category_groups cg ON cg.id = ec.group_id
      WHERE je.ledger_id = ? AND je.deleted = 0 AND je.is_excluded = 0
        AND je.transaction_date >= ? AND je.transaction_date < ?
-       AND cg.statement_type_code IN ('food', 'other')
-       AND ${scope_filter.sql}`,
-    [ledger_id, month_start, next_month_start, ...scope_filter.bind]
+       AND cg.statement_type_code IN ('food', 'other')`,
+    [ledger_id, month_start, next_month_start]
   );
   return sumAsNumber(sum_row?.total);
 }
@@ -200,7 +183,7 @@ export function loadLedgerBudgetInput(
   const ledger_recurring_fixed_total = selectTotal(
     sql_db,
     `SELECT SUM(amount) AS total FROM recurring_expenses
-     WHERE ledger_id = ? AND deleted = 0 AND type = 'fixed' AND amount IS NOT NULL AND wallet = 'ledger'`,
+     WHERE ledger_id = ? AND deleted = 0 AND type = 'fixed' AND amount IS NOT NULL`,
     [ledger_id]
   );
   const savings_monthly_total = selectTotal(
@@ -236,9 +219,9 @@ export interface LedgerSummary extends LedgerBudget {
   income_total: number;
   recurring_total: number;
   savings_total: number;
-  // Variable spending (food/other) of the shared ledger wallet so far this month.
+  // Variable spending (food/other) of the ledger so far this month.
   variable_spending: number;
-  // "あといくら" of the shared ledger (of everything in personal mode).
+  // "あといくら" of the ledger.
   remaining: number;
   daily_budget: number;
   days_remaining: number;
@@ -255,7 +238,6 @@ export function computeLedgerSummary(
   year_month: string,
   today_jst: string
 ): LedgerSummary {
-  const ledger_scope: SpendingScope = { wallet: "ledger" };
   const ledger_budget_input = loadLedgerBudgetInput(sql_db, ledger_id, year_month);
   const ledger_budget = computeLedgerBudget(ledger_budget_input);
   const [month_start, next_month_start] = monthBounds(year_month);
@@ -265,7 +247,7 @@ export function computeLedgerSummary(
      WHERE ledger_id = ? AND deleted = 0 AND transaction_date >= ? AND transaction_date < ?`,
     [ledger_id, month_start, next_month_start]
   );
-  const variable_spending = sumVariableSpending(sql_db, ledger_id, ledger_scope, year_month);
+  const variable_spending = sumVariableSpending(sql_db, ledger_id, year_month);
 
   const history: BudgetHistoryItem[] = [-2, -1, 0].map((month_offset) => {
     const history_month = addMonths(year_month, month_offset);
@@ -273,7 +255,7 @@ export function computeLedgerSummary(
       year_month: history_month,
       budget: computeLedgerBudget(loadLedgerBudgetInput(sql_db, ledger_id, history_month))
         .shared_living_budget,
-      actual: sumVariableSpending(sql_db, ledger_id, ledger_scope, history_month),
+      actual: sumVariableSpending(sql_db, ledger_id, history_month),
     };
   });
 
@@ -290,18 +272,18 @@ export function computeLedgerSummary(
   };
 }
 
-// The viewer's own non-excluded allowance spending per month, from local entries.
+// The viewer's own non-excluded allowance spending per month: every entry of
+// their personal ledger, recurring postings included (design.md Q6).
 export function listOwnAllowanceSpending(
   sql_db: SqlDatabase,
-  ledger_id: string,
-  owner_id: number
+  personal_ledger_id: string
 ): Record<string, number> {
   const spending_rows = sql_db.selectRows(
     `SELECT substr(transaction_date, 1, 7) AS year_month, SUM(amount) AS total
      FROM journal_entries
-     WHERE ledger_id = ? AND deleted = 0 AND is_excluded = 0 AND wallet = 'allowance' AND owner_id = ?
+     WHERE ledger_id = ? AND deleted = 0 AND is_excluded = 0
      GROUP BY substr(transaction_date, 1, 7)`,
-    [ledger_id, owner_id]
+    [personal_ledger_id]
   );
   return Object.fromEntries(
     spending_rows.map((spending_row) => [

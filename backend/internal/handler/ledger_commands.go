@@ -22,26 +22,26 @@ const maxCommandBodyBytes = 64 << 10
 // ledgerCommandRepository is the subset of repository.Repository used by the
 // ledger command handlers.
 type ledgerCommandRepository interface {
-	CreateLedgerCategoryGroup(ctx context.Context, user_id int64, category_group_input repository.CategoryGroupInput) (*repository.PulledRow, error)
-	UpdateLedgerCategoryGroup(ctx context.Context, user_id int64, group_id string, category_group_input repository.CategoryGroupInput) (*repository.PulledRow, error)
-	DeleteLedgerCategoryGroup(ctx context.Context, user_id int64, group_id string) (*repository.PulledRow, error)
-	CreateLedgerExpenseCategory(ctx context.Context, user_id int64, expense_category_input repository.ExpenseCategoryInput) (*repository.PulledRow, error)
-	UpdateLedgerExpenseCategory(ctx context.Context, user_id int64, category_id string, expense_category_input repository.ExpenseCategoryInput) (*repository.PulledRow, error)
-	DeleteLedgerExpenseCategory(ctx context.Context, user_id int64, category_id string) (*repository.PulledRow, error)
-	CreateLedgerIncomeRecord(ctx context.Context, user_id int64, income_record_input repository.IncomeRecordInput) (*repository.PulledRow, error)
-	UpdateLedgerIncomeRecord(ctx context.Context, user_id int64, income_id string, income_record_input repository.IncomeRecordInput) (*repository.PulledRow, error)
-	DeleteLedgerIncomeRecord(ctx context.Context, user_id int64, income_id string) (*repository.PulledRow, error)
-	PutLedgerBaseIncome(ctx context.Context, user_id int64, amount int32) (*repository.PulledRow, error)
-	CreateLedgerRecurringExpense(ctx context.Context, user_id int64, recurring_input repository.RecurringExpenseInput) (*repository.PulledRow, error)
-	UpdateLedgerRecurringExpense(ctx context.Context, user_id int64, recurring_id string, recurring_input repository.RecurringExpenseInput) (*repository.PulledRow, error)
-	DeleteLedgerRecurringExpense(ctx context.Context, user_id int64, recurring_id string) (*repository.PulledRow, error)
-	ConfirmLedgerRecurringExpense(ctx context.Context, user_id int64, recurring_id string, amount int32, year_month string) (*repository.PulledRow, error)
-	CreateLedgerSavingsGoal(ctx context.Context, user_id int64, savings_goal_input repository.SavingsGoalInput) (*repository.PulledRow, error)
-	UpdateLedgerSavingsGoal(ctx context.Context, user_id int64, goal_id string, savings_goal_input repository.SavingsGoalInput) (*repository.PulledRow, error)
-	DeleteLedgerSavingsGoal(ctx context.Context, user_id int64, goal_id string) (*repository.PulledRow, error)
-	CreateLedgerSavingsPosting(ctx context.Context, user_id int64, goal_id string, amount int32, year_month string) (*repository.PulledRow, error)
-	PutLedgerBudget(ctx context.Context, user_id int64, budget_input repository.BudgetInput) (*repository.PulledRow, error)
-	CreateLedgerSurplusAllocation(ctx context.Context, user_id int64, surplus_input repository.SurplusAllocationInput) (*repository.PulledRow, error)
+	CreateLedgerCategoryGroup(ctx context.Context, caller repository.Caller, category_group_input repository.CategoryGroupInput) (*repository.PulledRow, error)
+	UpdateLedgerCategoryGroup(ctx context.Context, caller repository.Caller, group_id string, category_group_input repository.CategoryGroupInput) (*repository.PulledRow, error)
+	DeleteLedgerCategoryGroup(ctx context.Context, caller repository.Caller, group_id string) (*repository.PulledRow, error)
+	CreateLedgerExpenseCategory(ctx context.Context, caller repository.Caller, expense_category_input repository.ExpenseCategoryInput) (*repository.PulledRow, error)
+	UpdateLedgerExpenseCategory(ctx context.Context, caller repository.Caller, category_id string, expense_category_input repository.ExpenseCategoryInput) (*repository.PulledRow, error)
+	DeleteLedgerExpenseCategory(ctx context.Context, caller repository.Caller, category_id string) (*repository.PulledRow, error)
+	CreateLedgerIncomeRecord(ctx context.Context, caller repository.Caller, income_record_input repository.IncomeRecordInput) (*repository.PulledRow, error)
+	UpdateLedgerIncomeRecord(ctx context.Context, caller repository.Caller, income_id string, income_record_input repository.IncomeRecordInput) (*repository.PulledRow, error)
+	DeleteLedgerIncomeRecord(ctx context.Context, caller repository.Caller, income_id string) (*repository.PulledRow, error)
+	PutLedgerBaseIncome(ctx context.Context, caller repository.Caller, amount int32) (*repository.PulledRow, error)
+	CreateLedgerRecurringExpense(ctx context.Context, caller repository.Caller, recurring_input repository.RecurringExpenseInput) (*repository.PulledRow, error)
+	UpdateLedgerRecurringExpense(ctx context.Context, caller repository.Caller, recurring_id string, recurring_input repository.RecurringExpenseInput) (*repository.PulledRow, error)
+	DeleteLedgerRecurringExpense(ctx context.Context, caller repository.Caller, recurring_id string) (*repository.PulledRow, error)
+	ConfirmLedgerRecurringExpense(ctx context.Context, caller repository.Caller, recurring_id string, amount int32, year_month string) (*repository.PulledRow, error)
+	CreateLedgerSavingsGoal(ctx context.Context, caller repository.Caller, savings_goal_input repository.SavingsGoalInput) (*repository.PulledRow, error)
+	UpdateLedgerSavingsGoal(ctx context.Context, caller repository.Caller, goal_id string, savings_goal_input repository.SavingsGoalInput) (*repository.PulledRow, error)
+	DeleteLedgerSavingsGoal(ctx context.Context, caller repository.Caller, goal_id string) (*repository.PulledRow, error)
+	CreateLedgerSavingsPosting(ctx context.Context, caller repository.Caller, goal_id string, amount int32, year_month string) (*repository.PulledRow, error)
+	PutLedgerBudget(ctx context.Context, caller repository.Caller, budget_input repository.BudgetInput) (*repository.PulledRow, error)
+	CreateLedgerSurplusAllocation(ctx context.Context, caller repository.Caller, surplus_input repository.SurplusAllocationInput) (*repository.PulledRow, error)
 }
 
 // commandValidationError carries the 400 message of an invalid request body.
@@ -71,18 +71,25 @@ func pathUUID(w http.ResponseWriter, r *http.Request) (string, bool) {
 }
 
 // serveLedgerCommand runs a validated command for the caller and writes the
-// written row, or maps the refusal to its status.
-func serveLedgerCommand(w http.ResponseWriter, r *http.Request, success_status int, validation_message commandValidationError, run_command func(context.Context, int64) (*repository.PulledRow, error)) {
+// written row, or maps the refusal to its status. The ?ledger= query parameter
+// picks the caller's personal (default) or household ledger (design.md D15);
+// the ledger itself is resolved from the token.
+func serveLedgerCommand(w http.ResponseWriter, r *http.Request, success_status int, validation_message commandValidationError, run_command func(context.Context, repository.Caller) (*repository.PulledRow, error)) {
 	user_id, ok := UserIDFromContext(r.Context())
 	if !ok {
 		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "認証情報が不正です")
+		return
+	}
+	ledger_target, is_known_target := repository.ParseLedgerTarget(r.URL.Query().Get("ledger"))
+	if !is_known_target {
+		WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "ledgerはpersonalかhouseholdで指定してください")
 		return
 	}
 	if validation_message != "" {
 		WriteError(w, http.StatusBadRequest, "BAD_REQUEST", string(validation_message))
 		return
 	}
-	written_row, err := run_command(r.Context(), user_id)
+	written_row, err := run_command(r.Context(), repository.Caller{UserID: user_id, Target: ledger_target})
 	var command_error *repository.CommandError
 	if errors.As(err, &command_error) {
 		switch command_error.Kind {
@@ -106,13 +113,13 @@ func serveLedgerCommand(w http.ResponseWriter, r *http.Request, success_status i
 }
 
 // serveDeleteCommand runs a delete command for the {id} in the path.
-func serveDeleteCommand(w http.ResponseWriter, r *http.Request, delete_row func(context.Context, int64, string) (*repository.PulledRow, error)) {
+func serveDeleteCommand(w http.ResponseWriter, r *http.Request, delete_row func(context.Context, repository.Caller, string) (*repository.PulledRow, error)) {
 	row_id, ok := pathUUID(w, r)
 	if !ok {
 		return
 	}
-	serveLedgerCommand(w, r, http.StatusOK, "", func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-		return delete_row(ctx, user_id, row_id)
+	serveLedgerCommand(w, r, http.StatusOK, "", func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+		return delete_row(ctx, caller, row_id)
 	})
 }
 
@@ -162,8 +169,8 @@ func CreateLedgerCategoryGroupHandler(repo ledgerCommandRepository) http.Handler
 			return
 		}
 		category_group_input, validation_message := category_group_request.validate()
-		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.CreateLedgerCategoryGroup(ctx, user_id, category_group_input)
+		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.CreateLedgerCategoryGroup(ctx, caller, category_group_input)
 		})
 	}
 }
@@ -180,8 +187,8 @@ func UpdateLedgerCategoryGroupHandler(repo ledgerCommandRepository) http.Handler
 			return
 		}
 		category_group_input, validation_message := category_group_request.validate()
-		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.UpdateLedgerCategoryGroup(ctx, user_id, group_id, category_group_input)
+		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.UpdateLedgerCategoryGroup(ctx, caller, group_id, category_group_input)
 		})
 	}
 }
@@ -223,8 +230,8 @@ func CreateLedgerExpenseCategoryHandler(repo ledgerCommandRepository) http.Handl
 			return
 		}
 		expense_category_input, validation_message := expense_category_request.validate()
-		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.CreateLedgerExpenseCategory(ctx, user_id, expense_category_input)
+		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.CreateLedgerExpenseCategory(ctx, caller, expense_category_input)
 		})
 	}
 }
@@ -241,8 +248,8 @@ func UpdateLedgerExpenseCategoryHandler(repo ledgerCommandRepository) http.Handl
 			return
 		}
 		expense_category_input, validation_message := expense_category_request.validate()
-		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.UpdateLedgerExpenseCategory(ctx, user_id, category_id, expense_category_input)
+		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.UpdateLedgerExpenseCategory(ctx, caller, category_id, expense_category_input)
 		})
 	}
 }
@@ -299,8 +306,8 @@ func CreateLedgerIncomeRecordHandler(repo ledgerCommandRepository) http.HandlerF
 			return
 		}
 		income_record_input, validation_message := income_record_request.validate()
-		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.CreateLedgerIncomeRecord(ctx, user_id, income_record_input)
+		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.CreateLedgerIncomeRecord(ctx, caller, income_record_input)
 		})
 	}
 }
@@ -317,8 +324,8 @@ func UpdateLedgerIncomeRecordHandler(repo ledgerCommandRepository) http.HandlerF
 			return
 		}
 		income_record_input, validation_message := income_record_request.validate()
-		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.UpdateLedgerIncomeRecord(ctx, user_id, income_id, income_record_input)
+		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.UpdateLedgerIncomeRecord(ctx, caller, income_id, income_record_input)
 		})
 	}
 }
@@ -344,8 +351,8 @@ func PutLedgerBaseIncomeHandler(repo ledgerCommandRepository) http.HandlerFunc {
 		if base_income_request.Amount == nil || *base_income_request.Amount < 0 {
 			validation_message = "amountは0以上の整数で指定してください"
 		}
-		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.PutLedgerBaseIncome(ctx, user_id, *base_income_request.Amount)
+		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.PutLedgerBaseIncome(ctx, caller, *base_income_request.Amount)
 		})
 	}
 }
@@ -353,7 +360,6 @@ func PutLedgerBaseIncomeHandler(repo ledgerCommandRepository) http.HandlerFunc {
 // --- Recurring expenses ---
 
 type recurringExpenseRequestJSON struct {
-	Wallet     *string `json:"wallet"`
 	Name       *string `json:"name"`
 	Emoji      *string `json:"emoji"`
 	BillingDay *int16  `json:"billing_day"`
@@ -363,9 +369,6 @@ type recurringExpenseRequestJSON struct {
 }
 
 func (recurring_request recurringExpenseRequestJSON) validate() (repository.RecurringExpenseInput, commandValidationError) {
-	if recurring_request.Wallet == nil || (*recurring_request.Wallet != "ledger" && *recurring_request.Wallet != "allowance") {
-		return repository.RecurringExpenseInput{}, "walletはledgerかallowanceで指定してください"
-	}
 	if validation_message := validateRequiredName(recurring_request.Name); validation_message != "" {
 		return repository.RecurringExpenseInput{}, validation_message
 	}
@@ -386,7 +389,6 @@ func (recurring_request recurringExpenseRequestJSON) validate() (repository.Recu
 		return repository.RecurringExpenseInput{}, "category_idは必須です"
 	}
 	return repository.RecurringExpenseInput{
-		Wallet:     *recurring_request.Wallet,
 		Name:       *recurring_request.Name,
 		Emoji:      *recurring_request.Emoji,
 		BillingDay: *recurring_request.BillingDay,
@@ -404,8 +406,8 @@ func CreateLedgerRecurringExpenseHandler(repo ledgerCommandRepository) http.Hand
 			return
 		}
 		recurring_input, validation_message := recurring_request.validate()
-		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.CreateLedgerRecurringExpense(ctx, user_id, recurring_input)
+		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.CreateLedgerRecurringExpense(ctx, caller, recurring_input)
 		})
 	}
 }
@@ -422,8 +424,8 @@ func UpdateLedgerRecurringExpenseHandler(repo ledgerCommandRepository) http.Hand
 			return
 		}
 		recurring_input, validation_message := recurring_request.validate()
-		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.UpdateLedgerRecurringExpense(ctx, user_id, recurring_id, recurring_input)
+		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.UpdateLedgerRecurringExpense(ctx, caller, recurring_id, recurring_input)
 		})
 	}
 }
@@ -463,8 +465,8 @@ func ConfirmLedgerRecurringExpenseHandler(repo ledgerCommandRepository) http.Han
 		if !decodeCommandBody(w, r, &confirm_request) {
 			return
 		}
-		serveLedgerCommand(w, r, http.StatusCreated, confirm_request.validate(), func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.ConfirmLedgerRecurringExpense(ctx, user_id, recurring_id, *confirm_request.Amount, *confirm_request.YearMonth)
+		serveLedgerCommand(w, r, http.StatusCreated, confirm_request.validate(), func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.ConfirmLedgerRecurringExpense(ctx, caller, recurring_id, *confirm_request.Amount, *confirm_request.YearMonth)
 		})
 	}
 }
@@ -518,8 +520,8 @@ func CreateLedgerSavingsGoalHandler(repo ledgerCommandRepository) http.HandlerFu
 			return
 		}
 		savings_goal_input, validation_message := savings_goal_request.validate()
-		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.CreateLedgerSavingsGoal(ctx, user_id, savings_goal_input)
+		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.CreateLedgerSavingsGoal(ctx, caller, savings_goal_input)
 		})
 	}
 }
@@ -536,8 +538,8 @@ func UpdateLedgerSavingsGoalHandler(repo ledgerCommandRepository) http.HandlerFu
 			return
 		}
 		savings_goal_input, validation_message := savings_goal_request.validate()
-		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.UpdateLedgerSavingsGoal(ctx, user_id, goal_id, savings_goal_input)
+		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.UpdateLedgerSavingsGoal(ctx, caller, goal_id, savings_goal_input)
 		})
 	}
 }
@@ -560,8 +562,8 @@ func CreateLedgerSavingsPostingHandler(repo ledgerCommandRepository) http.Handle
 		if !decodeCommandBody(w, r, &posting_request) {
 			return
 		}
-		serveLedgerCommand(w, r, http.StatusCreated, posting_request.validate(), func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.CreateLedgerSavingsPosting(ctx, user_id, goal_id, *posting_request.Amount, *posting_request.YearMonth)
+		serveLedgerCommand(w, r, http.StatusCreated, posting_request.validate(), func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.CreateLedgerSavingsPosting(ctx, caller, goal_id, *posting_request.Amount, *posting_request.YearMonth)
 		})
 	}
 }
@@ -586,8 +588,8 @@ func PutLedgerBudgetHandler(repo ledgerCommandRepository) http.HandlerFunc {
 		case budget_request.GoalAmount == nil || *budget_request.GoalAmount < 0:
 			validation_message = "goal_amountは0以上の整数で指定してください"
 		}
-		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
-			return repo.PutLedgerBudget(ctx, user_id, repository.BudgetInput{
+		serveLedgerCommand(w, r, http.StatusOK, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
+			return repo.PutLedgerBudget(ctx, caller, repository.BudgetInput{
 				MonthlyBudget: *budget_request.MonthlyBudget,
 				GoalText:      budget_request.GoalText,
 				GoalAmount:    *budget_request.GoalAmount,
@@ -621,13 +623,13 @@ func CreateLedgerSurplusAllocationHandler(repo ledgerCommandRepository) http.Han
 		case *surplus_request.Destination == "budget" && surplus_request.SavingsGoalID != nil:
 			validation_message = "destination=budgetの場合はsavings_goal_idは指定できません"
 		}
-		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, user_id int64) (*repository.PulledRow, error) {
+		serveLedgerCommand(w, r, http.StatusCreated, validation_message, func(ctx context.Context, caller repository.Caller) (*repository.PulledRow, error) {
 			var savings_goal_id *string
 			if surplus_request.SavingsGoalID != nil {
 				lower_goal_id := strings.ToLower(*surplus_request.SavingsGoalID)
 				savings_goal_id = &lower_goal_id
 			}
-			return repo.CreateLedgerSurplusAllocation(ctx, user_id, repository.SurplusAllocationInput{
+			return repo.CreateLedgerSurplusAllocation(ctx, caller, repository.SurplusAllocationInput{
 				YearMonth:     *surplus_request.YearMonth,
 				Amount:        *surplus_request.Amount,
 				Destination:   *surplus_request.Destination,

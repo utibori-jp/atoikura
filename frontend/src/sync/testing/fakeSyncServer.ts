@@ -2,7 +2,7 @@
 // backend/internal/syncrules (tombstones win, field-level HLC comparison,
 // natural-key merge of notes), plus just enough validation and ownership checks
 // to exercise rejections. One instance is shared by every simulated device.
-import { OFFLINE_COLLECTIONS, isOfflineCollection } from "../collections";
+import { OFFLINE_COLLECTIONS, isOfflineCollection, offlineTargetField } from "../collections";
 import { SyncNetworkError } from "../errors";
 import type { SyncTransport } from "../transport";
 import type { PullPage, PulledRow, PushChange, PushResult } from "../wire";
@@ -35,9 +35,24 @@ export class FakeSyncServer {
   private last_seq = 0;
   private readonly records = new Map<string, ServerRecord>();
   private readonly ledger_by_user = new Map<number, string>();
+  private readonly household_by_user = new Map<number, string>();
 
+  // Sets the user's personal ledger.
   setUserLedger(user_id: number, ledger_id: string): void {
     this.ledger_by_user.set(user_id, ledger_id);
+  }
+
+  // Attaches a household ledger to the user, or detaches it with null.
+  setUserHousehold(user_id: number, household_ledger_id: string | null): void {
+    if (household_ledger_id === null) this.household_by_user.delete(user_id);
+    else this.household_by_user.set(user_id, household_ledger_id);
+  }
+
+  private writableLedgers(user_id: number): string[] {
+    const household_ledger_id = this.household_by_user.get(user_id);
+    return household_ledger_id
+      ? [this.ledgerOf(user_id), household_ledger_id]
+      : [this.ledgerOf(user_id)];
   }
 
   private nextSeq(): number {
@@ -85,11 +100,11 @@ export class FakeSyncServer {
   }
 
   push(user_id: number, changes: PushChange[]): PushResult[] {
-    const ledger_id = this.ledgerOf(user_id);
-    return changes.map((push_change) => this.pushChange(user_id, ledger_id, push_change));
+    return changes.map((push_change) => this.pushChange(user_id, push_change));
   }
 
-  private pushChange(user_id: number, ledger_id: string, push_change: PushChange): PushResult {
+  private pushChange(user_id: number, pushed_change: PushChange): PushResult {
+    const push_change: PushChange = { ...pushed_change, fields: { ...pushed_change.fields } };
     const reject = (reason: string, message: string): PushResult => ({
       id: push_change.id,
       status: "rejected",
@@ -100,6 +115,9 @@ export class FakeSyncServer {
       return reject("UNKNOWN_COLLECTION", "unknown collection");
     }
     const collection_spec = OFFLINE_COLLECTIONS[push_change.collection];
+    const target_field = offlineTargetField(push_change.collection);
+    const target_value = target_field ? push_change.fields[target_field]?.value : undefined;
+    if (target_field) delete push_change.fields[target_field];
     const changed_fields = Object.keys(push_change.fields).sort();
     if (changed_fields.some((field_name) => !Object.hasOwn(collection_spec.fields, field_name))) {
       return reject("UNKNOWN_FIELD", "unknown field");
@@ -107,9 +125,25 @@ export class FakeSyncServer {
     const stored_record = this.records.get(`${push_change.collection}/${push_change.id}`);
     if (
       stored_record &&
-      (stored_record.ledger_id !== ledger_id || stored_record.owner_id !== user_id)
+      (!this.writableLedgers(user_id).includes(stored_record.ledger_id) ||
+        stored_record.owner_id !== user_id)
     ) {
       return reject("FORBIDDEN", "このデータは変更できません");
+    }
+    let ledger_id = stored_record?.ledger_id ?? this.ledgerOf(user_id);
+    if (target_field && target_value !== undefined) {
+      if (target_value !== "personal" && target_value !== "household") {
+        return reject("INVALID", "ledgerはpersonalかhouseholdで指定してください");
+      }
+      const target_ledger_id =
+        target_value === "personal" ? this.ledgerOf(user_id) : this.household_by_user.get(user_id);
+      if (!target_ledger_id) return reject("FORBIDDEN", "家計に参加していないため登録できません");
+      if (stored_record && stored_record.ledger_id !== target_ledger_id) {
+        return reject("IMMUTABLE", "ledgerは変更できません");
+      }
+      ledger_id = target_ledger_id;
+    } else if (target_field && !stored_record && !push_change.deleted_hlc) {
+      return reject("INVALID", "ledgerは必須です");
     }
 
     if (!stored_record) {
@@ -232,10 +266,7 @@ export class FakeSyncServer {
   }
 
   private isVisible(user_id: number, server_record: ServerRecord): boolean {
-    if (server_record.ledger_id !== this.ledgerOf(user_id)) return false;
-    if (server_record.collection === "journal_entries") {
-      return server_record.values.wallet === "ledger" || server_record.owner_id === user_id;
-    }
+    if (!this.writableLedgers(user_id).includes(server_record.ledger_id)) return false;
     if (
       server_record.collection === "daily_notes" ||
       server_record.collection === "monthly_review_notes"
@@ -249,6 +280,7 @@ export class FakeSyncServer {
     const pulled_row: PulledRow = {
       collection: server_record.collection,
       id: server_record.id,
+      ledger_id: server_record.ledger_id,
       owner_id: server_record.owner_id,
       seq: server_record.seq,
       deleted: server_record.deleted,
@@ -267,7 +299,9 @@ export class FakeSyncServer {
       .sort((left_record, right_record) => left_record.seq - right_record.seq);
     const page_records = visible_rows.slice(0, limit);
     return {
-      ledger_id: this.ledgerOf(user_id),
+      ledger_ids: this.writableLedgers(user_id),
+      personal_ledger_id: this.ledgerOf(user_id),
+      household_ledger_id: this.household_by_user.get(user_id) ?? null,
       rows: page_records.map((server_record) => this.toPulledRow(server_record)),
       next_since: page_records.length > 0 ? page_records[page_records.length - 1].seq : since,
       has_more: visible_rows.length > limit,

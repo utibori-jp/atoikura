@@ -34,7 +34,7 @@ export function daysRemaining(year_month: string, today_jst: string): number {
 export interface LedgerBudgetInput {
   // Each member's base income; personal mode has exactly one.
   base_incomes: number[];
-  // Fixed recurring expenses of the shared ledger wallet (allowance recurring expenses excluded).
+  // Fixed recurring expenses of the ledger.
   ledger_recurring_fixed_total: number;
   savings_monthly_total: number;
   savings_allocated: number;
@@ -47,7 +47,7 @@ export interface LedgerBudget {
   // Base incomes minus fixed costs and savings. Equals the variable budget in personal mode.
   disposable: number;
   allowance_total: number;
-  // What the shared ledger wallet may spend on variable costs.
+  // What the ledger may spend on variable costs.
   shared_living_budget: number;
 }
 

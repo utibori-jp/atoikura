@@ -63,11 +63,11 @@ func expectPulled(t *testing.T, rows_by_key map[string]repository.PulledRow, wri
 	return pulled_row
 }
 
-func createGroupAndCategory(t *testing.T, user_id int64, group_name string) (*repository.PulledRow, *repository.PulledRow) {
+func createGroupAndCategory(t *testing.T, caller repository.Caller, group_name string) (*repository.PulledRow, *repository.PulledRow) {
 	t.Helper()
 	ctx := context.Background()
-	group_row := mustCommand(t)(testRepo.CreateLedgerCategoryGroup(ctx, user_id, repository.CategoryGroupInput{Name: group_name, StatementTypeCode: "food"}))
-	category_row := mustCommand(t)(testRepo.CreateLedgerExpenseCategory(ctx, user_id, repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: group_name + " category"}))
+	group_row := mustCommand(t)(testRepo.CreateLedgerCategoryGroup(ctx, caller, repository.CategoryGroupInput{Name: group_name, StatementTypeCode: "food"}))
+	category_row := mustCommand(t)(testRepo.CreateLedgerExpenseCategory(ctx, caller, repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: group_name + " category"}))
 	return group_row, category_row
 }
 
@@ -75,8 +75,8 @@ func sampleIncome(amount int32) repository.IncomeRecordInput {
 	return repository.IncomeRecordInput{TransactionDate: "2026-10-25", Amount: amount, Name: "Salary", IncomeType: "salary", Emoji: "💴"}
 }
 
-func sampleRecurring(wallet string, recurring_type string, category_id string, amount *int32, billing_day int16) repository.RecurringExpenseInput {
-	return repository.RecurringExpenseInput{Wallet: wallet, Name: "Rent", Emoji: "🏠", BillingDay: billing_day, Amount: amount, Type: recurring_type, CategoryID: category_id}
+func sampleRecurring(recurring_type string, category_id string, amount *int32, billing_day int16) repository.RecurringExpenseInput {
+	return repository.RecurringExpenseInput{Name: "Rent", Emoji: "🏠", BillingDay: billing_day, Amount: amount, Type: recurring_type, CategoryID: category_id}
 }
 
 func sampleGoal(monthly_amount int32) repository.SavingsGoalInput {
@@ -87,32 +87,32 @@ func TestLedgerCommands_EveryCollectionReachesPull(t *testing.T) {
 	ctx := context.Background()
 	user_a := newSyncUser(t, "cmd-a")
 
-	group_row, category_row := createGroupAndCategory(t, user_a.UserID, "Groceries")
-	updated_group := mustCommand(t)(testRepo.UpdateLedgerCategoryGroup(ctx, user_a.UserID, group_row.ID, repository.CategoryGroupInput{Name: "Daily food", StatementTypeCode: "food", Description: strPtr("daily food")}))
-	updated_category := mustCommand(t)(testRepo.UpdateLedgerExpenseCategory(ctx, user_a.UserID, category_row.ID, repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: "Supermarket"}))
+	group_row, category_row := createGroupAndCategory(t, repository.PersonalCaller(user_a.UserID), "Groceries")
+	updated_group := mustCommand(t)(testRepo.UpdateLedgerCategoryGroup(ctx, repository.PersonalCaller(user_a.UserID), group_row.ID, repository.CategoryGroupInput{Name: "Daily food", StatementTypeCode: "food", Description: strPtr("daily food")}))
+	updated_category := mustCommand(t)(testRepo.UpdateLedgerExpenseCategory(ctx, repository.PersonalCaller(user_a.UserID), category_row.ID, repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: "Supermarket"}))
 
-	income_row := mustCommand(t)(testRepo.CreateLedgerIncomeRecord(ctx, user_a.UserID, sampleIncome(300000)))
-	updated_income := mustCommand(t)(testRepo.UpdateLedgerIncomeRecord(ctx, user_a.UserID, income_row.ID, sampleIncome(310000)))
-	base_income_row := mustCommand(t)(testRepo.PutLedgerBaseIncome(ctx, user_a.UserID, 250000))
-	updated_base_income := mustCommand(t)(testRepo.PutLedgerBaseIncome(ctx, user_a.UserID, 260000))
+	income_row := mustCommand(t)(testRepo.CreateLedgerIncomeRecord(ctx, repository.PersonalCaller(user_a.UserID), sampleIncome(300000)))
+	updated_income := mustCommand(t)(testRepo.UpdateLedgerIncomeRecord(ctx, repository.PersonalCaller(user_a.UserID), income_row.ID, sampleIncome(310000)))
+	base_income_row := mustCommand(t)(testRepo.PutLedgerBaseIncome(ctx, repository.PersonalCaller(user_a.UserID), 250000))
+	updated_base_income := mustCommand(t)(testRepo.PutLedgerBaseIncome(ctx, repository.PersonalCaller(user_a.UserID), 260000))
 	if updated_base_income.ID != base_income_row.ID {
 		t.Fatalf("base income upsert created a second row")
 	}
 
-	recurring_row := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, user_a.UserID, sampleRecurring("ledger", "variable", updated_category.ID, nil, 27)))
-	updated_recurring := mustCommand(t)(testRepo.UpdateLedgerRecurringExpense(ctx, user_a.UserID, recurring_row.ID, sampleRecurring("ledger", "variable", updated_category.ID, int32Ptr(9000), 27)))
-	confirmed_entry := mustCommand(t)(testRepo.ConfirmLedgerRecurringExpense(ctx, user_a.UserID, recurring_row.ID, 8800, "2026-02"))
+	recurring_row := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), sampleRecurring("variable", updated_category.ID, nil, 27)))
+	updated_recurring := mustCommand(t)(testRepo.UpdateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), recurring_row.ID, sampleRecurring("variable", updated_category.ID, int32Ptr(9000), 27)))
+	confirmed_entry := mustCommand(t)(testRepo.ConfirmLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), recurring_row.ID, 8800, "2026-02"))
 
-	goal_row := mustCommand(t)(testRepo.CreateLedgerSavingsGoal(ctx, user_a.UserID, sampleGoal(0)))
-	updated_goal := mustCommand(t)(testRepo.UpdateLedgerSavingsGoal(ctx, user_a.UserID, goal_row.ID, sampleGoal(0)))
-	posting_row := mustCommand(t)(testRepo.CreateLedgerSavingsPosting(ctx, user_a.UserID, goal_row.ID, 5000, "2026-10"))
-	budget_row := mustCommand(t)(testRepo.PutLedgerBudget(ctx, user_a.UserID, repository.BudgetInput{MonthlyBudget: 80000, GoalAmount: 20000, GoalText: strPtr("save")}))
-	surplus_row := mustCommand(t)(testRepo.CreateLedgerSurplusAllocation(ctx, user_a.UserID, repository.SurplusAllocationInput{
+	goal_row := mustCommand(t)(testRepo.CreateLedgerSavingsGoal(ctx, repository.PersonalCaller(user_a.UserID), sampleGoal(0)))
+	updated_goal := mustCommand(t)(testRepo.UpdateLedgerSavingsGoal(ctx, repository.PersonalCaller(user_a.UserID), goal_row.ID, sampleGoal(0)))
+	posting_row := mustCommand(t)(testRepo.CreateLedgerSavingsPosting(ctx, repository.PersonalCaller(user_a.UserID), goal_row.ID, 5000, "2026-10"))
+	budget_row := mustCommand(t)(testRepo.PutLedgerBudget(ctx, repository.PersonalCaller(user_a.UserID), repository.BudgetInput{MonthlyBudget: 80000, GoalAmount: 20000, GoalText: strPtr("save")}))
+	surplus_row := mustCommand(t)(testRepo.CreateLedgerSurplusAllocation(ctx, repository.PersonalCaller(user_a.UserID), repository.SurplusAllocationInput{
 		YearMonth: "2026-10", Amount: 30000, Destination: "savings", SavingsGoalID: &goal_row.ID,
 	}))
 
-	deleted_income := mustCommand(t)(testRepo.DeleteLedgerIncomeRecord(ctx, user_a.UserID, income_row.ID))
-	deleted_recurring := mustCommand(t)(testRepo.DeleteLedgerRecurringExpense(ctx, user_a.UserID, recurring_row.ID))
+	deleted_income := mustCommand(t)(testRepo.DeleteLedgerIncomeRecord(ctx, repository.PersonalCaller(user_a.UserID), income_row.ID))
+	deleted_recurring := mustCommand(t)(testRepo.DeleteLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), recurring_row.ID))
 
 	_, rows_by_key := pullAll(t, user_a.UserID)
 	pulled_group := expectPulled(t, rows_by_key, updated_group)
@@ -150,50 +150,50 @@ func TestLedgerCommands_IsolateOtherLedgers(t *testing.T) {
 	ctx := context.Background()
 	user_a := newSyncUser(t, "iso-a")
 	user_b := newSyncUser(t, "iso-b")
-	group_row, category_row := createGroupAndCategory(t, user_a.UserID, "A only")
-	income_row := mustCommand(t)(testRepo.CreateLedgerIncomeRecord(ctx, user_a.UserID, sampleIncome(1000)))
-	recurring_row := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, user_a.UserID, sampleRecurring("ledger", "variable", category_row.ID, nil, 1)))
-	goal_row := mustCommand(t)(testRepo.CreateLedgerSavingsGoal(ctx, user_a.UserID, sampleGoal(0)))
+	group_row, category_row := createGroupAndCategory(t, repository.PersonalCaller(user_a.UserID), "A only")
+	income_row := mustCommand(t)(testRepo.CreateLedgerIncomeRecord(ctx, repository.PersonalCaller(user_a.UserID), sampleIncome(1000)))
+	recurring_row := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), sampleRecurring("variable", category_row.ID, nil, 1)))
+	goal_row := mustCommand(t)(testRepo.CreateLedgerSavingsGoal(ctx, repository.PersonalCaller(user_a.UserID), sampleGoal(0)))
 
 	not_found_attempts := map[string]func() (*repository.PulledRow, error){
 		"update group": func() (*repository.PulledRow, error) {
-			return testRepo.UpdateLedgerCategoryGroup(ctx, user_b.UserID, group_row.ID, repository.CategoryGroupInput{Name: "x", StatementTypeCode: "food"})
+			return testRepo.UpdateLedgerCategoryGroup(ctx, repository.PersonalCaller(user_b.UserID), group_row.ID, repository.CategoryGroupInput{Name: "x", StatementTypeCode: "food"})
 		},
 		"delete group": func() (*repository.PulledRow, error) {
-			return testRepo.DeleteLedgerCategoryGroup(ctx, user_b.UserID, group_row.ID)
+			return testRepo.DeleteLedgerCategoryGroup(ctx, repository.PersonalCaller(user_b.UserID), group_row.ID)
 		},
 		"update category": func() (*repository.PulledRow, error) {
-			return testRepo.UpdateLedgerExpenseCategory(ctx, user_b.UserID, category_row.ID, repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: "x"})
+			return testRepo.UpdateLedgerExpenseCategory(ctx, repository.PersonalCaller(user_b.UserID), category_row.ID, repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: "x"})
 		},
 		"delete category": func() (*repository.PulledRow, error) {
-			return testRepo.DeleteLedgerExpenseCategory(ctx, user_b.UserID, category_row.ID)
+			return testRepo.DeleteLedgerExpenseCategory(ctx, repository.PersonalCaller(user_b.UserID), category_row.ID)
 		},
 		"update income": func() (*repository.PulledRow, error) {
-			return testRepo.UpdateLedgerIncomeRecord(ctx, user_b.UserID, income_row.ID, sampleIncome(1))
+			return testRepo.UpdateLedgerIncomeRecord(ctx, repository.PersonalCaller(user_b.UserID), income_row.ID, sampleIncome(1))
 		},
 		"delete income": func() (*repository.PulledRow, error) {
-			return testRepo.DeleteLedgerIncomeRecord(ctx, user_b.UserID, income_row.ID)
+			return testRepo.DeleteLedgerIncomeRecord(ctx, repository.PersonalCaller(user_b.UserID), income_row.ID)
 		},
 		"update recurring": func() (*repository.PulledRow, error) {
-			return testRepo.UpdateLedgerRecurringExpense(ctx, user_b.UserID, recurring_row.ID, sampleRecurring("ledger", "variable", category_row.ID, nil, 1))
+			return testRepo.UpdateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_b.UserID), recurring_row.ID, sampleRecurring("variable", category_row.ID, nil, 1))
 		},
 		"delete recurring": func() (*repository.PulledRow, error) {
-			return testRepo.DeleteLedgerRecurringExpense(ctx, user_b.UserID, recurring_row.ID)
+			return testRepo.DeleteLedgerRecurringExpense(ctx, repository.PersonalCaller(user_b.UserID), recurring_row.ID)
 		},
 		"confirm recurring": func() (*repository.PulledRow, error) {
-			return testRepo.ConfirmLedgerRecurringExpense(ctx, user_b.UserID, recurring_row.ID, 1, "2026-10")
+			return testRepo.ConfirmLedgerRecurringExpense(ctx, repository.PersonalCaller(user_b.UserID), recurring_row.ID, 1, "2026-10")
 		},
 		"update goal": func() (*repository.PulledRow, error) {
-			return testRepo.UpdateLedgerSavingsGoal(ctx, user_b.UserID, goal_row.ID, sampleGoal(0))
+			return testRepo.UpdateLedgerSavingsGoal(ctx, repository.PersonalCaller(user_b.UserID), goal_row.ID, sampleGoal(0))
 		},
 		"delete goal": func() (*repository.PulledRow, error) {
-			return testRepo.DeleteLedgerSavingsGoal(ctx, user_b.UserID, goal_row.ID)
+			return testRepo.DeleteLedgerSavingsGoal(ctx, repository.PersonalCaller(user_b.UserID), goal_row.ID)
 		},
 		"post to goal": func() (*repository.PulledRow, error) {
-			return testRepo.CreateLedgerSavingsPosting(ctx, user_b.UserID, goal_row.ID, 1, "2026-10")
+			return testRepo.CreateLedgerSavingsPosting(ctx, repository.PersonalCaller(user_b.UserID), goal_row.ID, 1, "2026-10")
 		},
 		"surplus to goal": func() (*repository.PulledRow, error) {
-			return testRepo.CreateLedgerSurplusAllocation(ctx, user_b.UserID, repository.SurplusAllocationInput{YearMonth: "2026-10", Amount: 1, Destination: "savings", SavingsGoalID: &goal_row.ID})
+			return testRepo.CreateLedgerSurplusAllocation(ctx, repository.PersonalCaller(user_b.UserID), repository.SurplusAllocationInput{YearMonth: "2026-10", Amount: 1, Destination: "savings", SavingsGoalID: &goal_row.ID})
 		},
 	}
 	for attempt_name, attempt := range not_found_attempts {
@@ -203,11 +203,11 @@ func TestLedgerCommands_IsolateOtherLedgers(t *testing.T) {
 		})
 	}
 	t.Run("category in A's group", func(t *testing.T) {
-		_, err := testRepo.CreateLedgerExpenseCategory(ctx, user_b.UserID, repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: "x"})
+		_, err := testRepo.CreateLedgerExpenseCategory(ctx, repository.PersonalCaller(user_b.UserID), repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: "x"})
 		expectCommandError(t, err, repository.CommandInvalid)
 	})
 	t.Run("recurring with A's category", func(t *testing.T) {
-		_, err := testRepo.CreateLedgerRecurringExpense(ctx, user_b.UserID, sampleRecurring("ledger", "fixed", category_row.ID, int32Ptr(1), 1))
+		_, err := testRepo.CreateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_b.UserID), sampleRecurring("fixed", category_row.ID, int32Ptr(1), 1))
 		expectCommandError(t, err, repository.CommandInvalid)
 	})
 
@@ -231,44 +231,76 @@ func TestLedgerCommands_HouseholdPermissions(t *testing.T) {
 	user_a := newSyncUser(t, "perm-a")
 	user_b := newSyncUser(t, "perm-b")
 
-	t.Run("allowance recurring needs a household", func(t *testing.T) {
-		_, err := testRepo.CreateLedgerRecurringExpense(ctx, user_a.UserID, sampleRecurring("allowance", "fixed", user_a.CategoryID, int32Ptr(1000), 1))
-		expectCommandError(t, err, repository.CommandInvalid)
+	t.Run("household commands need an attached household", func(t *testing.T) {
+		_, err := testRepo.CreateLedgerRecurringExpense(ctx, repository.HouseholdCaller(user_a.UserID), sampleRecurring("fixed", user_a.CategoryID, int32Ptr(1000), 1))
+		expectCommandError(t, err, repository.CommandForbidden)
+		_, err = testRepo.PutLedgerBudget(ctx, repository.HouseholdCaller(user_a.UserID), repository.BudgetInput{})
+		expectCommandError(t, err, repository.CommandForbidden)
 	})
 
-	joinHousehold(t, &user_a, &user_b)
-	a_income := mustCommand(t)(testRepo.CreateLedgerIncomeRecord(ctx, user_a.UserID, sampleIncome(1000)))
-	shared_recurring := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, user_a.UserID, sampleRecurring("ledger", "variable", user_a.CategoryID, nil, 5)))
-	a_allowance_recurring := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, user_a.UserID, sampleRecurring("allowance", "variable", user_a.CategoryID, nil, 5)))
+	household_id := joinHousehold(t, &user_a, &user_b)
+	a_income := mustCommand(t)(testRepo.CreateLedgerIncomeRecord(ctx, repository.HouseholdCaller(user_a.UserID), sampleIncome(1000)))
+	shared_recurring := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, repository.HouseholdCaller(user_a.UserID), sampleRecurring("variable", user_a.HouseholdCategoryID, nil, 5)))
+	a_personal_recurring := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), sampleRecurring("variable", user_a.CategoryID, nil, 5)))
 
+	t.Run("the target picks the ledger", func(t *testing.T) {
+		if stored_ledger_id := storedLedgerID(t, "recurring_expenses", shared_recurring.ID); stored_ledger_id != household_id {
+			t.Fatalf("household recurring stored in %s", stored_ledger_id)
+		}
+		if stored_ledger_id := storedLedgerID(t, "recurring_expenses", a_personal_recurring.ID); stored_ledger_id != user_a.LedgerID {
+			t.Fatalf("personal recurring stored in %s", stored_ledger_id)
+		}
+	})
 	t.Run("income is edited by its earner only", func(t *testing.T) {
-		_, err := testRepo.UpdateLedgerIncomeRecord(ctx, user_b.UserID, a_income.ID, sampleIncome(1))
+		_, err := testRepo.UpdateLedgerIncomeRecord(ctx, repository.HouseholdCaller(user_b.UserID), a_income.ID, sampleIncome(1))
 		expectCommandError(t, err, repository.CommandForbidden)
-		_, err = testRepo.DeleteLedgerIncomeRecord(ctx, user_b.UserID, a_income.ID)
+		_, err = testRepo.DeleteLedgerIncomeRecord(ctx, repository.HouseholdCaller(user_b.UserID), a_income.ID)
 		expectCommandError(t, err, repository.CommandForbidden)
 	})
-	t.Run("shared recurring is editable by any member", func(t *testing.T) {
-		mustCommand(t)(testRepo.UpdateLedgerRecurringExpense(ctx, user_b.UserID, shared_recurring.ID, sampleRecurring("ledger", "variable", user_a.CategoryID, int32Ptr(5000), 5)))
-		mustCommand(t)(testRepo.ConfirmLedgerRecurringExpense(ctx, user_b.UserID, shared_recurring.ID, 5100, "2026-10"))
+	t.Run("household recurring is editable by any member", func(t *testing.T) {
+		mustCommand(t)(testRepo.UpdateLedgerRecurringExpense(ctx, repository.HouseholdCaller(user_b.UserID), shared_recurring.ID, sampleRecurring("variable", user_a.HouseholdCategoryID, int32Ptr(5000), 5)))
+		mustCommand(t)(testRepo.ConfirmLedgerRecurringExpense(ctx, repository.HouseholdCaller(user_b.UserID), shared_recurring.ID, 5100, "2026-10"))
 	})
-	t.Run("another member's allowance recurring is invisible", func(t *testing.T) {
-		_, err := testRepo.UpdateLedgerRecurringExpense(ctx, user_b.UserID, a_allowance_recurring.ID, sampleRecurring("allowance", "variable", user_a.CategoryID, nil, 5))
+	t.Run("rows are found only through the target that holds them", func(t *testing.T) {
+		_, err := testRepo.UpdateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), shared_recurring.ID, sampleRecurring("variable", user_a.HouseholdCategoryID, nil, 5))
 		expectCommandError(t, err, repository.CommandNotFound)
-		_, err = testRepo.ConfirmLedgerRecurringExpense(ctx, user_b.UserID, a_allowance_recurring.ID, 1, "2026-10")
-		expectCommandError(t, err, repository.CommandNotFound)
-		_, err = testRepo.DeleteLedgerRecurringExpense(ctx, user_b.UserID, a_allowance_recurring.ID)
+		_, err = testRepo.UpdateLedgerRecurringExpense(ctx, repository.HouseholdCaller(user_a.UserID), a_personal_recurring.ID, sampleRecurring("variable", user_a.CategoryID, nil, 5))
 		expectCommandError(t, err, repository.CommandNotFound)
 	})
-	t.Run("wallet can't change", func(t *testing.T) {
-		_, err := testRepo.UpdateLedgerRecurringExpense(ctx, user_a.UserID, shared_recurring.ID, sampleRecurring("allowance", "variable", user_a.CategoryID, nil, 5))
+	t.Run("another member's personal recurring is invisible", func(t *testing.T) {
+		for _, caller := range []repository.Caller{repository.PersonalCaller(user_b.UserID), repository.HouseholdCaller(user_b.UserID)} {
+			_, err := testRepo.UpdateLedgerRecurringExpense(ctx, caller, a_personal_recurring.ID, sampleRecurring("variable", user_a.CategoryID, nil, 5))
+			expectCommandError(t, err, repository.CommandNotFound)
+			_, err = testRepo.ConfirmLedgerRecurringExpense(ctx, caller, a_personal_recurring.ID, 1, "2026-10")
+			expectCommandError(t, err, repository.CommandNotFound)
+			_, err = testRepo.DeleteLedgerRecurringExpense(ctx, caller, a_personal_recurring.ID)
+			expectCommandError(t, err, repository.CommandNotFound)
+		}
+	})
+	t.Run("categories must belong to the target ledger", func(t *testing.T) {
+		_, err := testRepo.CreateLedgerRecurringExpense(ctx, repository.HouseholdCaller(user_a.UserID), sampleRecurring("fixed", user_a.CategoryID, int32Ptr(1), 1))
+		expectCommandError(t, err, repository.CommandInvalid)
+		_, err = testRepo.CreateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), sampleRecurring("fixed", user_a.HouseholdCategoryID, int32Ptr(1), 1))
 		expectCommandError(t, err, repository.CommandInvalid)
 	})
 	t.Run("base incomes are per member", func(t *testing.T) {
-		a_base := mustCommand(t)(testRepo.PutLedgerBaseIncome(ctx, user_a.UserID, 200000))
-		b_base := mustCommand(t)(testRepo.PutLedgerBaseIncome(ctx, user_b.UserID, 100000))
+		a_base := mustCommand(t)(testRepo.PutLedgerBaseIncome(ctx, repository.HouseholdCaller(user_a.UserID), 200000))
+		b_base := mustCommand(t)(testRepo.PutLedgerBaseIncome(ctx, repository.HouseholdCaller(user_b.UserID), 100000))
 		if a_base.ID == b_base.ID {
 			t.Fatal("members share one base income row")
 		}
+	})
+	t.Run("a former member loses household commands", func(t *testing.T) {
+		if _, err := testPool.Exec(ctx,
+			"UPDATE lf.ledger_members SET left_at = NOW(), seq = nextval('lf.sync_seq') WHERE user_id = $1 AND ledger_id = $2::uuid",
+			user_b.UserID, household_id,
+		); err != nil {
+			t.Fatalf("leaving household: %v", err)
+		}
+		_, err := testRepo.UpdateLedgerRecurringExpense(ctx, repository.HouseholdCaller(user_b.UserID), shared_recurring.ID, sampleRecurring("variable", user_a.HouseholdCategoryID, nil, 5))
+		expectCommandError(t, err, repository.CommandForbidden)
+		_, err = testRepo.UpdateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_b.UserID), shared_recurring.ID, sampleRecurring("variable", user_a.HouseholdCategoryID, nil, 5))
+		expectCommandError(t, err, repository.CommandNotFound)
 	})
 }
 
@@ -277,33 +309,33 @@ func TestLedgerCommands_Invariants(t *testing.T) {
 	user_a := newSyncUser(t, "inv-a")
 
 	t.Run("unique group names among live groups", func(t *testing.T) {
-		first_group := mustCommand(t)(testRepo.CreateLedgerCategoryGroup(ctx, user_a.UserID, repository.CategoryGroupInput{Name: "Utilities", StatementTypeCode: "fixed"}))
-		_, err := testRepo.CreateLedgerCategoryGroup(ctx, user_a.UserID, repository.CategoryGroupInput{Name: "Utilities", StatementTypeCode: "other"})
+		first_group := mustCommand(t)(testRepo.CreateLedgerCategoryGroup(ctx, repository.PersonalCaller(user_a.UserID), repository.CategoryGroupInput{Name: "Utilities", StatementTypeCode: "fixed"}))
+		_, err := testRepo.CreateLedgerCategoryGroup(ctx, repository.PersonalCaller(user_a.UserID), repository.CategoryGroupInput{Name: "Utilities", StatementTypeCode: "other"})
 		expectCommandError(t, err, repository.CommandConflict)
-		mustCommand(t)(testRepo.DeleteLedgerCategoryGroup(ctx, user_a.UserID, first_group.ID))
-		mustCommand(t)(testRepo.CreateLedgerCategoryGroup(ctx, user_a.UserID, repository.CategoryGroupInput{Name: "Utilities", StatementTypeCode: "fixed"}))
+		mustCommand(t)(testRepo.DeleteLedgerCategoryGroup(ctx, repository.PersonalCaller(user_a.UserID), first_group.ID))
+		mustCommand(t)(testRepo.CreateLedgerCategoryGroup(ctx, repository.PersonalCaller(user_a.UserID), repository.CategoryGroupInput{Name: "Utilities", StatementTypeCode: "fixed"}))
 	})
 	t.Run("unique category names within a group", func(t *testing.T) {
-		group_row, category_row := createGroupAndCategory(t, user_a.UserID, "Hobby")
-		_, err := testRepo.CreateLedgerExpenseCategory(ctx, user_a.UserID, repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: dataText(t, *category_row, "name")})
+		group_row, category_row := createGroupAndCategory(t, repository.PersonalCaller(user_a.UserID), "Hobby")
+		_, err := testRepo.CreateLedgerExpenseCategory(ctx, repository.PersonalCaller(user_a.UserID), repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: dataText(t, *category_row, "name")})
 		expectCommandError(t, err, repository.CommandConflict)
 	})
 	t.Run("group with live categories can't be deleted", func(t *testing.T) {
-		group_row, category_row := createGroupAndCategory(t, user_a.UserID, "Pets")
-		_, err := testRepo.DeleteLedgerCategoryGroup(ctx, user_a.UserID, group_row.ID)
+		group_row, category_row := createGroupAndCategory(t, repository.PersonalCaller(user_a.UserID), "Pets")
+		_, err := testRepo.DeleteLedgerCategoryGroup(ctx, repository.PersonalCaller(user_a.UserID), group_row.ID)
 		expectCommandError(t, err, repository.CommandInvalid)
-		mustCommand(t)(testRepo.DeleteLedgerExpenseCategory(ctx, user_a.UserID, category_row.ID))
-		mustCommand(t)(testRepo.DeleteLedgerCategoryGroup(ctx, user_a.UserID, group_row.ID))
-		_, err = testRepo.CreateLedgerExpenseCategory(ctx, user_a.UserID, repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: "late"})
+		mustCommand(t)(testRepo.DeleteLedgerExpenseCategory(ctx, repository.PersonalCaller(user_a.UserID), category_row.ID))
+		mustCommand(t)(testRepo.DeleteLedgerCategoryGroup(ctx, repository.PersonalCaller(user_a.UserID), group_row.ID))
+		_, err = testRepo.CreateLedgerExpenseCategory(ctx, repository.PersonalCaller(user_a.UserID), repository.ExpenseCategoryInput{GroupID: group_row.ID, Name: "late"})
 		expectCommandError(t, err, repository.CommandInvalid)
 	})
 	t.Run("a variable month is confirmed once", func(t *testing.T) {
-		recurring_row := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, user_a.UserID, sampleRecurring("ledger", "variable", user_a.CategoryID, nil, 31)))
-		confirmed_entry := mustCommand(t)(testRepo.ConfirmLedgerRecurringExpense(ctx, user_a.UserID, recurring_row.ID, 4000, "2026-02"))
+		recurring_row := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), sampleRecurring("variable", user_a.CategoryID, nil, 31)))
+		confirmed_entry := mustCommand(t)(testRepo.ConfirmLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), recurring_row.ID, 4000, "2026-02"))
 		if dataText(t, *confirmed_entry, "transaction_date") != "2026-02-28" {
 			t.Fatalf("billing day 31 in February = %s", dataText(t, *confirmed_entry, "transaction_date"))
 		}
-		_, err := testRepo.ConfirmLedgerRecurringExpense(ctx, user_a.UserID, recurring_row.ID, 4100, "2026-02")
+		_, err := testRepo.ConfirmLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), recurring_row.ID, 4100, "2026-02")
 		expectCommandError(t, err, repository.CommandConflict)
 	})
 }
@@ -311,14 +343,14 @@ func TestLedgerCommands_Invariants(t *testing.T) {
 func TestLedgerCommands_SurplusUpperBound(t *testing.T) {
 	ctx := context.Background()
 	user_a := newSyncUser(t, "surplus-a")
-	mustCommand(t)(testRepo.CreateLedgerIncomeRecord(ctx, user_a.UserID, sampleIncome(300000)))
-	mustCommand(t)(testRepo.PutLedgerBaseIncome(ctx, user_a.UserID, 250000))
+	mustCommand(t)(testRepo.CreateLedgerIncomeRecord(ctx, repository.PersonalCaller(user_a.UserID), sampleIncome(300000)))
+	mustCommand(t)(testRepo.PutLedgerBaseIncome(ctx, repository.PersonalCaller(user_a.UserID), 250000))
 
 	surplus_of := func(amount int32) repository.SurplusAllocationInput {
 		return repository.SurplusAllocationInput{YearMonth: "2026-10", Amount: amount, Destination: "budget"}
 	}
-	mustCommand(t)(testRepo.CreateLedgerSurplusAllocation(ctx, user_a.UserID, surplus_of(30000)))
-	_, err := testRepo.CreateLedgerSurplusAllocation(ctx, user_a.UserID, surplus_of(20001))
+	mustCommand(t)(testRepo.CreateLedgerSurplusAllocation(ctx, repository.PersonalCaller(user_a.UserID), surplus_of(30000)))
+	_, err := testRepo.CreateLedgerSurplusAllocation(ctx, repository.PersonalCaller(user_a.UserID), surplus_of(20001))
 	expectCommandError(t, err, repository.CommandInvalid)
 
 	// 20000 remain: of ten concurrent 5000 allocations exactly four fit.
@@ -329,7 +361,7 @@ func TestLedgerCommands_SurplusUpperBound(t *testing.T) {
 		allocators.Add(1)
 		go func() {
 			defer allocators.Done()
-			_, err := testRepo.CreateLedgerSurplusAllocation(ctx, user_a.UserID, surplus_of(5000))
+			_, err := testRepo.CreateLedgerSurplusAllocation(ctx, repository.PersonalCaller(user_a.UserID), surplus_of(5000))
 			count_mutex.Lock()
 			defer count_mutex.Unlock()
 			var command_error *repository.CommandError
@@ -364,20 +396,22 @@ func TestMonthlyPosting_ExactlyOnceUnderConcurrency(t *testing.T) {
 	user_b := newSyncUser(t, "post-b")
 	household_id := joinHousehold(t, &user_a, &user_b)
 
-	shared_rent := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, user_a.UserID, sampleRecurring("ledger", "fixed", user_a.CategoryID, int32Ptr(80000), 31)))
-	a_gym := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, user_a.UserID, sampleRecurring("allowance", "fixed", user_a.CategoryID, int32Ptr(7000), 10)))
-	variable_bill := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, user_b.UserID, sampleRecurring("ledger", "variable", user_a.CategoryID, int32Ptr(9000), 20)))
-	auto_goal := mustCommand(t)(testRepo.CreateLedgerSavingsGoal(ctx, user_a.UserID, sampleGoal(10000)))
-	manual_goal := mustCommand(t)(testRepo.CreateLedgerSavingsGoal(ctx, user_b.UserID, sampleGoal(20000)))
-	mustCommand(t)(testRepo.CreateLedgerSavingsPosting(ctx, user_b.UserID, manual_goal.ID, 15000, "2027-02"))
+	shared_rent := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, repository.HouseholdCaller(user_a.UserID), sampleRecurring("fixed", user_a.HouseholdCategoryID, int32Ptr(80000), 31)))
+	a_gym := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), sampleRecurring("fixed", user_a.CategoryID, int32Ptr(7000), 10)))
+	variable_bill := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, repository.HouseholdCaller(user_b.UserID), sampleRecurring("variable", user_a.HouseholdCategoryID, int32Ptr(9000), 20)))
+	auto_goal := mustCommand(t)(testRepo.CreateLedgerSavingsGoal(ctx, repository.HouseholdCaller(user_a.UserID), sampleGoal(10000)))
+	manual_goal := mustCommand(t)(testRepo.CreateLedgerSavingsGoal(ctx, repository.HouseholdCaller(user_b.UserID), sampleGoal(20000)))
+	mustCommand(t)(testRepo.CreateLedgerSavingsPosting(ctx, repository.HouseholdCaller(user_b.UserID), manual_goal.ID, 15000, "2027-02"))
 
 	var posters sync.WaitGroup
 	for poster_index := 0; poster_index < 10; poster_index++ {
 		posters.Add(1)
 		go func() {
 			defer posters.Done()
-			if err := testRepo.PostMonthlyForLedger(ctx, household_id, "2027-02"); err != nil {
-				t.Errorf("posting: %v", err)
+			for _, ledger_id := range []string{household_id, user_a.LedgerID} {
+				if err := testRepo.PostMonthlyForLedger(ctx, ledger_id, "2027-02"); err != nil {
+					t.Errorf("posting: %v", err)
+				}
 			}
 		}()
 	}
@@ -409,15 +443,11 @@ func TestMonthlyPosting_ExactlyOnceUnderConcurrency(t *testing.T) {
 	if rent_posting == nil {
 		t.Fatal("rent posting missing from pull")
 	}
-	if dataText(t, *rent_posting, "transaction_date") != "2027-02-28" || rent_posting.OwnerID != user_a.UserID {
-		t.Fatalf("rent posting = %v owner %d", rent_posting.Data, rent_posting.OwnerID)
+	if dataText(t, *rent_posting, "transaction_date") != "2027-02-28" || rent_posting.OwnerID != user_a.UserID || rent_posting.LedgerID != household_id {
+		t.Fatalf("rent posting = %v owner %d ledger %s", rent_posting.Data, rent_posting.OwnerID, rent_posting.LedgerID)
 	}
 	if rent_posting.FieldHLC["amount"] == "" || !syncrules.CheckHLC(rent_posting.FieldHLC["amount"], time.Now()) {
 		t.Fatalf("rent posting HLC = %v", rent_posting.FieldHLC)
-	}
-	gym_total := rows_by_key[fmt.Sprintf("allowance_totals/%d:2027-02", user_a.UserID)]
-	if string(gym_total.Data["spent"]) != "7000" {
-		t.Fatalf("allowance total after posting = %s", gym_total.Data["spent"])
 	}
 
 	// A second run finds nothing to post and writes nothing.
@@ -429,68 +459,44 @@ func TestMonthlyPosting_ExactlyOnceUnderConcurrency(t *testing.T) {
 		t.Fatalf("idle posting allocated seq %d → %d", seq_before, seq_after)
 	}
 
-	// B's household pull hides A's allowance posting but shows its total.
+	// B's pull has the household posting but not A's personal one.
 	_, b_rows := pullAll(t, user_b.UserID)
+	var b_sees_rent bool
 	for _, pulled_row := range b_rows {
-		if pulled_row.Collection == "journal_entries" && string(pulled_row.Data["recurring_expense_id"]) == `"`+a_gym.ID+`"` {
-			t.Fatal("B pulled A's allowance posting")
+		if pulled_row.Collection != "journal_entries" {
+			continue
+		}
+		switch string(pulled_row.Data["recurring_expense_id"]) {
+		case `"` + a_gym.ID + `"`:
+			t.Fatal("B pulled A's personal posting")
+		case `"` + shared_rent.ID + `"`:
+			b_sees_rent = true
 		}
 	}
-	if _, found := b_rows[fmt.Sprintf("allowance_totals/%d:2027-02", user_a.UserID)]; !found {
-		t.Fatal("B is missing A's allowance total")
+	if !b_sees_rent {
+		t.Fatal("B is missing the household rent posting")
 	}
 }
 
 func TestPull_PostsCurrentMonth(t *testing.T) {
 	ctx := context.Background()
 	user_a := newSyncUser(t, "pullpost-a")
-	rent := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, user_a.UserID, sampleRecurring("ledger", "fixed", user_a.CategoryID, int32Ptr(1000), 1)))
+	user_b := newSyncUser(t, "pullpost-b")
+	joinHousehold(t, &user_a, &user_b)
+	personal_rent := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, repository.PersonalCaller(user_a.UserID), sampleRecurring("fixed", user_a.CategoryID, int32Ptr(1000), 1)))
+	household_rent := mustCommand(t)(testRepo.CreateLedgerRecurringExpense(ctx, repository.HouseholdCaller(user_a.UserID), sampleRecurring("fixed", user_a.HouseholdCategoryID, int32Ptr(2000), 1)))
 	current_month := time.Now().In(time.FixedZone("Asia/Tokyo", 9*60*60)).Format("2006-01")
 
 	_, rows_by_key := pullAll(t, user_a.UserID)
-	for _, pulled_row := range rows_by_key {
-		if pulled_row.Collection == "journal_entries" && string(pulled_row.Data["recurring_expense_id"]) == `"`+rent.ID+`"` && dataText(t, pulled_row, "recurring_year_month") == current_month {
-			return
+	for _, rent := range []*repository.PulledRow{personal_rent, household_rent} {
+		var is_posted bool
+		for _, pulled_row := range rows_by_key {
+			if pulled_row.Collection == "journal_entries" && string(pulled_row.Data["recurring_expense_id"]) == `"`+rent.ID+`"` && dataText(t, pulled_row, "recurring_year_month") == current_month {
+				is_posted = true
+			}
 		}
-	}
-	t.Fatal("pull did not post the current month")
-}
-
-func TestAllowanceTotals_FollowPushes(t *testing.T) {
-	user_a := newSyncUser(t, "total-a")
-	user_b := newSyncUser(t, "total-b")
-	joinHousehold(t, &user_a, &user_b)
-	total_key := func(year_month string) string {
-		return fmt.Sprintf("allowance_totals/%d:%s", user_a.UserID, year_month)
-	}
-	spent_in := func(year_month string) string {
-		_, rows_by_key := pullAll(t, user_b.UserID)
-		return string(rows_by_key[total_key(year_month)].Data["spent"])
-	}
-
-	allowance_entry_id := newUUID(t)
-	mustApply(t, user_a.UserID, journalEntryChange(t, allowance_entry_id, "allowance", user_a.CategoryID, 200))
-	excluded_entry := journalEntryChange(t, newUUID(t), "allowance", user_a.CategoryID, 50)
-	excluded_entry.Fields["is_excluded"] = fieldValue(t, true)
-	mustApply(t, user_a.UserID, excluded_entry)
-	mustApply(t, user_a.UserID, journalEntryChange(t, newUUID(t), "ledger", user_a.CategoryID, 100))
-	if spent := spent_in("2026-10"); spent != "200" {
-		t.Fatalf("October spent = %s, want 200", spent)
-	}
-
-	mustApply(t, user_a.UserID, syncrules.Change{Collection: "journal_entries", ID: allowance_entry_id, Fields: map[string]syncrules.FieldValue{
-		"transaction_date": fieldValue(t, "2026-11-02"),
-	}})
-	if spent := spent_in("2026-10"); spent != "0" {
-		t.Fatalf("October spent after moving the entry = %s, want 0", spent)
-	}
-	if spent := spent_in("2026-11"); spent != "200" {
-		t.Fatalf("November spent = %s, want 200", spent)
-	}
-
-	deleted_hlc := nextHLC()
-	mustApply(t, user_a.UserID, syncrules.Change{Collection: "journal_entries", ID: allowance_entry_id, DeletedHLC: &deleted_hlc})
-	if spent := spent_in("2026-11"); spent != "0" {
-		t.Fatalf("November spent after delete = %s, want 0", spent)
+		if !is_posted {
+			t.Fatalf("pull did not post %s for the current month", rent.ID)
+		}
 	}
 }

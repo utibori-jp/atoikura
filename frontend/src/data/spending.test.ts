@@ -24,7 +24,6 @@ function seedLedgerWithSpending(ledger_server: TestLedgerServer): void {
     description: null,
   });
   ledger_server.putRow("recurring_expenses", "01920000-0000-7000-8000-000000000401", {
-    wallet: "ledger",
     name: "家賃",
     emoji: null,
     billing_day: 25,

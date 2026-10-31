@@ -33,7 +33,6 @@ export interface IncomeRecordInput {
 }
 
 export interface RecurringExpenseInput {
-  wallet: "ledger" | "allowance";
   name: string;
   emoji?: string | null;
   billing_day: number;

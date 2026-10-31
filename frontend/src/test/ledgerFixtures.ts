@@ -40,6 +40,7 @@ export class TestLedgerServer {
     const pulled_row: PulledRow = {
       collection,
       id,
+      ledger_id: TEST_LEDGER_ID,
       owner_id,
       seq: this.next_seq++,
       deleted: false,
@@ -112,7 +113,6 @@ export class TestLedgerServer {
       const recurring_row = this.rows_by_id.get(record_id);
       if (!recurring_row) return undefined;
       return this.putRow("journal_entries", this.newCommandRowId(), {
-        wallet: recurring_row.data.wallet,
         transaction_date: `${request_body.year_month}-01`,
         amount: request_body.amount,
         category_id: recurring_row.data.category_id,
@@ -152,7 +152,9 @@ export class TestLedgerServer {
         .filter((pulled_row) => pulled_row.seq > since_seq)
         .sort((left_row, right_row) => left_row.seq - right_row.seq);
       return HttpResponse.json({
-        ledger_id: TEST_LEDGER_ID,
+        ledger_ids: [TEST_LEDGER_ID],
+        personal_ledger_id: TEST_LEDGER_ID,
+        household_ledger_id: null,
         rows: new_rows,
         next_since: Math.max(since_seq, ...new_rows.map((pulled_row) => pulled_row.seq)),
         has_more: false,
@@ -207,7 +209,6 @@ export function putJournalEntry(
     "journal_entries",
     entry_id,
     {
-      wallet: "ledger",
       item: null,
       is_excluded: false,
       note: null,
@@ -324,7 +325,6 @@ export function putRecurringExpense(
   recurring_id: string = nextFixtureRowId()
 ): string {
   ledger_server.putRow("recurring_expenses", recurring_id, {
-    wallet: "ledger",
     name: "家賃",
     emoji: "🏠",
     billing_day: 27,

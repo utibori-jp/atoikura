@@ -6,7 +6,6 @@ import { dateInMonth, daysInMonth } from "./calendar";
 
 export interface RecurringExpense {
   id: string;
-  wallet: "ledger" | "allowance";
   name: string;
   billing_day: number;
   amount: number | null;
@@ -16,7 +15,6 @@ export interface RecurringExpense {
 
 export interface PendingRecurringPosting {
   recurring_expense_id: string;
-  wallet: "ledger" | "allowance";
   name: string;
   amount: number;
   category_id: string;
@@ -46,7 +44,6 @@ export function pendingRecurringPostings(
     )
     .map((recurring_expense) => ({
       recurring_expense_id: recurring_expense.id,
-      wallet: recurring_expense.wallet,
       name: recurring_expense.name,
       amount: recurring_expense.amount as number,
       category_id: recurring_expense.category_id,
