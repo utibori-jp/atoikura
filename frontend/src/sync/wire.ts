@@ -25,6 +25,7 @@ export interface PushResult {
 export interface PulledRow {
   collection: string;
   id: string;
+  ledger_id: string;
   owner_id: number;
   seq: number;
   deleted: boolean;
@@ -32,8 +33,12 @@ export interface PulledRow {
   field_hlc?: Record<string, string>;
 }
 
+// A pull page names the ledgers it covers: the personal ledger, the attached
+// household (null when none) and archives, all in ledger_ids.
 export interface PullPage {
-  ledger_id: string;
+  ledger_ids: string[];
+  personal_ledger_id: string;
+  household_ledger_id: string | null;
   rows: PulledRow[];
   next_since: number;
   has_more: boolean;

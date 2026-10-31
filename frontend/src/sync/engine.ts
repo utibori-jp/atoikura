@@ -301,9 +301,9 @@ export class SyncEngine {
       const { ledger_changed } = await this.store.applyPullPage(pull_page);
       if (ledger_changed) {
         if (ledger_reset_done) throw new Error("台帳の切り替えが完了しませんでした");
-        // Joined or left a household: push what is pending, then start over.
+        // A household was attached or detached: push what is pending, then start over.
         await this.pushOutbox();
-        await this.store.resetForLedger(pull_page.ledger_id);
+        await this.store.resetForLedgers();
         ledger_reset_done = true;
         continue;
       }

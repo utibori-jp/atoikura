@@ -44,9 +44,7 @@ func TestValidateJournalEntryFieldsSharedVectors(t *testing.T) {
 
 	for _, validation_case := range vector_file.Cases {
 		t.Run(validation_case.Name, func(t *testing.T) {
-			change := Change{Collection: "journal_entries", Fields: map[string]FieldValue{
-				"wallet": {Value: json.RawMessage(`"ledger"`)},
-			}}
+			change := Change{Collection: "journal_entries", Fields: map[string]FieldValue{}}
 			for field_name, raw_value := range validation_case.Input {
 				if field_name == "category" {
 					if raw_value == "present" {
@@ -58,7 +56,7 @@ func TestValidateJournalEntryFieldsSharedVectors(t *testing.T) {
 				change.Fields[field_name] = FieldValue{Value: encoded_value}
 			}
 
-			message := ValidateJournalEntryFields(DecodeFields(&journalEntriesSpec, change), false)
+			message := ValidateJournalEntryFields(DecodeFields(&journalEntriesSpec, change))
 			if validation_case.Expected.Valid && message != "" {
 				t.Errorf("expected valid, got %q", message)
 			}
@@ -69,8 +67,8 @@ func TestValidateJournalEntryFieldsSharedVectors(t *testing.T) {
 	}
 }
 
-func TestValidateJournalEntryWalletAndTypes(t *testing.T) {
-	valid_row := Row{"wallet": "ledger", "transaction_date": "2026-10-27", "amount": int64(500), "category_id": testCategoryID, "is_excluded": false}
+func TestValidateJournalEntryTypes(t *testing.T) {
+	valid_row := Row{"transaction_date": "2026-10-27", "amount": int64(500), "category_id": testCategoryID, "is_excluded": false}
 	copyWith := func(field_name string, field_value any) Row {
 		candidate_row := Row{}
 		for name, value := range valid_row {
@@ -80,22 +78,13 @@ func TestValidateJournalEntryWalletAndTypes(t *testing.T) {
 		return candidate_row
 	}
 
-	if message := ValidateJournalEntryFields(copyWith("wallet", "allowance"), false); message != "お小遣いの仕訳は家庭に参加しているときだけ登録できます" {
-		t.Errorf("allowance in personal mode: %q", message)
-	}
-	if message := ValidateJournalEntryFields(copyWith("wallet", "allowance"), true); message != "" {
-		t.Errorf("allowance in household mode: %q", message)
-	}
-	if message := ValidateJournalEntryFields(copyWith("wallet", nil), false); message != "walletはledgerかallowanceで指定してください" {
-		t.Errorf("missing wallet: %q", message)
-	}
-	if message := ValidateJournalEntryFields(copyWith("amount", DecodeValue(json.RawMessage(`1.5`))), false); message != "amountは正の整数である必要があります" {
+	if message := ValidateJournalEntryFields(copyWith("amount", DecodeValue(json.RawMessage(`1.5`)))); message != "amountは正の整数である必要があります" {
 		t.Errorf("fractional amount: %q", message)
 	}
-	if message := ValidateJournalEntryFields(copyWith("amount", DecodeValue(json.RawMessage(`"500"`))), false); message != "amountは正の整数である必要があります" {
+	if message := ValidateJournalEntryFields(copyWith("amount", DecodeValue(json.RawMessage(`"500"`)))); message != "amountは正の整数である必要があります" {
 		t.Errorf("string amount: %q", message)
 	}
-	if message := ValidateJournalEntryFields(copyWith("category_id", "not-a-uuid"), false); message != "category_idが不正です" {
+	if message := ValidateJournalEntryFields(copyWith("category_id", "not-a-uuid")); message != "category_idが不正です" {
 		t.Errorf("bad category id: %q", message)
 	}
 }
@@ -144,7 +133,7 @@ func fieldChange(field_values map[string][2]string) Change {
 
 func TestMergeFieldLevelLWW(t *testing.T) {
 	stored_record := &StoredRecord{
-		Values:   Row{"wallet": "ledger", "amount": int64(500), "item": "ランチ"},
+		Values:   Row{"amount": int64(500), "item": "ランチ"},
 		FieldHLC: map[string]string{"amount": "1793000000000-0001-a", "item": "1793000000000-0005-a"},
 	}
 	change := fieldChange(map[string][2]string{
@@ -174,11 +163,12 @@ func TestMergeFieldLevelLWW(t *testing.T) {
 }
 
 func TestMergeTombstonesAndImmutables(t *testing.T) {
-	stored_record := &StoredRecord{Values: Row{"wallet": "ledger", "amount": int64(500)}, FieldHLC: map[string]string{}}
+	stored_record := &StoredRecord{Values: Row{"amount": int64(500)}, FieldHLC: map[string]string{}}
 
-	wallet_change := fieldChange(map[string][2]string{"wallet": {`"allowance"`, "1793000000000-0001-a"}})
-	if _, rejection := Merge(&journalEntriesSpec, stored_record, wallet_change, DecodeFields(&journalEntriesSpec, wallet_change)); rejection == nil || rejection.Reason != ReasonImmutable {
-		t.Errorf("wallet change: %v", rejection)
+	stored_note := &StoredRecord{Values: Row{"date": "2026-10-27", "note": "メモ"}, FieldHLC: map[string]string{}}
+	date_change := Change{Collection: "daily_notes", Fields: map[string]FieldValue{"date": {Value: json.RawMessage(`"2026-10-28"`), HLC: "1793000000000-0001-a"}}}
+	if _, rejection := Merge(&dailyNotesSpec, stored_note, date_change, DecodeFields(&dailyNotesSpec, date_change)); rejection == nil || rejection.Reason != ReasonImmutable {
+		t.Errorf("date change: %v", rejection)
 	}
 
 	delete_change := fieldChange(map[string][2]string{"amount": {`900`, "1793000000000-0009-a"}})
@@ -228,18 +218,52 @@ func TestMergeNaturalKeyDuplicate(t *testing.T) {
 
 func TestCanWrite(t *testing.T) {
 	recurring_id := "0192f000-0000-7000-8000-0000000000bb"
-	own_entry := &StoredRecord{LedgerID: "L1", OwnerID: 1, Values: Row{"wallet": "ledger"}}
-	posting := &StoredRecord{LedgerID: "L1", OwnerID: 1, Values: Row{"wallet": "ledger"}, RecurringExpenseID: &recurring_id}
-	allowance_posting := &StoredRecord{LedgerID: "L1", OwnerID: 1, Values: Row{"wallet": "allowance"}, RecurringExpenseID: &recurring_id}
+	personal_entry := &StoredRecord{LedgerID: "P1", OwnerID: 1}
+	household_entry := &StoredRecord{LedgerID: "H1", OwnerID: 1}
+	household_posting := &StoredRecord{LedgerID: "H1", OwnerID: 1, RecurringExpenseID: &recurring_id}
+	personal_posting := &StoredRecord{LedgerID: "P1", OwnerID: 1, RecurringExpenseID: &recurring_id}
+	archived_entry := &StoredRecord{LedgerID: "A1", OwnerID: 2}
 
-	if !CanWrite(own_entry, 1, "L1") || CanWrite(own_entry, 2, "L1") || CanWrite(own_entry, 1, "L2") {
-		t.Error("author-only rule broken")
+	if !CanWrite(personal_entry, 1, "P1", "") || CanWrite(personal_entry, 2, "P2", "H1") {
+		t.Error("a personal ledger is writable by its owner only")
 	}
-	if !CanWrite(posting, 2, "L1") || CanWrite(posting, 2, "L2") {
-		t.Error("shared-ledger postings are editable by members of that ledger only")
+	if !CanWrite(household_entry, 1, "P1", "H1") || CanWrite(household_entry, 2, "P2", "H1") {
+		t.Error("household entries are author-only")
 	}
-	if CanWrite(allowance_posting, 2, "L1") {
-		t.Error("allowance postings stay owner-only")
+	if !CanWrite(household_posting, 2, "P2", "H1") || CanWrite(household_posting, 2, "P2", "") || CanWrite(household_posting, 3, "P3", "H2") {
+		t.Error("household postings are editable by members of that household only")
+	}
+	if !CanWrite(personal_posting, 1, "P1", "H1") || CanWrite(personal_posting, 2, "P2", "H1") {
+		t.Error("personal postings stay owner-only")
+	}
+	if CanWrite(archived_entry, 2, "P2", "H1") {
+		t.Error("archives are read-only, even for their owner")
+	}
+}
+
+func TestSplitTarget(t *testing.T) {
+	change := Change{Collection: "journal_entries", Fields: map[string]FieldValue{
+		"ledger": {Value: json.RawMessage(`"household"`), HLC: "1793000000000-0001-a"},
+		"amount": {Value: json.RawMessage(`500`), HLC: "1793000000000-0001-a"},
+	}}
+	remaining_change, target_text, rejection := SplitTarget(&journalEntriesSpec, change)
+	if rejection != nil || target_text != "household" {
+		t.Fatalf("target = %q, rejection = %v", target_text, rejection)
+	}
+	if _, has_target := remaining_change.Fields["ledger"]; has_target || len(remaining_change.Fields) != 1 {
+		t.Errorf("the target must not reach the merge: %v", remaining_change.Fields)
+	}
+	if _, has_target := change.Fields["ledger"]; !has_target {
+		t.Error("the pushed change must not be modified")
+	}
+
+	numeric_target := Change{Collection: "journal_entries", Fields: map[string]FieldValue{"ledger": {Value: json.RawMessage(`1`), HLC: "1793000000000-0001-a"}}}
+	if _, _, rejection := SplitTarget(&journalEntriesSpec, numeric_target); rejection == nil || rejection.Reason != ReasonInvalid {
+		t.Errorf("numeric target: %v", rejection)
+	}
+	note_change := Change{Collection: "daily_notes", Fields: map[string]FieldValue{"note": {Value: json.RawMessage(`"x"`), HLC: "1793000000000-0001-a"}}}
+	if _, target_text, rejection := SplitTarget(&dailyNotesSpec, note_change); target_text != "" || rejection != nil {
+		t.Errorf("notes have no target: %q %v", target_text, rejection)
 	}
 }
 

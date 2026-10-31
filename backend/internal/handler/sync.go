@@ -120,6 +120,7 @@ func PushHandler(repo syncRepository) http.HandlerFunc {
 type pulledRowJSON struct {
 	Collection string                     `json:"collection"`
 	ID         string                     `json:"id"`
+	LedgerID   string                     `json:"ledger_id"`
 	OwnerID    int64                      `json:"owner_id"`
 	Seq        int64                      `json:"seq"`
 	Deleted    bool                       `json:"deleted"`
@@ -127,14 +128,18 @@ type pulledRowJSON struct {
 	FieldHLC   map[string]string          `json:"field_hlc,omitempty"`
 }
 
+// pullResponseJSON names the ledgers the page covers (sync-protocol.md §4): a
+// device starts over from 0 when that set changes.
 type pullResponseJSON struct {
-	LedgerID  string          `json:"ledger_id"`
-	Rows      []pulledRowJSON `json:"rows"`
-	NextSince int64           `json:"next_since"`
-	HasMore   bool            `json:"has_more"`
+	LedgerIDs         []string        `json:"ledger_ids"`
+	PersonalLedgerID  string          `json:"personal_ledger_id"`
+	HouseholdLedgerID *string         `json:"household_ledger_id"`
+	Rows              []pulledRowJSON `json:"rows"`
+	NextSince         int64           `json:"next_since"`
+	HasMore           bool            `json:"has_more"`
 }
 
-// PullHandler returns the changes of the caller's ledger after a cursor.
+// PullHandler returns the changes of the caller's ledgers after a cursor.
 func PullHandler(repo syncRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user_id, ok := UserIDFromContext(r.Context())
@@ -167,11 +172,17 @@ func PullHandler(repo syncRepository) http.HandlerFunc {
 		for _, pulled_row := range pull_result.Rows {
 			pulled_rows_json = append(pulled_rows_json, pulledRowJSON(pulled_row))
 		}
+		var household_ledger_id *string
+		if pull_result.Ledgers.HouseholdID != "" {
+			household_ledger_id = &pull_result.Ledgers.HouseholdID
+		}
 		WriteJSON(w, http.StatusOK, pullResponseJSON{
-			LedgerID:  pull_result.LedgerID,
-			Rows:      pulled_rows_json,
-			NextSince: pull_result.NextSince,
-			HasMore:   pull_result.HasMore,
+			LedgerIDs:         pull_result.Ledgers.VisibleIDs(),
+			PersonalLedgerID:  pull_result.Ledgers.PersonalID,
+			HouseholdLedgerID: household_ledger_id,
+			Rows:              pulled_rows_json,
+			NextSince:         pull_result.NextSince,
+			HasMore:           pull_result.HasMore,
 		})
 	}
 }

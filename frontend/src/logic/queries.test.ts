@@ -18,6 +18,7 @@ import {
 
 const LEDGER_ID = "ledger-1";
 const OTHER_LEDGER_ID = "ledger-2";
+const PERSONAL_LEDGER_A = "personal-a";
 const MEMBER_A = 1;
 const MEMBER_B = 2;
 const FORMER_MEMBER = 3;
@@ -43,7 +44,7 @@ function insertRow(table_name: string, column_values: Record<string, SqlValue>):
 }
 
 function insertJournalEntry(column_values: Record<string, SqlValue>): void {
-  insertRow("journal_entries", { wallet: "ledger", is_excluded: 0, ...column_values });
+  insertRow("journal_entries", { is_excluded: 0, ...column_values });
 }
 
 beforeAll(async () => {
@@ -80,7 +81,7 @@ beforeEach(() => {
   });
   insertRow("expense_categories", { id: "cat-rent", group_id: "group-fixed", name: "家賃" });
 
-  // Shared ledger wallet
+  // Household ledger
   insertJournalEntry({ transaction_date: "2026-10-01", amount: 1000, category_id: "cat-grocery" });
   insertJournalEntry({ transaction_date: "2026-10-01", amount: 500, category_id: "cat-sundries" });
   insertJournalEntry({
@@ -117,19 +118,12 @@ beforeEach(() => {
     deleted: 1,
   });
   insertJournalEntry({ transaction_date: "2026-09-15", amount: 5000, category_id: "cat-grocery" });
-  // Allowance wallets
+  // Member A's personal ledger (the allowance)
   insertJournalEntry({
     transaction_date: "2026-10-03",
     amount: 1500,
     category_id: "cat-sundries",
-    wallet: "allowance",
-  });
-  insertJournalEntry({
-    transaction_date: "2026-10-03",
-    amount: 4000,
-    category_id: "cat-grocery",
-    wallet: "allowance",
-    owner_id: MEMBER_B,
+    ledger_id: PERSONAL_LEDGER_A,
   });
   // Another ledger
   insertJournalEntry({
@@ -143,7 +137,6 @@ beforeEach(() => {
   insertRow("base_incomes", { member_id: MEMBER_A, amount: 300000 });
   insertRow("base_incomes", { member_id: MEMBER_B, amount: 220000, owner_id: MEMBER_B });
   insertRow("recurring_expenses", {
-    wallet: "ledger",
     name: "家賃",
     billing_day: 27,
     amount: 90000,
@@ -151,7 +144,7 @@ beforeEach(() => {
     category_id: "cat-rent",
   });
   insertRow("recurring_expenses", {
-    wallet: "allowance",
+    ledger_id: PERSONAL_LEDGER_A,
     name: "スマホ",
     billing_day: 1,
     amount: 3000,
@@ -159,7 +152,6 @@ beforeEach(() => {
     category_id: "cat-sundries",
   });
   insertRow("recurring_expenses", {
-    wallet: "ledger",
     name: "電気",
     billing_day: 10,
     amount: null,
@@ -217,22 +209,15 @@ afterEach(() => {
 });
 
 describe("listDailyVariableSums", () => {
-  it("sums non-excluded food/other entries of the shared ledger, including deleted categories", () => {
-    expect(listDailyVariableSums(test_db, LEDGER_ID, { wallet: "ledger" }, "2026-10")).toEqual({
+  it("sums non-excluded food/other entries of the household ledger, including deleted categories", () => {
+    expect(listDailyVariableSums(test_db, LEDGER_ID, "2026-10")).toEqual({
       "2026-10-01": { food: 1000, other: 500 },
       "2026-10-02": { food: 2000 },
     });
   });
 
-  it("limits an allowance scope to its owner", () => {
-    expect(
-      listDailyVariableSums(
-        test_db,
-        LEDGER_ID,
-        { wallet: "allowance", owner_id: MEMBER_A },
-        "2026-10"
-      )
-    ).toEqual({
+  it("covers only the given ledger", () => {
+    expect(listDailyVariableSums(test_db, PERSONAL_LEDGER_A, "2026-10")).toEqual({
       "2026-10-03": { other: 1500 },
     });
   });
@@ -240,7 +225,7 @@ describe("listDailyVariableSums", () => {
 
 describe("listMonthlyBreakdown", () => {
   it("moves excluded entries to 対象外 and orders by statement type", () => {
-    expect(listMonthlyBreakdown(test_db, LEDGER_ID, { wallet: "ledger" }, "2026-10")).toEqual([
+    expect(listMonthlyBreakdown(test_db, LEDGER_ID, "2026-10")).toEqual([
       {
         category_id: "cat-grocery",
         category_name: "スーパー",
@@ -283,7 +268,7 @@ describe("listMonthlyBreakdown", () => {
 
 describe("sumVariableSpending", () => {
   it("counts only non-excluded food/other spending", () => {
-    expect(sumVariableSpending(test_db, LEDGER_ID, { wallet: "ledger" }, "2026-10")).toBe(3500);
+    expect(sumVariableSpending(test_db, LEDGER_ID, "2026-10")).toBe(3500);
   });
 });
 
@@ -312,8 +297,8 @@ describe("computeLedgerSummary", () => {
 });
 
 describe("allowance spending", () => {
-  it("reads the viewer's own allowance from local entries", () => {
-    expect(listOwnAllowanceSpending(test_db, LEDGER_ID, MEMBER_A)).toEqual({ "2026-10": 1500 });
+  it("reads the viewer's own allowance from their personal ledger", () => {
+    expect(listOwnAllowanceSpending(test_db, PERSONAL_LEDGER_A)).toEqual({ "2026-10": 1500 });
   });
 
   it("reads other members' allowance from the server-computed totals", () => {

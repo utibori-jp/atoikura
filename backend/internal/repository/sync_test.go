@@ -41,9 +41,13 @@ func newUUID(t *testing.T) string {
 }
 
 type syncUser struct {
-	UserID     int64
+	UserID int64
+	// LedgerID and CategoryID are in the user's personal ledger.
 	LedgerID   string
 	CategoryID string
+	// HouseholdID and HouseholdCategoryID are set by joinHousehold.
+	HouseholdID         string
+	HouseholdCategoryID string
 }
 
 // newSyncUser creates a user with a personal ledger and one category in it.
@@ -54,11 +58,11 @@ func newSyncUser(t *testing.T, email_prefix string) syncUser {
 	if err != nil {
 		t.Fatalf("creating user: %v", err)
 	}
-	personal_ledger, err := testRepo.EnsurePersonalLedger(ctx, user.ID)
+	caller_ledgers, err := testRepo.EnsureCallerLedgers(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("ensuring personal ledger: %v", err)
 	}
-	return syncUser{UserID: user.ID, LedgerID: personal_ledger.ID, CategoryID: insertCategory(t, personal_ledger.ID, user.ID)}
+	return syncUser{UserID: user.ID, LedgerID: caller_ledgers.PersonalID, CategoryID: insertCategory(t, caller_ledgers.PersonalID, user.ID)}
 }
 
 // insertCategory adds a category group and a category to a ledger. Online-only
@@ -85,9 +89,9 @@ func insertCategory(t *testing.T, ledger_id string, owner_id int64) string {
 	return category_id
 }
 
-// joinHousehold moves the users out of their personal ledgers into a new
-// household ledger and returns it with one category. Households get REST
-// commands in #207; until then tests set them up directly.
+// joinHousehold attaches a new household ledger with one category to the users
+// (design.md §6); their personal ledgers stay. The household commands come in
+// the next Step 8 PR; until then tests set households up directly.
 func joinHousehold(t *testing.T, members ...*syncUser) string {
 	t.Helper()
 	ctx := context.Background()
@@ -99,28 +103,22 @@ func joinHousehold(t *testing.T, members ...*syncUser) string {
 		t.Fatalf("inserting household: %v", err)
 	}
 	for member_index, member := range members {
-		if _, err := testPool.Exec(ctx,
-			"UPDATE lf.ledger_members SET left_at = NOW(), seq = nextval('lf.sync_seq') WHERE user_id = $1 AND left_at IS NULL",
-			member.UserID,
-		); err != nil {
-			t.Fatalf("leaving personal ledger: %v", err)
-		}
 		member_role := "member"
 		if member_index == 0 {
 			member_role = "owner"
 		}
 		if _, err := testPool.Exec(ctx,
-			`INSERT INTO lf.ledger_members (id, ledger_id, owner_id, seq, user_id, role)
-			 VALUES (gen_random_uuid(), $1::uuid, $2, nextval('lf.sync_seq'), $2, $3)`,
+			`INSERT INTO lf.ledger_members (id, ledger_id, owner_id, seq, user_id, role, ledger_kind)
+			 VALUES (gen_random_uuid(), $1::uuid, $2, nextval('lf.sync_seq'), $2, $3, 'household')`,
 			household_id, member.UserID, member_role,
 		); err != nil {
 			t.Fatalf("joining household: %v", err)
 		}
-		member.LedgerID = household_id
+		member.HouseholdID = household_id
 	}
 	category_id := insertCategory(t, household_id, members[0].UserID)
 	for _, member := range members {
-		member.CategoryID = category_id
+		member.HouseholdCategoryID = category_id
 	}
 	return household_id
 }
@@ -134,13 +132,13 @@ func fieldValue(t *testing.T, value any) syncrules.FieldValue {
 	return syncrules.FieldValue{Value: encoded_value, HLC: nextHLC()}
 }
 
-func journalEntryChange(t *testing.T, entry_id string, wallet string, category_id string, amount int) syncrules.Change {
+func journalEntryChange(t *testing.T, entry_id string, ledger_target string, category_id string, amount int) syncrules.Change {
 	t.Helper()
 	return syncrules.Change{
 		Collection: "journal_entries",
 		ID:         entry_id,
 		Fields: map[string]syncrules.FieldValue{
-			"wallet":           fieldValue(t, wallet),
+			"ledger":           fieldValue(t, ledger_target),
 			"transaction_date": fieldValue(t, "2026-10-01"),
 			"item":             fieldValue(t, "lunch"),
 			"amount":           fieldValue(t, amount),
@@ -195,23 +193,23 @@ func expectRejected(t *testing.T, push_result repository.PushResult, want_reason
 }
 
 // pullAll pulls every visible row from cursor 0 and indexes them by collection/id.
-func pullAll(t *testing.T, user_id int64) (string, map[string]repository.PulledRow) {
+func pullAll(t *testing.T, user_id int64) (repository.CallerLedgers, map[string]repository.PulledRow) {
 	t.Helper()
 	rows_by_key := map[string]repository.PulledRow{}
 	var since int64
-	var ledger_id string
+	var pulled_ledgers repository.CallerLedgers
 	for {
 		pull_result, err := testRepo.Pull(context.Background(), user_id, since, 1000)
 		if err != nil {
 			t.Fatalf("pull: %v", err)
 		}
-		ledger_id = pull_result.LedgerID
+		pulled_ledgers = pull_result.Ledgers
 		for _, pulled_row := range pull_result.Rows {
 			rows_by_key[pulled_row.Collection+"/"+pulled_row.ID] = pulled_row
 		}
 		since = pull_result.NextSince
 		if !pull_result.HasMore {
-			return ledger_id, rows_by_key
+			return pulled_ledgers, rows_by_key
 		}
 	}
 }
@@ -228,7 +226,7 @@ func storedAmount(t *testing.T, entry_id string) (int, bool) {
 	return stored_amount, is_deleted
 }
 
-func TestEnsurePersonalLedger_IsStableAndConcurrentSafe(t *testing.T) {
+func TestEnsureCallerLedgers_IsStableAndConcurrentSafe(t *testing.T) {
 	ctx := context.Background()
 	user, err := testRepo.CreateUserWithDefaults(ctx, fmt.Sprintf("ledger-%d@example.com", time.Now().UnixNano()), nil, "testhash")
 	if err != nil {
@@ -240,20 +238,20 @@ func TestEnsurePersonalLedger_IsStableAndConcurrentSafe(t *testing.T) {
 		wait_group.Add(1)
 		go func() {
 			defer wait_group.Done()
-			personal_ledger, err := testRepo.EnsurePersonalLedger(ctx, user.ID)
+			caller_ledgers, err := testRepo.EnsureCallerLedgers(ctx, user.ID)
 			if err != nil {
 				t.Errorf("ensuring ledger: %v", err)
 				return
 			}
-			if personal_ledger.Kind != "personal" {
-				t.Errorf("kind = %q, want personal", personal_ledger.Kind)
+			if caller_ledgers.HouseholdID != "" || len(caller_ledgers.ArchiveIDs) != 0 {
+				t.Errorf("a new user has only a personal ledger: %+v", caller_ledgers)
 			}
-			ledger_ids[worker_index] = personal_ledger.ID
+			ledger_ids[worker_index] = caller_ledgers.PersonalID
 		}()
 	}
 	wait_group.Wait()
 	for _, ledger_id := range ledger_ids {
-		if ledger_id != ledger_ids[0] {
+		if ledger_id == "" || ledger_id != ledger_ids[0] {
 			t.Fatalf("ledger ids differ: %v", ledger_ids)
 		}
 	}
@@ -302,7 +300,7 @@ func TestEnsurePersonalLedger_SeedsDefaultCategoriesInOrder(t *testing.T) {
 		`SELECT cg.name, cg.statement_type_code,
 		        (SELECT ec.name FROM lf.expense_categories ec WHERE ec.group_id = cg.id ORDER BY ec.created_at LIMIT 1)
 		 FROM lf.category_groups cg WHERE cg.ledger_id = $1::uuid ORDER BY cg.created_at`,
-		pull_result.LedgerID,
+		pull_result.Ledgers.PersonalID,
 	)
 	if err != nil {
 		t.Fatalf("listing groups: %v", err)
@@ -335,20 +333,20 @@ func TestPush_AppliesAndPullReturnsRow(t *testing.T) {
 	user_a := newSyncUser(t, "push-a")
 	entry_id := newUUID(t)
 
-	push_result := mustApply(t, user_a.UserID, journalEntryChange(t, entry_id, "ledger", user_a.CategoryID, 1200))
+	push_result := mustApply(t, user_a.UserID, journalEntryChange(t, entry_id, "personal", user_a.CategoryID, 1200))
 	if push_result.Seq == nil {
 		t.Fatal("seq missing on applied change")
 	}
 
-	ledger_id, rows_by_key := pullAll(t, user_a.UserID)
-	if ledger_id != user_a.LedgerID {
-		t.Fatalf("ledger_id = %s, want %s", ledger_id, user_a.LedgerID)
+	pulled_ledgers, rows_by_key := pullAll(t, user_a.UserID)
+	if pulled_ledgers.PersonalID != user_a.LedgerID {
+		t.Fatalf("personal ledger = %s, want %s", pulled_ledgers.PersonalID, user_a.LedgerID)
 	}
 	pulled_entry, found := rows_by_key["journal_entries/"+entry_id]
 	if !found {
 		t.Fatal("pushed entry missing from pull")
 	}
-	if pulled_entry.OwnerID != user_a.UserID || pulled_entry.Seq != *push_result.Seq {
+	if pulled_entry.OwnerID != user_a.UserID || pulled_entry.LedgerID != user_a.LedgerID || pulled_entry.Seq != *push_result.Seq {
 		t.Fatalf("pulled entry owner/seq = %d/%d", pulled_entry.OwnerID, pulled_entry.Seq)
 	}
 	if string(pulled_entry.Data["amount"]) != "1200" || pulled_entry.FieldHLC["amount"] == "" {
@@ -364,7 +362,7 @@ func TestPush_AppliesAndPullReturnsRow(t *testing.T) {
 func TestPush_FieldLWWAndTombstone(t *testing.T) {
 	user_a := newSyncUser(t, "lww-a")
 	entry_id := newUUID(t)
-	mustApply(t, user_a.UserID, journalEntryChange(t, entry_id, "ledger", user_a.CategoryID, 100))
+	mustApply(t, user_a.UserID, journalEntryChange(t, entry_id, "personal", user_a.CategoryID, 100))
 
 	stale_change := syncrules.Change{Collection: "journal_entries", ID: entry_id, Fields: map[string]syncrules.FieldValue{
 		"amount": {Value: json.RawMessage("999"), HLC: olderHLC()},
@@ -399,23 +397,78 @@ func TestPush_FieldLWWAndTombstone(t *testing.T) {
 	}
 }
 
-func TestPush_ImmutableWallet(t *testing.T) {
-	user_a := newSyncUser(t, "immutable-a")
-	user_b := newSyncUser(t, "immutable-b")
-	joinHousehold(t, &user_a, &user_b)
-	entry_id := newUUID(t)
-	mustApply(t, user_a.UserID, journalEntryChange(t, entry_id, "ledger", user_a.CategoryID, 100))
+func TestPush_LedgerTarget(t *testing.T) {
+	user_a := newSyncUser(t, "target-a")
+	user_b := newSyncUser(t, "target-b")
+	loner := newSyncUser(t, "target-loner")
+	household_id := joinHousehold(t, &user_a, &user_b)
 
-	expectRejected(t, pushOne(t, user_a.UserID, syncrules.Change{Collection: "journal_entries", ID: entry_id, Fields: map[string]syncrules.FieldValue{
-		"wallet": fieldValue(t, "allowance"),
-	}}), syncrules.ReasonImmutable)
+	t.Run("a new entry goes to the ledger its target names", func(t *testing.T) {
+		personal_entry_id := newUUID(t)
+		household_entry_id := newUUID(t)
+		mustApply(t, user_a.UserID, journalEntryChange(t, personal_entry_id, "personal", user_a.CategoryID, 100))
+		mustApply(t, user_a.UserID, journalEntryChange(t, household_entry_id, "household", user_a.HouseholdCategoryID, 200))
+		if stored_ledger_id := storedLedgerID(t, "journal_entries", personal_entry_id); stored_ledger_id != user_a.LedgerID {
+			t.Fatalf("personal entry stored in %s, want %s", stored_ledger_id, user_a.LedgerID)
+		}
+		if stored_ledger_id := storedLedgerID(t, "journal_entries", household_entry_id); stored_ledger_id != household_id {
+			t.Fatalf("household entry stored in %s, want %s", stored_ledger_id, household_id)
+		}
+	})
+
+	t.Run("an entry cannot move to the other ledger", func(t *testing.T) {
+		entry_id := newUUID(t)
+		mustApply(t, user_a.UserID, journalEntryChange(t, entry_id, "household", user_a.HouseholdCategoryID, 100))
+		expectRejected(t, pushOne(t, user_a.UserID, syncrules.Change{Collection: "journal_entries", ID: entry_id, Fields: map[string]syncrules.FieldValue{
+			"ledger": fieldValue(t, "personal"),
+		}}), syncrules.ReasonImmutable)
+		// Re-sending the same target with an edit is fine.
+		mustApply(t, user_a.UserID, syncrules.Change{Collection: "journal_entries", ID: entry_id, Fields: map[string]syncrules.FieldValue{
+			"ledger": fieldValue(t, "household"),
+			"amount": fieldValue(t, 150),
+		}})
+		if stored_amount, _ := storedAmount(t, entry_id); stored_amount != 150 {
+			t.Fatalf("amount = %d, want 150", stored_amount)
+		}
+	})
+
+	t.Run("household needs an attached household", func(t *testing.T) {
+		expectRejected(t, pushOne(t, loner.UserID, journalEntryChange(t, newUUID(t), "household", user_a.HouseholdCategoryID, 100)), syncrules.ReasonForbidden)
+	})
+
+	t.Run("a new entry needs a known target", func(t *testing.T) {
+		missing_target := journalEntryChange(t, newUUID(t), "personal", user_a.CategoryID, 100)
+		delete(missing_target.Fields, "ledger")
+		expectRejected(t, pushOne(t, user_a.UserID, missing_target), syncrules.ReasonInvalid)
+		for _, bad_target := range []string{"archive", household_id, "allowance"} {
+			expectRejected(t, pushOne(t, user_a.UserID, journalEntryChange(t, newUUID(t), bad_target, user_a.CategoryID, 100)), syncrules.ReasonInvalid)
+		}
+	})
+
+	t.Run("categories must belong to the target ledger", func(t *testing.T) {
+		expectRejected(t, pushOne(t, user_a.UserID, journalEntryChange(t, newUUID(t), "household", user_a.CategoryID, 100)), syncrules.ReasonInvalid)
+		expectRejected(t, pushOne(t, user_a.UserID, journalEntryChange(t, newUUID(t), "personal", user_a.HouseholdCategoryID, 100)), syncrules.ReasonInvalid)
+		expectRejected(t, pushOne(t, user_a.UserID, journalEntryChange(t, newUUID(t), "personal", user_b.CategoryID, 100)), syncrules.ReasonInvalid)
+	})
+
+	t.Run("notes go to the personal ledger and may reflect on household categories", func(t *testing.T) {
+		note_id := newUUID(t)
+		mustApply(t, user_a.UserID, dailyNoteChange(t, note_id, "2026-10-06", "メモ"))
+		if stored_ledger_id := storedLedgerID(t, "daily_notes", note_id); stored_ledger_id != user_a.LedgerID {
+			t.Fatalf("note stored in %s, want the personal ledger", stored_ledger_id)
+		}
+		for _, category_id := range []string{user_a.CategoryID, user_a.HouseholdCategoryID} {
+			mustApply(t, user_a.UserID, reviewNoteChange(t, newUUID(t), "2026-10", category_id, "ふりかえり"))
+		}
+		expectRejected(t, pushOne(t, loner.UserID, reviewNoteChange(t, newUUID(t), "2026-10", user_a.HouseholdCategoryID, "x")), syncrules.ReasonInvalid)
+	})
 }
 
 func TestPush_ForbiddenOnOtherUsersRecord(t *testing.T) {
 	user_a := newSyncUser(t, "forbid-a")
 	user_b := newSyncUser(t, "forbid-b")
 	entry_id := newUUID(t)
-	mustApply(t, user_a.UserID, journalEntryChange(t, entry_id, "ledger", user_a.CategoryID, 100))
+	mustApply(t, user_a.UserID, journalEntryChange(t, entry_id, "personal", user_a.CategoryID, 100))
 
 	t.Run("update", func(t *testing.T) {
 		expectRejected(t, pushOne(t, user_b.UserID, syncrules.Change{Collection: "journal_entries", ID: entry_id, Fields: map[string]syncrules.FieldValue{
@@ -427,10 +480,10 @@ func TestPush_ForbiddenOnOtherUsersRecord(t *testing.T) {
 		expectRejected(t, pushOne(t, user_b.UserID, syncrules.Change{Collection: "journal_entries", ID: entry_id, DeletedHLC: &deleted_hlc}), syncrules.ReasonForbidden)
 	})
 	t.Run("create with existing id", func(t *testing.T) {
-		expectRejected(t, pushOne(t, user_b.UserID, journalEntryChange(t, entry_id, "ledger", user_b.CategoryID, 1)), syncrules.ReasonForbidden)
+		expectRejected(t, pushOne(t, user_b.UserID, journalEntryChange(t, entry_id, "personal", user_b.CategoryID, 1)), syncrules.ReasonForbidden)
 	})
 	t.Run("create with existing id in different case", func(t *testing.T) {
-		expectRejected(t, pushOne(t, user_b.UserID, journalEntryChange(t, strings.ToUpper(entry_id), "ledger", user_b.CategoryID, 1)), syncrules.ReasonForbidden)
+		expectRejected(t, pushOne(t, user_b.UserID, journalEntryChange(t, strings.ToUpper(entry_id), "personal", user_b.CategoryID, 1)), syncrules.ReasonForbidden)
 	})
 
 	stored_amount, is_deleted := storedAmount(t, entry_id)
@@ -442,14 +495,14 @@ func TestPush_ForbiddenOnOtherUsersRecord(t *testing.T) {
 func TestPush_RejectsCategoryFromAnotherLedger(t *testing.T) {
 	user_a := newSyncUser(t, "category-a")
 	user_b := newSyncUser(t, "category-b")
-	expectRejected(t, pushOne(t, user_b.UserID, journalEntryChange(t, newUUID(t), "ledger", user_a.CategoryID, 100)), syncrules.ReasonInvalid)
+	expectRejected(t, pushOne(t, user_b.UserID, journalEntryChange(t, newUUID(t), "personal", user_a.CategoryID, 100)), syncrules.ReasonInvalid)
 }
 
 func TestPush_RejectsOwnershipFields(t *testing.T) {
 	user_a := newSyncUser(t, "ownership-a")
 	user_b := newSyncUser(t, "ownership-b")
 	for _, forged_field := range []string{"owner_id", "ledger_id"} {
-		forged_change := journalEntryChange(t, newUUID(t), "ledger", user_b.CategoryID, 100)
+		forged_change := journalEntryChange(t, newUUID(t), "personal", user_b.CategoryID, 100)
 		forged_change.Fields[forged_field] = fieldValue(t, user_a.LedgerID)
 		expectRejected(t, pushOne(t, user_b.UserID, forged_change), syncrules.ReasonUnknownField)
 	}
@@ -457,12 +510,11 @@ func TestPush_RejectsOwnershipFields(t *testing.T) {
 
 func TestPush_RejectsInvalidChanges(t *testing.T) {
 	user_a := newSyncUser(t, "invalid-a")
-	future_change := journalEntryChange(t, newUUID(t), "ledger", user_a.CategoryID, 100)
+	future_change := journalEntryChange(t, newUUID(t), "personal", user_a.CategoryID, 100)
 	future_change.Fields["amount"] = syncrules.FieldValue{Value: json.RawMessage("100"), HLC: fmt.Sprintf("%013d-0000-itest", time.Now().Add(time.Hour).UnixMilli())}
 	oversized_change := dailyNoteChange(t, newUUID(t), "2026-10-02", strings.Repeat("あ", 6000))
 	too_long_note := dailyNoteChange(t, newUUID(t), "2026-10-02", strings.Repeat("a", 501))
-	zero_amount := journalEntryChange(t, newUUID(t), "ledger", user_a.CategoryID, 0)
-	allowance_in_personal := journalEntryChange(t, newUUID(t), "allowance", user_a.CategoryID, 100)
+	zero_amount := journalEntryChange(t, newUUID(t), "personal", user_a.CategoryID, 0)
 
 	test_cases := []struct {
 		name        string
@@ -474,7 +526,6 @@ func TestPush_RejectsInvalidChanges(t *testing.T) {
 		{"oversized change", oversized_change, syncrules.ReasonTooLarge},
 		{"note too long", too_long_note, syncrules.ReasonInvalid},
 		{"zero amount", zero_amount, syncrules.ReasonInvalid},
-		{"allowance in personal ledger", allowance_in_personal, syncrules.ReasonInvalid},
 	}
 	for _, test_case := range test_cases {
 		t.Run(test_case.name, func(t *testing.T) {
@@ -520,15 +571,15 @@ func TestPush_DailyNoteNaturalKeyMerge(t *testing.T) {
 func TestPull_IsolatesLedgers(t *testing.T) {
 	user_a := newSyncUser(t, "isolate-a")
 	user_b := newSyncUser(t, "isolate-b")
-	mustApply(t, user_a.UserID, journalEntryChange(t, newUUID(t), "ledger", user_a.CategoryID, 100))
+	mustApply(t, user_a.UserID, journalEntryChange(t, newUUID(t), "personal", user_a.CategoryID, 100))
 	mustApply(t, user_a.UserID, dailyNoteChange(t, newUUID(t), "2026-10-04", "secret"))
 
-	ledger_id, rows_by_key := pullAll(t, user_b.UserID)
-	if ledger_id != user_b.LedgerID {
-		t.Fatalf("B's ledger = %s, want %s", ledger_id, user_b.LedgerID)
+	pulled_ledgers, rows_by_key := pullAll(t, user_b.UserID)
+	if pulled_ledgers.PersonalID != user_b.LedgerID || strings.Join(pulled_ledgers.VisibleIDs(), ",") != user_b.LedgerID {
+		t.Fatalf("B's ledgers = %+v, want only %s", pulled_ledgers, user_b.LedgerID)
 	}
 	for row_key, pulled_row := range rows_by_key {
-		if pulled_row.OwnerID == user_a.UserID {
+		if pulled_row.OwnerID == user_a.UserID || pulled_row.LedgerID != user_b.LedgerID {
 			t.Fatalf("B pulled A's row %s", row_key)
 		}
 	}
@@ -540,61 +591,57 @@ func TestHousehold_PushAndPullVisibility(t *testing.T) {
 	household_id := joinHousehold(t, &user_a, &user_b)
 
 	shared_entry_id := newUUID(t)
-	allowance_entry_id := newUUID(t)
+	personal_entry_id := newUUID(t)
 	note_id := newUUID(t)
-	mustApply(t, user_a.UserID, journalEntryChange(t, shared_entry_id, "ledger", user_a.CategoryID, 100))
-	mustApply(t, user_a.UserID, journalEntryChange(t, allowance_entry_id, "allowance", user_a.CategoryID, 200))
+	mustApply(t, user_a.UserID, journalEntryChange(t, shared_entry_id, "household", user_a.HouseholdCategoryID, 100))
+	mustApply(t, user_a.UserID, journalEntryChange(t, personal_entry_id, "personal", user_a.CategoryID, 200))
 	mustApply(t, user_a.UserID, dailyNoteChange(t, note_id, "2026-10-05", "private"))
 
-	allowance_recurring_id := newUUID(t)
-	// Variable, so that pull does not post it into the allowance total checked below.
+	personal_recurring_id := newUUID(t)
 	if _, err := testPool.Exec(context.Background(),
-		`INSERT INTO lf.recurring_expenses (id, ledger_id, owner_id, seq, wallet, name, billing_day, amount, type, category_id)
-		 VALUES ($1::uuid, $2::uuid, $3, nextval('lf.sync_seq'), 'allowance', 'Gym', 1, 5000, 'variable', $4::uuid)`,
-		allowance_recurring_id, household_id, user_a.UserID, user_a.CategoryID,
+		`INSERT INTO lf.recurring_expenses (id, ledger_id, owner_id, seq, name, billing_day, amount, type, category_id)
+		 VALUES ($1::uuid, $2::uuid, $3, nextval('lf.sync_seq'), 'Gym', 1, 5000, 'variable', $4::uuid)`,
+		personal_recurring_id, user_a.LedgerID, user_a.UserID, user_a.CategoryID,
 	); err != nil {
 		t.Fatalf("inserting recurring expense: %v", err)
 	}
-	// The push of the allowance entry computed A's total for October.
-	allowance_total_id := fmt.Sprintf("%d:2026-10", user_a.UserID)
 
 	t.Run("member cannot write another member's entries", func(t *testing.T) {
-		for _, target_entry_id := range []string{allowance_entry_id, shared_entry_id} {
+		for _, target_entry_id := range []string{personal_entry_id, shared_entry_id} {
 			expectRejected(t, pushOne(t, user_b.UserID, syncrules.Change{Collection: "journal_entries", ID: target_entry_id, Fields: map[string]syncrules.FieldValue{
 				"amount": fieldValue(t, 1),
 			}}), syncrules.ReasonForbidden)
 		}
 	})
 
-	t.Run("member pull hides private rows", func(t *testing.T) {
-		ledger_id, rows_by_key := pullAll(t, user_b.UserID)
-		if ledger_id != household_id {
-			t.Fatalf("B's ledger = %s, want household %s", ledger_id, household_id)
+	t.Run("member pull hides the other member's personal ledger", func(t *testing.T) {
+		pulled_ledgers, rows_by_key := pullAll(t, user_b.UserID)
+		if pulled_ledgers.PersonalID != user_b.LedgerID || pulled_ledgers.HouseholdID != household_id {
+			t.Fatalf("B's ledgers = %+v", pulled_ledgers)
 		}
-		if _, found := rows_by_key["journal_entries/"+shared_entry_id]; !found {
-			t.Fatal("shared entry missing for B")
+		shared_entry, found := rows_by_key["journal_entries/"+shared_entry_id]
+		if !found || shared_entry.LedgerID != household_id {
+			t.Fatalf("shared entry for B = %+v", shared_entry)
 		}
-		for _, hidden_key := range []string{"journal_entries/" + allowance_entry_id, "daily_notes/" + note_id, "recurring_expenses/" + allowance_recurring_id} {
+		for _, hidden_key := range []string{"journal_entries/" + personal_entry_id, "daily_notes/" + note_id, "recurring_expenses/" + personal_recurring_id} {
 			if _, found := rows_by_key[hidden_key]; found {
 				t.Fatalf("B pulled A's private row %s", hidden_key)
 			}
 		}
-		if allowance_total := rows_by_key["allowance_totals/"+allowance_total_id]; string(allowance_total.Data["spent"]) != "200" {
-			t.Fatalf("allowance total for B = %s, want 200", allowance_total.Data["spent"])
-		}
-	})
-
-	t.Run("owner pull includes own private rows", func(t *testing.T) {
-		_, rows_by_key := pullAll(t, user_a.UserID)
-		for _, own_key := range []string{"journal_entries/" + allowance_entry_id, "daily_notes/" + note_id, "recurring_expenses/" + allowance_recurring_id} {
-			if _, found := rows_by_key[own_key]; !found {
-				t.Fatalf("A's own row %s missing", own_key)
+		for row_key, pulled_row := range rows_by_key {
+			if pulled_row.LedgerID == user_a.LedgerID {
+				t.Fatalf("B pulled %s from A's personal ledger", row_key)
 			}
 		}
 	})
 
-	t.Run("member can write own allowance entries", func(t *testing.T) {
-		mustApply(t, user_a.UserID, journalEntryChange(t, newUUID(t), "allowance", user_a.CategoryID, 50))
+	t.Run("owner pull includes own personal rows", func(t *testing.T) {
+		_, rows_by_key := pullAll(t, user_a.UserID)
+		for _, own_key := range []string{"journal_entries/" + shared_entry_id, "journal_entries/" + personal_entry_id, "daily_notes/" + note_id, "recurring_expenses/" + personal_recurring_id} {
+			if _, found := rows_by_key[own_key]; !found {
+				t.Fatalf("A's own row %s missing", own_key)
+			}
+		}
 	})
 }
 
@@ -603,41 +650,52 @@ func TestHousehold_SharedRecurringPostingEditableByMembers(t *testing.T) {
 	user_b := newSyncUser(t, "posting-b")
 	household_id := joinHousehold(t, &user_a, &user_b)
 
-	recurring_id := newUUID(t)
-	if _, err := testPool.Exec(context.Background(),
-		`INSERT INTO lf.recurring_expenses (id, ledger_id, owner_id, seq, wallet, name, billing_day, type, category_id)
-		 VALUES ($1::uuid, $2::uuid, $3, nextval('lf.sync_seq'), 'ledger', 'Electricity', 10, 'variable', $4::uuid)`,
-		recurring_id, household_id, user_a.UserID, user_a.CategoryID,
-	); err != nil {
-		t.Fatalf("inserting recurring expense: %v", err)
-	}
-	posting_id := newUUID(t)
-	if _, err := testPool.Exec(context.Background(),
-		`INSERT INTO lf.journal_entries (id, ledger_id, owner_id, seq, wallet, transaction_date, amount, category_id, recurring_expense_id, recurring_year_month)
-		 VALUES ($1::uuid, $2::uuid, $3, nextval('lf.sync_seq'), 'ledger', '2026-10-10', 1, $4::uuid, $5::uuid, '2026-10')`,
-		posting_id, household_id, user_a.UserID, user_a.CategoryID, recurring_id,
-	); err != nil {
-		t.Fatalf("inserting posting: %v", err)
+	insertPosting := func(ledger_id string, category_id string) string {
+		recurring_id := newUUID(t)
+		if _, err := testPool.Exec(context.Background(),
+			`INSERT INTO lf.recurring_expenses (id, ledger_id, owner_id, seq, name, billing_day, type, category_id)
+			 VALUES ($1::uuid, $2::uuid, $3, nextval('lf.sync_seq'), 'Electricity', 10, 'variable', $4::uuid)`,
+			recurring_id, ledger_id, user_a.UserID, category_id,
+		); err != nil {
+			t.Fatalf("inserting recurring expense: %v", err)
+		}
+		posting_id := newUUID(t)
+		if _, err := testPool.Exec(context.Background(),
+			`INSERT INTO lf.journal_entries (id, ledger_id, owner_id, seq, transaction_date, amount, category_id, recurring_expense_id, recurring_year_month)
+			 VALUES ($1::uuid, $2::uuid, $3, nextval('lf.sync_seq'), '2026-10-10', 1, $4::uuid, $5::uuid, '2026-10')`,
+			posting_id, ledger_id, user_a.UserID, category_id, recurring_id,
+		); err != nil {
+			t.Fatalf("inserting posting: %v", err)
+		}
+		return posting_id
 	}
 
-	mustApply(t, user_b.UserID, syncrules.Change{Collection: "journal_entries", ID: posting_id, Fields: map[string]syncrules.FieldValue{"amount": fieldValue(t, 8000)}})
-	if stored_amount, _ := storedAmount(t, posting_id); stored_amount != 8000 {
+	household_posting_id := insertPosting(household_id, user_a.HouseholdCategoryID)
+	mustApply(t, user_b.UserID, syncrules.Change{Collection: "journal_entries", ID: household_posting_id, Fields: map[string]syncrules.FieldValue{"amount": fieldValue(t, 8000)}})
+	if stored_amount, _ := storedAmount(t, household_posting_id); stored_amount != 8000 {
 		t.Fatalf("posting amount = %d, want 8000", stored_amount)
 	}
 	var stored_owner_id int64
-	if err := testPool.QueryRow(context.Background(), "SELECT owner_id FROM lf.journal_entries WHERE id = $1::uuid", posting_id).Scan(&stored_owner_id); err != nil {
+	if err := testPool.QueryRow(context.Background(), "SELECT owner_id FROM lf.journal_entries WHERE id = $1::uuid", household_posting_id).Scan(&stored_owner_id); err != nil {
 		t.Fatalf("loading owner: %v", err)
 	}
 	if stored_owner_id != user_a.UserID {
 		t.Fatalf("posting owner changed to %d", stored_owner_id)
 	}
+
+	// A posting in A's personal ledger stays A's alone.
+	personal_posting_id := insertPosting(user_a.LedgerID, user_a.CategoryID)
+	expectRejected(t, pushOne(t, user_b.UserID, syncrules.Change{Collection: "journal_entries", ID: personal_posting_id, Fields: map[string]syncrules.FieldValue{"amount": fieldValue(t, 1)}}), syncrules.ReasonForbidden)
 }
 
-func TestHousehold_LeftMemberPullsNewLedgerOnly(t *testing.T) {
+func TestHousehold_LeftMemberLosesTheHousehold(t *testing.T) {
 	user_a := newSyncUser(t, "leave-a")
 	user_b := newSyncUser(t, "leave-b")
 	household_id := joinHousehold(t, &user_a, &user_b)
-	mustApply(t, user_a.UserID, journalEntryChange(t, newUUID(t), "ledger", user_a.CategoryID, 100))
+	household_entry_id := newUUID(t)
+	own_household_entry_id := newUUID(t)
+	mustApply(t, user_a.UserID, journalEntryChange(t, household_entry_id, "household", user_a.HouseholdCategoryID, 100))
+	mustApply(t, user_b.UserID, journalEntryChange(t, own_household_entry_id, "household", user_b.HouseholdCategoryID, 100))
 
 	if _, err := testPool.Exec(context.Background(),
 		"UPDATE lf.ledger_members SET left_at = NOW(), seq = nextval('lf.sync_seq') WHERE user_id = $1 AND ledger_id = $2::uuid",
@@ -645,24 +703,65 @@ func TestHousehold_LeftMemberPullsNewLedgerOnly(t *testing.T) {
 	); err != nil {
 		t.Fatalf("leaving household: %v", err)
 	}
-	ledger_id, rows_by_key := pullAll(t, user_b.UserID)
-	if ledger_id == household_id {
-		t.Fatal("B still pulls the household after leaving")
+	pulled_ledgers, rows_by_key := pullAll(t, user_b.UserID)
+	if pulled_ledgers.HouseholdID != "" || strings.Join(pulled_ledgers.VisibleIDs(), ",") != user_b.LedgerID {
+		t.Fatalf("B's ledgers after leaving = %+v", pulled_ledgers)
 	}
-	for row_key := range rows_by_key {
-		if pulled_row := rows_by_key[row_key]; pulled_row.OwnerID == user_a.UserID {
+	for row_key, pulled_row := range rows_by_key {
+		if pulled_row.LedgerID == household_id {
 			t.Fatalf("B pulled household row %s after leaving", row_key)
 		}
 	}
-	// Writing an allowance entry is no longer possible outside a household.
-	new_category_id := insertCategory(t, ledger_id, user_b.UserID)
-	expectRejected(t, pushOne(t, user_b.UserID, journalEntryChange(t, newUUID(t), "allowance", new_category_id, 10)), syncrules.ReasonInvalid)
+	// The household is no longer writable, not even B's own entries in it.
+	expectRejected(t, pushOne(t, user_b.UserID, journalEntryChange(t, newUUID(t), "household", user_b.HouseholdCategoryID, 10)), syncrules.ReasonForbidden)
+	expectRejected(t, pushOne(t, user_b.UserID, syncrules.Change{Collection: "journal_entries", ID: own_household_entry_id, Fields: map[string]syncrules.FieldValue{"amount": fieldValue(t, 1)}}), syncrules.ReasonForbidden)
+	// The personal ledger carries on.
+	mustApply(t, user_b.UserID, journalEntryChange(t, newUUID(t), "personal", user_b.CategoryID, 10))
+}
+
+func TestHousehold_ArchiveIsPulledButReadOnly(t *testing.T) {
+	user_a := newSyncUser(t, "archive-a")
+	archive_id := newUUID(t)
+	ctx := context.Background()
+	if _, err := testPool.Exec(ctx,
+		`INSERT INTO lf.ledgers (id, ledger_id, owner_id, seq, kind) VALUES ($1::uuid, $1::uuid, $2, nextval('lf.sync_seq'), 'archive')`,
+		archive_id, user_a.UserID,
+	); err != nil {
+		t.Fatalf("inserting archive: %v", err)
+	}
+	if _, err := testPool.Exec(ctx,
+		`INSERT INTO lf.ledger_members (id, ledger_id, owner_id, seq, user_id, role, ledger_kind)
+		 VALUES (gen_random_uuid(), $1::uuid, $2, nextval('lf.sync_seq'), $2, 'owner', 'archive')`,
+		archive_id, user_a.UserID,
+	); err != nil {
+		t.Fatalf("adding archive member: %v", err)
+	}
+	archive_category_id := insertCategory(t, archive_id, user_a.UserID)
+	archived_entry_id := newUUID(t)
+	if _, err := testPool.Exec(ctx,
+		`INSERT INTO lf.journal_entries (id, ledger_id, owner_id, seq, transaction_date, amount, category_id)
+		 VALUES ($1::uuid, $2::uuid, $3, nextval('lf.sync_seq'), '2026-09-10', 300, $4::uuid)`,
+		archived_entry_id, archive_id, user_a.UserID, archive_category_id,
+	); err != nil {
+		t.Fatalf("inserting archived entry: %v", err)
+	}
+
+	pulled_ledgers, rows_by_key := pullAll(t, user_a.UserID)
+	if len(pulled_ledgers.ArchiveIDs) != 1 || pulled_ledgers.ArchiveIDs[0] != archive_id {
+		t.Fatalf("archives = %v", pulled_ledgers.ArchiveIDs)
+	}
+	if archived_entry, found := rows_by_key["journal_entries/"+archived_entry_id]; !found || archived_entry.LedgerID != archive_id {
+		t.Fatalf("archived entry = %+v", archived_entry)
+	}
+	expectRejected(t, pushOne(t, user_a.UserID, syncrules.Change{Collection: "journal_entries", ID: archived_entry_id, Fields: map[string]syncrules.FieldValue{"amount": fieldValue(t, 1)}}), syncrules.ReasonForbidden)
+	deleted_hlc := nextHLC()
+	expectRejected(t, pushOne(t, user_a.UserID, syncrules.Change{Collection: "journal_entries", ID: archived_entry_id, DeletedHLC: &deleted_hlc}), syncrules.ReasonForbidden)
 }
 
 func TestPull_Pagination(t *testing.T) {
 	user_a := newSyncUser(t, "page-a")
 	for entry_index := 0; entry_index < 5; entry_index++ {
-		mustApply(t, user_a.UserID, journalEntryChange(t, newUUID(t), "ledger", user_a.CategoryID, 100+entry_index))
+		mustApply(t, user_a.UserID, journalEntryChange(t, newUUID(t), "personal", user_a.CategoryID, 100+entry_index))
 	}
 	_, all_rows := pullAll(t, user_a.UserID)
 
@@ -718,7 +817,7 @@ func TestPull_WatermarkUnderConcurrentWriters(t *testing.T) {
 			defer writers.Done()
 			for entry_index := 0; entry_index < entries_per_writer; entry_index++ {
 				entry_id := newUUID(t)
-				push_result := pushOne(t, writer_user.UserID, journalEntryChange(t, entry_id, "ledger", writer_user.CategoryID, 1+entry_index))
+				push_result := pushOne(t, writer_user.UserID, journalEntryChange(t, entry_id, "household", writer_user.HouseholdCategoryID, 1+entry_index))
 				if !push_result.Applied {
 					t.Errorf("push rejected: %s", push_result.Reason)
 					return
@@ -773,4 +872,28 @@ func TestPull_WatermarkUnderConcurrentWriters(t *testing.T) {
 	if missing_count > 0 {
 		t.Fatalf("%d pushed entries were skipped by incremental pull", missing_count)
 	}
+}
+
+func reviewNoteChange(t *testing.T, note_id string, year_month string, category_id string, note string) syncrules.Change {
+	t.Helper()
+	return syncrules.Change{
+		Collection: "monthly_review_notes",
+		ID:         note_id,
+		Fields: map[string]syncrules.FieldValue{
+			"year_month":  fieldValue(t, year_month),
+			"category_id": fieldValue(t, category_id),
+			"note":        fieldValue(t, note),
+		},
+	}
+}
+
+func storedLedgerID(t *testing.T, collection string, record_id string) string {
+	t.Helper()
+	var stored_ledger_id string
+	if err := testPool.QueryRow(context.Background(),
+		"SELECT ledger_id::text FROM lf."+collection+" WHERE id = $1::uuid", record_id,
+	).Scan(&stored_ledger_id); err != nil {
+		t.Fatalf("loading %s ledger: %v", collection, err)
+	}
+	return stored_ledger_id
 }

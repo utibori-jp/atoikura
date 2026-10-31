@@ -162,7 +162,14 @@ export const handlers = [
   http.post(`${API_BASE}/auth/refresh`, () => HttpResponse.json(testTokenPair())),
   http.post(`${API_BASE}/auth/logout`, () => new HttpResponse(null, { status: 204 })),
   http.get(`${API_BASE}/sync/pull`, () =>
-    HttpResponse.json({ ledger_id: TEST_LEDGER_ID, rows: [], next_since: 0, has_more: false })
+    HttpResponse.json({
+      ledger_ids: [TEST_LEDGER_ID],
+      personal_ledger_id: TEST_LEDGER_ID,
+      household_ledger_id: null,
+      rows: [],
+      next_since: 0,
+      has_more: false,
+    })
   ),
   http.post(`${API_BASE}/sync/push`, () => HttpResponse.json({ results: [] })),
 

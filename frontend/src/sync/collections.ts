@@ -9,12 +9,14 @@ export interface OfflineCollectionSpec {
   fields: Record<string, FieldKind>;
   // Fields that can't change once the record exists (the server answers IMMUTABLE).
   immutable: string[];
+  // Pushed with a new record to name its ledger, "personal" or "household"
+  // (design.md D15). It is not a column: the device derives it from ledger_id.
+  target_field?: string;
 }
 
 export const OFFLINE_COLLECTIONS = {
   journal_entries: {
     fields: {
-      wallet: "text",
       transaction_date: "text",
       item: "text",
       amount: "integer",
@@ -22,7 +24,8 @@ export const OFFLINE_COLLECTIONS = {
       category_id: "text",
       note: "text",
     },
-    immutable: ["wallet"],
+    immutable: [],
+    target_field: "ledger",
   },
   daily_notes: {
     fields: { date: "text", note: "text" },
@@ -96,4 +99,10 @@ export function toLocalValue(wire_value: unknown): SqlValue {
   if (typeof wire_value === "boolean") return wire_value ? 1 : 0;
   if (typeof wire_value === "number" || typeof wire_value === "string") return wire_value;
   return JSON.stringify(wire_value);
+}
+
+// The target field a new record of the collection is pushed with, if any.
+export function offlineTargetField(collection_name: OfflineCollectionName): string | undefined {
+  const collection_spec: OfflineCollectionSpec = OFFLINE_COLLECTIONS[collection_name];
+  return collection_spec.target_field;
 }

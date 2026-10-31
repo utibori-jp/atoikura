@@ -35,9 +35,9 @@ func (income_record_input IncomeRecordInput) columns() []columnValue {
 
 // CreateLedgerIncomeRecord records income earned by the caller. Income is shared
 // within the ledger, but only its earner edits it.
-func (r *Repository) CreateLedgerIncomeRecord(ctx context.Context, user_id int64, income_record_input IncomeRecordInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
-		income_columns := append(income_record_input.columns(), columnValue{name: "earner_id", value: user_id, sqlType: "integer"})
+func (r *Repository) CreateLedgerIncomeRecord(ctx context.Context, caller Caller, income_record_input IncomeRecordInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+		income_columns := append(income_record_input.columns(), columnValue{name: "earner_id", value: ledger_tx.user_id, sqlType: "integer"})
 		income_id, err := ledger_tx.insertRow(ctx, "income_records", income_columns)
 		if err != nil {
 			return nil, err
@@ -62,8 +62,8 @@ func (ledger_tx *ledgerTx) lockOwnIncomeRecord(ctx context.Context, income_id st
 }
 
 // UpdateLedgerIncomeRecord overwrites one of the caller's income records.
-func (r *Repository) UpdateLedgerIncomeRecord(ctx context.Context, user_id int64, income_id string, income_record_input IncomeRecordInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) UpdateLedgerIncomeRecord(ctx context.Context, caller Caller, income_id string, income_record_input IncomeRecordInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		income_row, err := ledger_tx.lockOwnIncomeRecord(ctx, income_id)
 		if err != nil {
 			return nil, err
@@ -76,8 +76,8 @@ func (r *Repository) UpdateLedgerIncomeRecord(ctx context.Context, user_id int64
 }
 
 // DeleteLedgerIncomeRecord deletes one of the caller's income records.
-func (r *Repository) DeleteLedgerIncomeRecord(ctx context.Context, user_id int64, income_id string) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) DeleteLedgerIncomeRecord(ctx context.Context, caller Caller, income_id string) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		income_row, err := ledger_tx.lockOwnIncomeRecord(ctx, income_id)
 		if err != nil {
 			return nil, err
@@ -91,8 +91,8 @@ func (r *Repository) DeleteLedgerIncomeRecord(ctx context.Context, user_id int64
 
 // PutLedgerBaseIncome sets the caller's base income. The ledger's base income is
 // the sum over its members (design.md Q3).
-func (r *Repository) PutLedgerBaseIncome(ctx context.Context, user_id int64, amount int32) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) PutLedgerBaseIncome(ctx context.Context, caller Caller, amount int32) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		next_seq, err := ledger_tx.seq_allocator.allocateSeq(ctx)
 		if err != nil {
 			return nil, err
@@ -104,7 +104,7 @@ func (r *Repository) PutLedgerBaseIncome(ctx context.Context, user_id int64, amo
 			 ON CONFLICT (ledger_id, member_id) WHERE deleted = false
 			 DO UPDATE SET amount = EXCLUDED.amount, seq = EXCLUDED.seq, updated_at = NOW()
 			 RETURNING id::text`,
-			ledger_tx.ledger.ID, user_id, next_seq, amount,
+			ledger_tx.ledger_id, ledger_tx.user_id, next_seq, amount,
 		).Scan(&base_income_id); err != nil {
 			return nil, fmt.Errorf("upserting base income: %w", err)
 		}
@@ -120,8 +120,8 @@ type BudgetInput struct {
 }
 
 // PutLedgerBudget sets the ledger's budget (one row per ledger).
-func (r *Repository) PutLedgerBudget(ctx context.Context, user_id int64, budget_input BudgetInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) PutLedgerBudget(ctx context.Context, caller Caller, budget_input BudgetInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		next_seq, err := ledger_tx.seq_allocator.allocateSeq(ctx)
 		if err != nil {
 			return nil, err
@@ -134,7 +134,7 @@ func (r *Repository) PutLedgerBudget(ctx context.Context, user_id int64, budget_
 			 DO UPDATE SET monthly_budget = EXCLUDED.monthly_budget, goal_text = EXCLUDED.goal_text,
 			     goal_amount = EXCLUDED.goal_amount, seq = EXCLUDED.seq, updated_at = NOW()
 			 RETURNING id::text`,
-			ledger_tx.ledger.ID, user_id, next_seq, budget_input.MonthlyBudget, budget_input.GoalText, budget_input.GoalAmount,
+			ledger_tx.ledger_id, ledger_tx.user_id, next_seq, budget_input.MonthlyBudget, budget_input.GoalText, budget_input.GoalAmount,
 		).Scan(&budget_id); err != nil {
 			return nil, fmt.Errorf("upserting budget: %w", err)
 		}
@@ -168,11 +168,11 @@ SELECT GREATEST(0,
 // are append-only, and the upper bound is a hard error as today (design.md §5.2).
 // An allocation to savings counts toward the goal's accumulated amount, which
 // devices derive from savings postings plus these allocations.
-func (r *Repository) CreateLedgerSurplusAllocation(ctx context.Context, user_id int64, surplus_input SurplusAllocationInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) CreateLedgerSurplusAllocation(ctx context.Context, caller Caller, surplus_input SurplusAllocationInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		// Allocations of one ledger are serialized on the ledger row so that two
 		// concurrent allocations can't both fit under the bound.
-		if _, err := ledger_tx.tx.Exec(ctx, "SELECT 1 FROM lf.ledgers WHERE id = $1::uuid FOR UPDATE", ledger_tx.ledger.ID); err != nil {
+		if _, err := ledger_tx.tx.Exec(ctx, "SELECT 1 FROM lf.ledgers WHERE id = $1::uuid FOR UPDATE", ledger_tx.ledger_id); err != nil {
 			return nil, fmt.Errorf("locking ledger: %w", err)
 		}
 		var savings_goal_id *string
@@ -187,7 +187,7 @@ func (r *Repository) CreateLedgerSurplusAllocation(ctx context.Context, user_id 
 			savings_goal_id = &goal_row.ID
 		}
 		var remaining_surplus int64
-		if err := ledger_tx.tx.QueryRow(ctx, remainingSurplusQuery, ledger_tx.ledger.ID, surplus_input.YearMonth).Scan(&remaining_surplus); err != nil {
+		if err := ledger_tx.tx.QueryRow(ctx, remainingSurplusQuery, ledger_tx.ledger_id, surplus_input.YearMonth).Scan(&remaining_surplus); err != nil {
 			return nil, fmt.Errorf("computing remaining surplus: %w", err)
 		}
 		if int64(surplus_input.Amount) > remaining_surplus {

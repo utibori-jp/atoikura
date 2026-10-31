@@ -1,10 +1,5 @@
 import type { SqlRow, SqlValue } from "../db/types";
-import {
-  STATEMENT_TYPES,
-  type StatementTypeCode,
-  type Wallet,
-  validateJournalEntry,
-} from "../logic";
+import { STATEMENT_TYPES, type StatementTypeCode, validateJournalEntry } from "../logic";
 import type { LedgerData } from "./ledgerData";
 
 // Journal entries and the categories they reference, read from the local
@@ -37,7 +32,6 @@ export interface ExpenseCategoryView {
 
 export interface JournalEntryView {
   id: string;
-  wallet: Wallet;
   transaction_date: string;
   item: string | null;
   amount: number;
@@ -51,7 +45,7 @@ export interface JournalEntryView {
   is_recurring: boolean;
   // The category was deleted after the entry was written (design.md §5.1).
   is_category_deleted: boolean;
-  // Only the author edits an entry, except shared recurring postings (D11).
+  // Only the author edits an entry, except household recurring postings (D11).
   can_edit: boolean;
 }
 
@@ -128,11 +122,10 @@ export async function listExpenseCategories(
   }));
 }
 
-function journalEntryView(entry_row: SqlRow, user_id: number): JournalEntryView {
+function journalEntryView(entry_row: SqlRow, ledger_data: LedgerData): JournalEntryView {
   const is_recurring = entry_row.recurring_expense_id !== null;
   return {
     id: String(entry_row.id),
-    wallet: entry_row.wallet as Wallet,
     transaction_date: String(entry_row.transaction_date),
     item: textOrNull(entry_row.item),
     amount: Number(entry_row.amount),
@@ -147,7 +140,8 @@ function journalEntryView(entry_row: SqlRow, user_id: number): JournalEntryView 
     is_recurring,
     is_category_deleted: Number(entry_row.category_deleted) === 1,
     can_edit:
-      Number(entry_row.owner_id) === user_id || (is_recurring && entry_row.wallet === "ledger"),
+      Number(entry_row.owner_id) === ledger_data.user_id ||
+      (is_recurring && entry_row.ledger_id === ledger_data.household_ledger_id),
   };
 }
 
@@ -157,7 +151,7 @@ export async function listJournalDays(
   year_month: string
 ): Promise<JournalDay[]> {
   const entry_rows = await ledger_data.local_db.select(
-    `SELECT je.id, je.owner_id, je.wallet, je.transaction_date, je.item, je.amount, je.category_id,
+    `SELECT je.id, je.ledger_id, je.owner_id, je.transaction_date, je.item, je.amount, je.category_id,
             je.is_excluded, je.note, je.recurring_expense_id,
             ec.name AS category_name, ec.deleted AS category_deleted,
             cg.id AS group_id, cg.name AS group_name, cg.statement_type_code
@@ -170,7 +164,7 @@ export async function listJournalDays(
   );
   const journal_days: JournalDay[] = [];
   for (const entry_row of entry_rows) {
-    const entry_view = journalEntryView(entry_row, ledger_data.user_id);
+    const entry_view = journalEntryView(entry_row, ledger_data);
     const last_day = journal_days[journal_days.length - 1];
     if (last_day?.date === entry_view.transaction_date) {
       last_day.journal_entries.push(entry_view);
@@ -203,13 +197,11 @@ async function categoryStatusLookup(
 
 async function validateEntryFields(
   ledger_data: LedgerData,
-  entry_fields: JournalEntryFields,
-  wallet: Wallet
+  entry_fields: JournalEntryFields
 ): Promise<void> {
   const validation_result = validateJournalEntry(
-    { ...entry_fields, wallet },
+    { ...entry_fields },
     {
-      is_household: ledger_data.is_household,
       categoryStatus: await categoryStatusLookup(ledger_data),
     }
   );
@@ -227,17 +219,17 @@ function entryColumnValues(entry_fields: JournalEntryFields): Record<string, Sql
   };
 }
 
-// Records an entry in the shared ledger wallet and returns its ID.
+// Records an entry in the personal ledger and returns its ID.
 export async function createJournalEntry(
   ledger_data: LedgerData,
   entry_fields: JournalEntryFields
 ): Promise<string> {
-  const wallet: Wallet = "ledger";
-  await validateEntryFields(ledger_data, entry_fields, wallet);
-  return ledger_data.store.createRecord("journal_entries", {
-    ...entryColumnValues(entry_fields),
-    wallet,
-  });
+  await validateEntryFields(ledger_data, entry_fields);
+  return ledger_data.store.createRecord(
+    "journal_entries",
+    entryColumnValues(entry_fields),
+    "personal"
+  );
 }
 
 export async function updateJournalEntry(
@@ -245,12 +237,12 @@ export async function updateJournalEntry(
   entry_id: string,
   entry_fields: JournalEntryFields
 ): Promise<void> {
-  const [wallet_row] = await ledger_data.local_db.select(
-    "SELECT wallet FROM journal_entries WHERE id = ? AND deleted = 0",
+  const [entry_row] = await ledger_data.local_db.select(
+    "SELECT id FROM journal_entries WHERE id = ? AND deleted = 0",
     [entry_id]
   );
-  if (!wallet_row) throw new Error("この支出は削除されています");
-  await validateEntryFields(ledger_data, entry_fields, wallet_row.wallet as Wallet);
+  if (!entry_row) throw new Error("この支出は削除されています");
+  await validateEntryFields(ledger_data, entry_fields);
   await ledger_data.store.updateRecord(
     "journal_entries",
     entry_id,

@@ -185,7 +185,6 @@ describe("ledger api — reads", () => {
       category_id: RENT_CATEGORY_ID,
       category_name: "家賃",
       group_name: "住居",
-      wallet: "ledger",
     });
   });
 });
@@ -213,28 +212,6 @@ describe("ledger api — commands", () => {
       ledger_api.createCategoryGroup({ group_name: "謎", statement_type_id: 42 })
     ).rejects.toThrow("区分が不正です");
     expect(ledger_server.recorded_commands).toEqual([]);
-  });
-
-  it("keeps the wallet of the recurring expense it updates", async () => {
-    let allowance_recurring_id = "";
-    const { ledger_api, ledger_server } = await openLedgerApi((seeded_server) => {
-      allowance_recurring_id = putRecurringExpense(seeded_server, { name: "サブスク" });
-      seeded_server.putRow("recurring_expenses", allowance_recurring_id, {
-        ...seeded_server.row(allowance_recurring_id)!.data,
-        wallet: "allowance",
-      });
-    });
-
-    await ledger_api.updateRecurringExpense(allowance_recurring_id, {
-      name: "サブスク",
-      emoji: "📱",
-      billing_day: 1,
-      amount: 980,
-      type: "fixed",
-      category_id: RENT_CATEGORY_ID,
-    });
-
-    expect(ledger_server.recorded_commands[0].request_body).toMatchObject({ wallet: "allowance" });
   });
 
   it("writes the command's row to the local database", async () => {

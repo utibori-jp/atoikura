@@ -4,7 +4,7 @@
 // backend. State is kept in localStorage: a reload keeps the visitor's changes,
 // and a new month starts over from fresh sample data.
 import { formatHlc } from "../sync/hlc";
-import { OFFLINE_COLLECTIONS, isOfflineCollection } from "../sync/collections";
+import { OFFLINE_COLLECTIONS, isOfflineCollection, offlineTargetField } from "../sync/collections";
 import { uuidv7 } from "../sync/uuid";
 import type { PullPage, PulledRow, PushChange, PushResult } from "../sync/wire";
 import { daysInMonth } from "../logic";
@@ -28,7 +28,8 @@ export interface DemoCommandResult {
 }
 
 const STATE_STORAGE_KEY = "atoikura.demo_ledger_server";
-const STATE_VERSION = 1;
+// Version 2: rows carry their ledger_id and journal entries have no wallet.
+const STATE_VERSION = 2;
 const SERVER_HLC_DEVICE = "server";
 
 // The ledger command paths (sync-api.yaml, /ledger/*) and the collections they write.
@@ -84,6 +85,7 @@ export class DemoLedgerServer {
       this.replaceRow({
         collection: seed_row.collection,
         id: seed_row.id,
+        ledger_id: DEMO_LEDGER_ID,
         owner_id: DEMO_USER_ID,
         seq: 0,
         deleted: false,
@@ -155,7 +157,9 @@ export class DemoLedgerServer {
       .sort((left_row, right_row) => left_row.seq - right_row.seq);
     const page_rows = new_rows.slice(0, limit);
     return {
-      ledger_id: DEMO_LEDGER_ID,
+      ledger_ids: [DEMO_LEDGER_ID],
+      personal_ledger_id: DEMO_LEDGER_ID,
+      household_ledger_id: null,
       rows: page_rows,
       next_since: page_rows.length > 0 ? page_rows[page_rows.length - 1].seq : since,
       has_more: new_rows.length > limit,
@@ -179,7 +183,11 @@ export class DemoLedgerServer {
         message: "unknown collection",
       };
     }
-    const changed_fields = Object.keys(push_change.fields);
+    // The demo has the personal ledger only, which is where every target lands.
+    const target_field = offlineTargetField(push_change.collection);
+    const changed_fields = Object.keys(push_change.fields).filter(
+      (field_name) => field_name !== target_field
+    );
     const stored_row = this.state.rows.find(
       (state_row) =>
         state_row.collection === push_change.collection && state_row.id === push_change.id
@@ -212,6 +220,7 @@ export class DemoLedgerServer {
     const written_row = this.replaceRow({
       collection: push_change.collection,
       id: push_change.id,
+      ledger_id: DEMO_LEDGER_ID,
       owner_id: DEMO_USER_ID,
       seq: 0,
       deleted: false,
@@ -248,6 +257,7 @@ export class DemoLedgerServer {
     const written_row = this.replaceRow({
       collection,
       id,
+      ledger_id: DEMO_LEDGER_ID,
       owner_id: existing_row?.owner_id ?? DEMO_USER_ID,
       seq: 0,
       deleted: false,
@@ -314,9 +324,6 @@ export class DemoLedgerServer {
       return commandError(404, "NOT_FOUND", NOT_FOUND_MESSAGES[collection] ?? "見つかりません");
     }
     if (method === "PUT") {
-      if (collection === "recurring_expenses" && request_body.wallet !== existing_row.data.wallet) {
-        return commandError(400, "BAD_REQUEST", "walletは変更できません");
-      }
       const category_error = this.checkReferences(collection, request_body);
       if (category_error) return category_error;
       return this.writeOnlineRow(collection, existing_row.id, request_body, 200);
@@ -381,12 +388,12 @@ export class DemoLedgerServer {
     const written_row = this.replaceRow({
       collection: "journal_entries",
       id: uuidv7(),
+      ledger_id: DEMO_LEDGER_ID,
       owner_id: DEMO_USER_ID,
       seq: 0,
       deleted: false,
       data: {
         created_at: new Date().toISOString(),
-        wallet: recurring_row.data.wallet,
         transaction_date: `${year_month}-${String(billing_day).padStart(2, "0")}`,
         item: recurring_row.data.name,
         amount: request_body.amount,

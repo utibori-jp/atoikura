@@ -77,7 +77,6 @@ describe("MobileRecurring — create form", () => {
         name: "サブスク",
         emoji: "📱",
         category_id: RENT_CATEGORY_ID,
-        wallet: "ledger",
       },
     });
   });

@@ -13,7 +13,7 @@ import type { PullPage, PulledRow, PushChange, PushResult } from "./wire";
 // sync protocol version; a 401 is retried once with a refreshed token.
 
 export const SYNC_PROTOCOL_HEADER = "X-Atoikura-Sync-Protocol";
-export const SYNC_PROTOCOL_VERSION = 1;
+export const SYNC_PROTOCOL_VERSION = 2;
 
 export type CommandMethod = "POST" | "PUT" | "DELETE";
 

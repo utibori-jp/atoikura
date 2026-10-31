@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	// ProtocolVersion is the sync protocol version this server speaks.
-	ProtocolVersion = 1
+	// ProtocolVersion is the sync protocol version this server speaks. Version 2
+	// replaced the journal entry wallet with a ledger target (Step 8).
+	ProtocolVersion = 2
 	// MinSupportedProtocolVersion is the oldest client protocol still accepted.
-	MinSupportedProtocolVersion = 1
+	MinSupportedProtocolVersion = 2
 
 	// MaxChangesPerPush and MaxChangeBytes bound a single push request.
 	MaxChangesPerPush = 500
@@ -72,12 +73,15 @@ type CollectionSpec struct {
 	NaturalKey []string
 	// MergeField is the text field concatenated when two records share a natural key.
 	MergeField string
+	// TargetField names the ledger of a new record ("personal" or "household",
+	// design.md D15). It is pushed like a field but is not a column: the server
+	// resolves it to a ledger, and the record never moves to another ledger.
+	TargetField string
 }
 
 var journalEntriesSpec = CollectionSpec{
 	Name: "journal_entries",
 	Fields: []FieldSpec{
-		{Name: "wallet", Kind: KindText},
 		{Name: "transaction_date", Kind: KindDate},
 		{Name: "item", Kind: KindText},
 		{Name: "amount", Kind: KindInteger},
@@ -85,7 +89,7 @@ var journalEntriesSpec = CollectionSpec{
 		{Name: "category_id", Kind: KindUUID},
 		{Name: "note", Kind: KindText},
 	},
-	Immutable: []string{"wallet"},
+	TargetField: "ledger",
 }
 
 var dailyNotesSpec = CollectionSpec{
@@ -227,7 +231,7 @@ func CheckEnvelope(change Change, change_size int, now time.Time) (*CollectionSp
 		return nil, reject(ReasonUnknownCollection, "このデータは同期できません")
 	}
 	for field_name := range change.Fields {
-		if _, known := collection_spec.Field(field_name); !known {
+		if _, known := collection_spec.Field(field_name); !known && field_name != collection_spec.TargetField {
 			return nil, reject(ReasonUnknownField, "同期できない項目が含まれています: "+field_name)
 		}
 	}
@@ -282,9 +286,9 @@ type invalidValue struct{}
 
 // ValidationContext is what content validation needs from stored state.
 type ValidationContext struct {
-	IsHousehold bool
-	// CategoryInLedger reports whether the category belongs to the caller's ledger
-	// (tombstoned categories included, design.md §5.1).
+	// CategoryInLedger reports whether the category belongs to the record's
+	// ledger (for review notes: the caller's personal ledger or attached
+	// household), tombstoned categories included (design.md §5.1).
 	CategoryInLedger func(category_id string) (bool, error)
 }
 
@@ -294,7 +298,7 @@ func ValidateRow(collection_spec *CollectionSpec, candidate_row Row, validation_
 	var message string
 	switch collection_spec.Name {
 	case journalEntriesSpec.Name:
-		message = validateJournalEntry(candidate_row, validation_context)
+		message = validateJournalEntry(candidate_row)
 	case dailyNotesSpec.Name:
 		message = validateDailyNote(candidate_row)
 	case monthlyReviewNotesSpec.Name:
@@ -320,11 +324,11 @@ func ValidateRow(collection_spec *CollectionSpec, candidate_row Row, validation_
 
 // ValidateJournalEntryFields runs the journal entry rules without the category
 // lookup. It is the server side of testdata/logic/journal_entry_validation.json.
-func ValidateJournalEntryFields(candidate_row Row, is_household bool) string {
-	return validateJournalEntry(candidate_row, ValidationContext{IsHousehold: is_household})
+func ValidateJournalEntryFields(candidate_row Row) string {
+	return validateJournalEntry(candidate_row)
 }
 
-func validateJournalEntry(candidate_row Row, validation_context ValidationContext) string {
+func validateJournalEntry(candidate_row Row) string {
 	if !isValidDateValue(candidate_row["transaction_date"]) {
 		return "transaction_dateはYYYY-MM-DD形式で指定してください"
 	}
@@ -347,13 +351,6 @@ func validateJournalEntry(candidate_row Row, validation_context ValidationContex
 	}
 	if message := checkOptionalText(candidate_row["note"], maxNoteLength, "noteは500文字以内で入力してください"); message != "" {
 		return message
-	}
-	wallet, _ := candidate_row["wallet"].(string)
-	if wallet != "ledger" && wallet != "allowance" {
-		return "walletはledgerかallowanceで指定してください"
-	}
-	if wallet == "allowance" && !validation_context.IsHousehold {
-		return "お小遣いの仕訳は家庭に参加しているときだけ登録できます"
 	}
 	return ""
 }

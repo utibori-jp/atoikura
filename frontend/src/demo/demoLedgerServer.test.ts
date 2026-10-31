@@ -33,7 +33,9 @@ describe("DemoLedgerServer", () => {
     const demo_server = new DemoLedgerServer(new MemoryStorage(), TODAY);
     const pull_page = demo_server.pull(0, 10_000);
 
-    expect(pull_page.ledger_id).toBe(DEMO_LEDGER_ID);
+    expect(pull_page.personal_ledger_id).toBe(DEMO_LEDGER_ID);
+    expect(pull_page.ledger_ids).toEqual([DEMO_LEDGER_ID]);
+    expect(pull_page.household_ledger_id).toBeNull();
     expect(liveRows(demo_server, "category_groups")).toHaveLength(3);
     expect(liveRows(demo_server, "expense_categories").length).toBeGreaterThan(0);
     const entry_dates = liveRows(demo_server, "journal_entries").map((pulled_row) =>

@@ -131,7 +131,8 @@ The result for each change is
   collections). Tombstones are included.
 - The response includes `next_since` and `has_more`. `limit` defaults to 500
   and is capped at 1000.
-- It also includes `ledger_ids`, the ledgers in scope. If the set differs from
+- It also includes `ledger_ids`, the ledgers in scope, and which of them are
+  the caller's `personal_ledger_id` and `household_ledger_id` (null when none). If the set differs from
   the one the device has stored (the user created, joined, left or dissolved a
   household), the device **resets its cursor to 0**, drops the local rows of
   ledgers no longer listed, and pulls again.
@@ -199,7 +200,8 @@ Retries:
 - **Ledger and user changes.** `_sync_state.user_id` (schema v2) binds the
   database to one user. If another user signs in, everything is wiped. If the
   set of ledgers changes, the engine pushes the outbox, clears the synced
-  tables and pulls from 0 (Step 8 narrows this to the ledgers no longer listed).
+  tables and pulls from 0. Attaching or leaving a household is rare, so a full
+  re-pull is simpler than clearing only the ledgers that changed.
 - **Tokens.** The access token stays in memory. The refresh token and the user
   ID are kept in `localStorage`, so the app can sync after a restart without the
   password; the strict CSP is what protects them. Refreshes are serialized

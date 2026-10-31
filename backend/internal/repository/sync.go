@@ -28,12 +28,6 @@ const syncSeqLockKey int64 = 0x6c66_7365_71 // "lfseq"
 
 const pgUniqueViolation = "23505"
 
-// Ledger is the caller's current ledger.
-type Ledger struct {
-	ID   string
-	Kind string
-}
-
 type txAllocator struct {
 	tx        pgx.Tx
 	is_locked bool
@@ -69,42 +63,6 @@ func isUniqueViolation(err error) bool {
 	return errors.As(err, &pg_error) && pg_error.Code == pgUniqueViolation
 }
 
-// EnsurePersonalLedger returns the user's current ledger, creating a personal
-// ledger with the user as its owner the first time.
-func (r *Repository) EnsurePersonalLedger(ctx context.Context, user_id int64) (*Ledger, error) {
-	for attempt_number := 0; attempt_number < 2; attempt_number++ {
-		current_ledger, err := r.currentLedger(ctx, user_id)
-		if err != nil || current_ledger != nil {
-			return current_ledger, err
-		}
-		err = r.createPersonalLedger(ctx, user_id)
-		if err == nil || isUniqueViolation(err) {
-			// Created here, or concurrently by another request: read it back.
-			continue
-		}
-		return nil, err
-	}
-	return r.currentLedger(ctx, user_id)
-}
-
-func (r *Repository) currentLedger(ctx context.Context, user_id int64) (*Ledger, error) {
-	var current_ledger Ledger
-	err := r.pool.QueryRow(ctx,
-		`SELECT l.id::text, l.kind
-		 FROM lf.ledger_members m
-		 JOIN lf.ledgers l ON l.id = m.ledger_id
-		 WHERE m.user_id = $1 AND m.left_at IS NULL AND m.deleted = false AND l.deleted = false`,
-		user_id,
-	).Scan(&current_ledger.ID, &current_ledger.Kind)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("loading current ledger: %w", err)
-	}
-	return &current_ledger, nil
-}
-
 func (r *Repository) createPersonalLedger(ctx context.Context, user_id int64) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -131,8 +89,8 @@ func (r *Repository) createPersonalLedger(ctx context.Context, user_id int64) er
 		return err
 	}
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO lf.ledger_members (id, ledger_id, owner_id, seq, user_id, role)
-		 VALUES (gen_random_uuid(), $1::uuid, $2, $3, $2, 'owner')`,
+		`INSERT INTO lf.ledger_members (id, ledger_id, owner_id, seq, user_id, role, ledger_kind)
+		 VALUES (gen_random_uuid(), $1::uuid, $2, $3, $2, 'owner', 'personal')`,
 		ledger_id, user_id, member_seq,
 	); err != nil {
 		return fmt.Errorf("adding ledger owner: %w", err)
@@ -164,11 +122,11 @@ func rejectedResult(change_id string, rejection *syncrules.Rejection) PushResult
 	return PushResult{ID: change_id, Reason: rejection.Reason, Message: rejection.Message}
 }
 
-// Push applies each change in its own transaction. The caller's ledger and owner
-// come from user_id only; nothing in a change can name another owner or ledger.
+// Push applies each change in its own transaction. The caller and their ledgers
+// come from user_id only; a change names a target ("personal" or "household"),
+// never an owner or a ledger ID.
 func (r *Repository) Push(ctx context.Context, user_id int64, push_inputs []PushInput) ([]PushResult, error) {
-	caller_ledger, err := r.EnsurePersonalLedger(ctx, user_id)
-	if err != nil {
+	if _, err := r.EnsureCallerLedgers(ctx, user_id); err != nil {
 		return nil, err
 	}
 	now := time.Now()
@@ -179,7 +137,7 @@ func (r *Repository) Push(ctx context.Context, user_id int64, push_inputs []Push
 			push_results = append(push_results, rejectedResult(push_input.Change.ID, rejection))
 			continue
 		}
-		push_result, err := r.pushChangeWithRetry(ctx, user_id, caller_ledger, collection_spec, push_input.Change)
+		push_result, err := r.pushChangeWithRetry(ctx, user_id, collection_spec, push_input.Change)
 		if err != nil {
 			return nil, err
 		}
@@ -190,27 +148,74 @@ func (r *Repository) Push(ctx context.Context, user_id int64, push_inputs []Push
 
 // pushChangeWithRetry retries once when a concurrent push created the same natural
 // key first; the retry then merges into that record.
-func (r *Repository) pushChangeWithRetry(ctx context.Context, user_id int64, caller_ledger *Ledger, collection_spec *syncrules.CollectionSpec, change syncrules.Change) (PushResult, error) {
-	push_result, err := r.pushChange(ctx, user_id, caller_ledger, collection_spec, change)
+func (r *Repository) pushChangeWithRetry(ctx context.Context, user_id int64, collection_spec *syncrules.CollectionSpec, change syncrules.Change) (PushResult, error) {
+	push_result, err := r.pushChange(ctx, user_id, collection_spec, change)
 	if err != nil && isUniqueViolation(err) {
-		push_result, err = r.pushChange(ctx, user_id, caller_ledger, collection_spec, change)
+		push_result, err = r.pushChange(ctx, user_id, collection_spec, change)
 	}
 	return push_result, err
 }
 
-func (r *Repository) pushChange(ctx context.Context, user_id int64, caller_ledger *Ledger, collection_spec *syncrules.CollectionSpec, change syncrules.Change) (PushResult, error) {
+var forbiddenRejection = &syncrules.Rejection{Reason: syncrules.ReasonForbidden, Message: "このデータは変更できません"}
+
+// recordLedgerID decides which ledger a pushed record lives in. A stored record
+// stays where it is (a target naming another ledger is IMMUTABLE). A new journal
+// entry needs a target; notes always go to the personal ledger.
+func recordLedgerID(caller_ledgers *CallerLedgers, collection_spec *syncrules.CollectionSpec, stored_record *loadedRecord, target_text string) (string, *syncrules.Rejection) {
+	if collection_spec.TargetField == "" {
+		if stored_record != nil {
+			return stored_record.LedgerID, nil
+		}
+		return caller_ledgers.PersonalID, nil
+	}
+	if target_text == "" {
+		if stored_record != nil {
+			return stored_record.LedgerID, nil
+		}
+		return "", &syncrules.Rejection{Reason: syncrules.ReasonInvalid, Message: collection_spec.TargetField + "は必須です"}
+	}
+	target, is_known := ParseLedgerTarget(target_text)
+	if !is_known {
+		return "", &syncrules.Rejection{Reason: syncrules.ReasonInvalid, Message: collection_spec.TargetField + "はpersonalかhouseholdで指定してください"}
+	}
+	target_ledger_id, is_attached := caller_ledgers.Resolve(target)
+	if !is_attached {
+		return "", &syncrules.Rejection{Reason: syncrules.ReasonForbidden, Message: "家計に参加していないため登録できません"}
+	}
+	if stored_record != nil && stored_record.LedgerID != target_ledger_id {
+		return "", &syncrules.Rejection{Reason: syncrules.ReasonImmutable, Message: collection_spec.TargetField + "は変更できません"}
+	}
+	return target_ledger_id, nil
+}
+
+func (r *Repository) pushChange(ctx context.Context, user_id int64, collection_spec *syncrules.CollectionSpec, pushed_change syncrules.Change) (PushResult, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return PushResult{}, fmt.Errorf("beginning push transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// Memberships are read (and share-locked) inside the transaction, so the
+	// checks below hold until commit.
+	caller_ledgers, err := loadCallerLedgers(ctx, tx, user_id)
+	if err != nil {
+		return PushResult{}, err
+	}
+	change, target_text, rejection := syncrules.SplitTarget(collection_spec, pushed_change)
+	if rejection != nil {
+		return rejectedResult(change.ID, rejection), nil
+	}
+
 	stored_record, err := loadStoredRecord(ctx, tx, collection_spec, "t.id = $1::uuid", change.ID)
 	if err != nil {
 		return PushResult{}, err
 	}
-	if stored_record != nil && !syncrules.CanWrite(&stored_record.StoredRecord, user_id, caller_ledger.ID) {
-		return rejectedResult(change.ID, &syncrules.Rejection{Reason: syncrules.ReasonForbidden, Message: "このデータは変更できません"}), nil
+	if stored_record != nil && !syncrules.CanWrite(&stored_record.StoredRecord, user_id, caller_ledgers.PersonalID, caller_ledgers.HouseholdID) {
+		return rejectedResult(change.ID, forbiddenRejection), nil
+	}
+	ledger_id, rejection := recordLedgerID(caller_ledgers, collection_spec, stored_record, target_text)
+	if rejection != nil {
+		return rejectedResult(change.ID, rejection), nil
 	}
 
 	decoded_row := syncrules.DecodeFields(collection_spec, change)
@@ -229,10 +234,15 @@ func (r *Repository) pushChange(ctx context.Context, user_id int64, caller_ledge
 
 	write_target_id := change.ID
 	if !merge_result.Tombstone {
+		// A journal entry uses its own ledger's categories. A review note lives in
+		// the personal ledger but may reflect on a household category.
+		category_ledger_ids := []string{ledger_id}
+		if collection_spec.Name == "monthly_review_notes" {
+			category_ledger_ids = caller_ledgers.WritableIDs()
+		}
 		validation_context := syncrules.ValidationContext{
-			IsHousehold: caller_ledger.Kind == "household",
 			CategoryInLedger: func(category_id string) (bool, error) {
-				return categoryInLedger(ctx, tx, category_id, caller_ledger.ID)
+				return categoryInLedgers(ctx, tx, category_id, category_ledger_ids)
 			},
 		}
 		rejection, err := syncrules.ValidateRow(collection_spec, merge_result.Candidate, validation_context)
@@ -244,7 +254,7 @@ func (r *Repository) pushChange(ctx context.Context, user_id int64, caller_ledge
 		}
 
 		if stored_record == nil && len(collection_spec.NaturalKey) > 0 {
-			duplicate_record, err := loadNaturalKeyDuplicate(ctx, tx, collection_spec, caller_ledger.ID, user_id, merge_result.Candidate)
+			duplicate_record, err := loadNaturalKeyDuplicate(ctx, tx, collection_spec, ledger_id, user_id, merge_result.Candidate)
 			if err != nil {
 				return PushResult{}, err
 			}
@@ -270,24 +280,12 @@ func (r *Repository) pushChange(ctx context.Context, user_id int64, caller_ledge
 	case merge_result.Tombstone:
 		err = writeTombstone(ctx, tx, collection_spec, write_target_id, next_seq, *change.DeletedHLC)
 	case stored_record == nil:
-		err = insertRecord(ctx, tx, collection_spec, write_target_id, caller_ledger.ID, user_id, next_seq, merge_result)
+		err = insertRecord(ctx, tx, collection_spec, write_target_id, ledger_id, user_id, next_seq, merge_result)
 	default:
 		err = updateRecord(ctx, tx, collection_spec, write_target_id, next_seq, merge_result)
 	}
 	if err != nil {
 		return PushResult{}, err
-	}
-	if collection_spec.Name == "journal_entries" {
-		entry_owner_id := user_id
-		var stored_values syncrules.Row
-		if stored_record != nil {
-			entry_owner_id = stored_record.OwnerID
-			stored_values = stored_record.Values
-		}
-		allowance_months := allowanceMonthsTouched(stored_values, merge_result.Candidate)
-		if err := recomputeAllowanceTotals(ctx, seq_allocator, caller_ledger.ID, entry_owner_id, allowance_months); err != nil {
-			return PushResult{}, err
-		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return PushResult{}, fmt.Errorf("committing push: %w", err)
@@ -350,11 +348,11 @@ func loadNaturalKeyDuplicate(ctx context.Context, tx pgx.Tx, collection_spec *sy
 	return loadStoredRecord(ctx, tx, collection_spec, strings.Join(predicates, " AND "), where_values...)
 }
 
-func categoryInLedger(ctx context.Context, tx pgx.Tx, category_id string, ledger_id string) (bool, error) {
+func categoryInLedgers(ctx context.Context, tx pgx.Tx, category_id string, ledger_ids []string) (bool, error) {
 	var is_in_ledger bool
 	err := tx.QueryRow(ctx,
-		"SELECT EXISTS (SELECT 1 FROM lf.expense_categories WHERE id = $1::uuid AND ledger_id = $2::uuid)",
-		category_id, ledger_id,
+		"SELECT EXISTS (SELECT 1 FROM lf.expense_categories WHERE id = $1::uuid AND ledger_id = ANY($2::uuid[]))",
+		category_id, ledger_ids,
 	).Scan(&is_in_ledger)
 	if err != nil {
 		return false, fmt.Errorf("checking category ledger: %w", err)
@@ -447,8 +445,10 @@ type pullCollection struct {
 	visibility string
 }
 
-// pullCollections lists every synced table in lf (design.md §3.1). Allowance-wallet
-// rows and notes are visible to their owner only.
+// pullCollections lists every synced table in lf (design.md §3.1). A pull reads
+// the caller's personal ledger, attached household and archives; notes are
+// visible to their owner only. Other members' personal ledgers are never in
+// that set, so their entries never leave the server.
 var pullCollections = []pullCollection{
 	{name: "ledgers"},
 	{name: "ledger_members"},
@@ -456,14 +456,14 @@ var pullCollections = []pullCollection{
 	{name: "expense_categories"},
 	{name: "income_records"},
 	{name: "base_incomes"},
-	{name: "recurring_expenses", visibility: "(t.wallet = 'ledger' OR t.owner_id = $3)"},
+	{name: "recurring_expenses"},
 	{name: "savings_goals"},
 	{name: "savings_postings"},
 	{name: "budgets"},
 	{name: "allowances"},
 	{name: "surplus_allocations"},
 	{name: "allowance_totals"},
-	{name: "journal_entries", visibility: "(t.wallet = 'ledger' OR t.owner_id = $3)"},
+	{name: "journal_entries"},
 	{name: "daily_notes", visibility: "t.owner_id = $3"},
 	{name: "monthly_review_notes", visibility: "t.owner_id = $3"},
 }
@@ -478,7 +478,7 @@ func buildPullQuery() string {
 			visibility_sql = pull_collection.visibility
 		}
 		collection_selects = append(collection_selects, fmt.Sprintf(
-			"SELECT '%s' AS collection, t.seq, to_jsonb(t) AS row_data FROM lf.%s t WHERE t.ledger_id = $1::uuid AND t.seq > $2 AND %s",
+			"SELECT '%s' AS collection, t.seq, to_jsonb(t) AS row_data FROM lf.%s t WHERE t.ledger_id = ANY($1::uuid[]) AND t.seq > $2 AND %s",
 			pull_collection.name, pull_collection.name, visibility_sql,
 		))
 	}
@@ -489,6 +489,7 @@ func buildPullQuery() string {
 type PulledRow struct {
 	Collection string
 	ID         string
+	LedgerID   string
 	OwnerID    int64
 	Seq        int64
 	Deleted    bool
@@ -496,9 +497,9 @@ type PulledRow struct {
 	FieldHLC   map[string]string
 }
 
-// PullResult is one page of changes after a cursor.
+// PullResult is one page of changes after a cursor, with the ledgers it covers.
 type PullResult struct {
-	LedgerID  string
+	Ledgers   CallerLedgers
 	Rows      []PulledRow
 	NextSince int64
 	HasMore   bool
@@ -507,25 +508,28 @@ type PullResult struct {
 // envelopeColumns are returned outside of data (or not at all).
 var envelopeColumns = []string{"id", "ledger_id", "owner_id", "seq", "deleted", "field_hlc"}
 
-// Pull returns the rows of the caller's ledger visible to the caller, with
+// Pull returns the rows of the caller's ledgers visible to the caller, with
 // seq > since, ordered by seq.
 func (r *Repository) Pull(ctx context.Context, user_id int64, since int64, limit int) (*PullResult, error) {
-	caller_ledger, err := r.EnsurePersonalLedger(ctx, user_id)
+	caller_ledgers, err := r.EnsureCallerLedgers(ctx, user_id)
 	if err != nil {
 		return nil, err
 	}
 	// The first pull of a month posts that month's fixed recurring expenses and
 	// savings (design.md §5.3), so the postings are part of this very pull.
-	if err := r.PostMonthlyForLedger(ctx, caller_ledger.ID, time.Now().In(jstLocation()).Format("2006-01")); err != nil {
-		return nil, err
+	current_month := time.Now().In(jstLocation()).Format("2006-01")
+	for _, writable_ledger_id := range caller_ledgers.WritableIDs() {
+		if err := r.PostMonthlyForLedger(ctx, writable_ledger_id, current_month); err != nil {
+			return nil, err
+		}
 	}
-	pulled_rows, err := r.pool.Query(ctx, pullQuery, caller_ledger.ID, since, user_id, limit+1)
+	pulled_rows, err := r.pool.Query(ctx, pullQuery, caller_ledgers.VisibleIDs(), since, user_id, limit+1)
 	if err != nil {
 		return nil, fmt.Errorf("pulling changes: %w", err)
 	}
 	defer pulled_rows.Close()
 
-	pull_result := &PullResult{LedgerID: caller_ledger.ID, NextSince: since, Rows: []PulledRow{}}
+	pull_result := &PullResult{Ledgers: *caller_ledgers, NextSince: since, Rows: []PulledRow{}}
 	for pulled_rows.Next() {
 		var collection_name string
 		var row_seq int64
@@ -559,6 +563,7 @@ func decodePulledRow(collection_name string, row_json []byte) (PulledRow, error)
 	}
 	pulled_row := PulledRow{Collection: collection_name}
 	_ = json.Unmarshal(row_columns["id"], &pulled_row.ID)
+	_ = json.Unmarshal(row_columns["ledger_id"], &pulled_row.LedgerID)
 	_ = json.Unmarshal(row_columns["owner_id"], &pulled_row.OwnerID)
 	_ = json.Unmarshal(row_columns["seq"], &pulled_row.Seq)
 	_ = json.Unmarshal(row_columns["deleted"], &pulled_row.Deleted)

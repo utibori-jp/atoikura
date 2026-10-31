@@ -44,7 +44,6 @@ export interface IncomeRecordFields {
 
 export interface RecurringExpenseView {
   id: string;
-  wallet: "ledger" | "allowance";
   name: string;
   emoji: string;
   billing_day: number;
@@ -237,7 +236,7 @@ export function createLedgerApi(ledger_data: LedgerData, ledger_commands: Ledger
     // --- Recurring expenses ------------------------------------------------------
     async listRecurringExpenses(): Promise<{ recurring_expenses: RecurringExpenseView[] }> {
       const recurring_rows = await local_db.select(
-        `SELECT re.id, re.wallet, re.name, re.emoji, re.billing_day, re.amount, re.type, re.category_id,
+        `SELECT re.id, re.name, re.emoji, re.billing_day, re.amount, re.type, re.category_id,
                 ec.name AS category_name, cg.id AS group_id, cg.name AS group_name
          FROM recurring_expenses re
          LEFT JOIN expense_categories ec ON ec.id = re.category_id
@@ -249,7 +248,6 @@ export function createLedgerApi(ledger_data: LedgerData, ledger_commands: Ledger
       return {
         recurring_expenses: recurring_rows.map((recurring_row) => ({
           id: String(recurring_row.id),
-          wallet: recurring_row.wallet as "ledger" | "allowance",
           name: String(recurring_row.name),
           emoji: textOrEmpty(recurring_row.emoji),
           billing_day: Number(recurring_row.billing_day),
@@ -290,20 +288,10 @@ export function createLedgerApi(ledger_data: LedgerData, ledger_commands: Ledger
           })),
       };
     },
-    // New recurring expenses go to the shared ledger wallet; the allowance
-    // wallet arrives with the household screens (Step 8).
     createRecurringExpense: (recurring_fields: RecurringExpenseFields) =>
-      ledger_commands.createRecurringExpense({ ...recurring_fields, wallet: "ledger" }),
-    async updateRecurringExpense(recurring_id: string, recurring_fields: RecurringExpenseFields) {
-      const [wallet_row] = await local_db.select(
-        "SELECT wallet FROM recurring_expenses WHERE id = ? AND deleted = 0",
-        [recurring_id]
-      );
-      return ledger_commands.updateRecurringExpense(recurring_id, {
-        ...recurring_fields,
-        wallet: (wallet_row?.wallet as "ledger" | "allowance" | undefined) ?? "ledger",
-      });
-    },
+      ledger_commands.createRecurringExpense(recurring_fields),
+    updateRecurringExpense: (recurring_id: string, recurring_fields: RecurringExpenseFields) =>
+      ledger_commands.updateRecurringExpense(recurring_id, recurring_fields),
     deleteRecurringExpense: (recurring_id: string) =>
       ledger_commands.deleteRecurringExpense(recurring_id),
     confirmRecurringExpense: (recurring_id: string, amount: number, year_month: string) =>

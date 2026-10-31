@@ -33,11 +33,16 @@ function requestHeaders(fetch_fn: ReturnType<typeof vi.fn<typeof fetch>>, call_i
 
 describe("HttpSyncTransport", () => {
   it("sends the bearer token and the protocol version with every request", async () => {
-    const fetch_fn = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        jsonResponse({ ledger_id: "l1", rows: [], next_since: 4, has_more: false })
-      );
+    const fetch_fn = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        ledger_ids: ["l1"],
+        personal_ledger_id: "l1",
+        household_ledger_id: null,
+        rows: [],
+        next_since: 4,
+        has_more: false,
+      })
+    );
     const transport = new HttpSyncTransport({
       api_base_url: API_BASE_URL,
       auth: fakeAuth(),
@@ -50,7 +55,7 @@ describe("HttpSyncTransport", () => {
     expect(fetch_fn.mock.calls[0][0]).toBe(`${API_BASE_URL}/sync/pull?since=4&limit=500`);
     expect(requestHeaders(fetch_fn, 0)).toEqual({
       Authorization: "Bearer access-1",
-      "X-Atoikura-Sync-Protocol": "1",
+      "X-Atoikura-Sync-Protocol": "2",
     });
   });
 

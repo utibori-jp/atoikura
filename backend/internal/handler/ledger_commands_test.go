@@ -14,7 +14,7 @@ import (
 // fakeLedgerCommandRepo records the last command and returns a fixed result.
 type fakeLedgerCommandRepo struct {
 	called_command string
-	called_user_id int64
+	called_caller  repository.Caller
 	called_row_id  string
 	called_input   any
 	command_err    error
@@ -22,76 +22,76 @@ type fakeLedgerCommandRepo struct {
 
 const fakeWrittenRowID = "00000000-0000-4000-8000-0000000000aa"
 
-func (f *fakeLedgerCommandRepo) record(command_name string, user_id int64, row_id string, command_input any) (*repository.PulledRow, error) {
+func (f *fakeLedgerCommandRepo) record(command_name string, caller repository.Caller, row_id string, command_input any) (*repository.PulledRow, error) {
 	f.called_command = command_name
-	f.called_user_id = user_id
+	f.called_caller = caller
 	f.called_row_id = row_id
 	f.called_input = command_input
 	if f.command_err != nil {
 		return nil, f.command_err
 	}
-	return &repository.PulledRow{Collection: command_name, ID: fakeWrittenRowID, OwnerID: user_id, Seq: 9, Data: map[string]json.RawMessage{}}, nil
+	return &repository.PulledRow{Collection: command_name, ID: fakeWrittenRowID, OwnerID: caller.UserID, Seq: 9, Data: map[string]json.RawMessage{}}, nil
 }
 
-func (f *fakeLedgerCommandRepo) CreateLedgerCategoryGroup(_ context.Context, user_id int64, command_input repository.CategoryGroupInput) (*repository.PulledRow, error) {
-	return f.record("CreateLedgerCategoryGroup", user_id, "", command_input)
+func (f *fakeLedgerCommandRepo) CreateLedgerCategoryGroup(_ context.Context, caller repository.Caller, command_input repository.CategoryGroupInput) (*repository.PulledRow, error) {
+	return f.record("CreateLedgerCategoryGroup", caller, "", command_input)
 }
-func (f *fakeLedgerCommandRepo) UpdateLedgerCategoryGroup(_ context.Context, user_id int64, row_id string, command_input repository.CategoryGroupInput) (*repository.PulledRow, error) {
-	return f.record("UpdateLedgerCategoryGroup", user_id, row_id, command_input)
+func (f *fakeLedgerCommandRepo) UpdateLedgerCategoryGroup(_ context.Context, caller repository.Caller, row_id string, command_input repository.CategoryGroupInput) (*repository.PulledRow, error) {
+	return f.record("UpdateLedgerCategoryGroup", caller, row_id, command_input)
 }
-func (f *fakeLedgerCommandRepo) DeleteLedgerCategoryGroup(_ context.Context, user_id int64, row_id string) (*repository.PulledRow, error) {
-	return f.record("DeleteLedgerCategoryGroup", user_id, row_id, nil)
+func (f *fakeLedgerCommandRepo) DeleteLedgerCategoryGroup(_ context.Context, caller repository.Caller, row_id string) (*repository.PulledRow, error) {
+	return f.record("DeleteLedgerCategoryGroup", caller, row_id, nil)
 }
-func (f *fakeLedgerCommandRepo) CreateLedgerExpenseCategory(_ context.Context, user_id int64, command_input repository.ExpenseCategoryInput) (*repository.PulledRow, error) {
-	return f.record("CreateLedgerExpenseCategory", user_id, "", command_input)
+func (f *fakeLedgerCommandRepo) CreateLedgerExpenseCategory(_ context.Context, caller repository.Caller, command_input repository.ExpenseCategoryInput) (*repository.PulledRow, error) {
+	return f.record("CreateLedgerExpenseCategory", caller, "", command_input)
 }
-func (f *fakeLedgerCommandRepo) UpdateLedgerExpenseCategory(_ context.Context, user_id int64, row_id string, command_input repository.ExpenseCategoryInput) (*repository.PulledRow, error) {
-	return f.record("UpdateLedgerExpenseCategory", user_id, row_id, command_input)
+func (f *fakeLedgerCommandRepo) UpdateLedgerExpenseCategory(_ context.Context, caller repository.Caller, row_id string, command_input repository.ExpenseCategoryInput) (*repository.PulledRow, error) {
+	return f.record("UpdateLedgerExpenseCategory", caller, row_id, command_input)
 }
-func (f *fakeLedgerCommandRepo) DeleteLedgerExpenseCategory(_ context.Context, user_id int64, row_id string) (*repository.PulledRow, error) {
-	return f.record("DeleteLedgerExpenseCategory", user_id, row_id, nil)
+func (f *fakeLedgerCommandRepo) DeleteLedgerExpenseCategory(_ context.Context, caller repository.Caller, row_id string) (*repository.PulledRow, error) {
+	return f.record("DeleteLedgerExpenseCategory", caller, row_id, nil)
 }
-func (f *fakeLedgerCommandRepo) CreateLedgerIncomeRecord(_ context.Context, user_id int64, command_input repository.IncomeRecordInput) (*repository.PulledRow, error) {
-	return f.record("CreateLedgerIncomeRecord", user_id, "", command_input)
+func (f *fakeLedgerCommandRepo) CreateLedgerIncomeRecord(_ context.Context, caller repository.Caller, command_input repository.IncomeRecordInput) (*repository.PulledRow, error) {
+	return f.record("CreateLedgerIncomeRecord", caller, "", command_input)
 }
-func (f *fakeLedgerCommandRepo) UpdateLedgerIncomeRecord(_ context.Context, user_id int64, row_id string, command_input repository.IncomeRecordInput) (*repository.PulledRow, error) {
-	return f.record("UpdateLedgerIncomeRecord", user_id, row_id, command_input)
+func (f *fakeLedgerCommandRepo) UpdateLedgerIncomeRecord(_ context.Context, caller repository.Caller, row_id string, command_input repository.IncomeRecordInput) (*repository.PulledRow, error) {
+	return f.record("UpdateLedgerIncomeRecord", caller, row_id, command_input)
 }
-func (f *fakeLedgerCommandRepo) DeleteLedgerIncomeRecord(_ context.Context, user_id int64, row_id string) (*repository.PulledRow, error) {
-	return f.record("DeleteLedgerIncomeRecord", user_id, row_id, nil)
+func (f *fakeLedgerCommandRepo) DeleteLedgerIncomeRecord(_ context.Context, caller repository.Caller, row_id string) (*repository.PulledRow, error) {
+	return f.record("DeleteLedgerIncomeRecord", caller, row_id, nil)
 }
-func (f *fakeLedgerCommandRepo) PutLedgerBaseIncome(_ context.Context, user_id int64, amount int32) (*repository.PulledRow, error) {
-	return f.record("PutLedgerBaseIncome", user_id, "", amount)
+func (f *fakeLedgerCommandRepo) PutLedgerBaseIncome(_ context.Context, caller repository.Caller, amount int32) (*repository.PulledRow, error) {
+	return f.record("PutLedgerBaseIncome", caller, "", amount)
 }
-func (f *fakeLedgerCommandRepo) CreateLedgerRecurringExpense(_ context.Context, user_id int64, command_input repository.RecurringExpenseInput) (*repository.PulledRow, error) {
-	return f.record("CreateLedgerRecurringExpense", user_id, "", command_input)
+func (f *fakeLedgerCommandRepo) CreateLedgerRecurringExpense(_ context.Context, caller repository.Caller, command_input repository.RecurringExpenseInput) (*repository.PulledRow, error) {
+	return f.record("CreateLedgerRecurringExpense", caller, "", command_input)
 }
-func (f *fakeLedgerCommandRepo) UpdateLedgerRecurringExpense(_ context.Context, user_id int64, row_id string, command_input repository.RecurringExpenseInput) (*repository.PulledRow, error) {
-	return f.record("UpdateLedgerRecurringExpense", user_id, row_id, command_input)
+func (f *fakeLedgerCommandRepo) UpdateLedgerRecurringExpense(_ context.Context, caller repository.Caller, row_id string, command_input repository.RecurringExpenseInput) (*repository.PulledRow, error) {
+	return f.record("UpdateLedgerRecurringExpense", caller, row_id, command_input)
 }
-func (f *fakeLedgerCommandRepo) DeleteLedgerRecurringExpense(_ context.Context, user_id int64, row_id string) (*repository.PulledRow, error) {
-	return f.record("DeleteLedgerRecurringExpense", user_id, row_id, nil)
+func (f *fakeLedgerCommandRepo) DeleteLedgerRecurringExpense(_ context.Context, caller repository.Caller, row_id string) (*repository.PulledRow, error) {
+	return f.record("DeleteLedgerRecurringExpense", caller, row_id, nil)
 }
-func (f *fakeLedgerCommandRepo) ConfirmLedgerRecurringExpense(_ context.Context, user_id int64, row_id string, amount int32, year_month string) (*repository.PulledRow, error) {
-	return f.record("ConfirmLedgerRecurringExpense", user_id, row_id, []any{amount, year_month})
+func (f *fakeLedgerCommandRepo) ConfirmLedgerRecurringExpense(_ context.Context, caller repository.Caller, row_id string, amount int32, year_month string) (*repository.PulledRow, error) {
+	return f.record("ConfirmLedgerRecurringExpense", caller, row_id, []any{amount, year_month})
 }
-func (f *fakeLedgerCommandRepo) CreateLedgerSavingsGoal(_ context.Context, user_id int64, command_input repository.SavingsGoalInput) (*repository.PulledRow, error) {
-	return f.record("CreateLedgerSavingsGoal", user_id, "", command_input)
+func (f *fakeLedgerCommandRepo) CreateLedgerSavingsGoal(_ context.Context, caller repository.Caller, command_input repository.SavingsGoalInput) (*repository.PulledRow, error) {
+	return f.record("CreateLedgerSavingsGoal", caller, "", command_input)
 }
-func (f *fakeLedgerCommandRepo) UpdateLedgerSavingsGoal(_ context.Context, user_id int64, row_id string, command_input repository.SavingsGoalInput) (*repository.PulledRow, error) {
-	return f.record("UpdateLedgerSavingsGoal", user_id, row_id, command_input)
+func (f *fakeLedgerCommandRepo) UpdateLedgerSavingsGoal(_ context.Context, caller repository.Caller, row_id string, command_input repository.SavingsGoalInput) (*repository.PulledRow, error) {
+	return f.record("UpdateLedgerSavingsGoal", caller, row_id, command_input)
 }
-func (f *fakeLedgerCommandRepo) DeleteLedgerSavingsGoal(_ context.Context, user_id int64, row_id string) (*repository.PulledRow, error) {
-	return f.record("DeleteLedgerSavingsGoal", user_id, row_id, nil)
+func (f *fakeLedgerCommandRepo) DeleteLedgerSavingsGoal(_ context.Context, caller repository.Caller, row_id string) (*repository.PulledRow, error) {
+	return f.record("DeleteLedgerSavingsGoal", caller, row_id, nil)
 }
-func (f *fakeLedgerCommandRepo) CreateLedgerSavingsPosting(_ context.Context, user_id int64, row_id string, amount int32, year_month string) (*repository.PulledRow, error) {
-	return f.record("CreateLedgerSavingsPosting", user_id, row_id, []any{amount, year_month})
+func (f *fakeLedgerCommandRepo) CreateLedgerSavingsPosting(_ context.Context, caller repository.Caller, row_id string, amount int32, year_month string) (*repository.PulledRow, error) {
+	return f.record("CreateLedgerSavingsPosting", caller, row_id, []any{amount, year_month})
 }
-func (f *fakeLedgerCommandRepo) PutLedgerBudget(_ context.Context, user_id int64, command_input repository.BudgetInput) (*repository.PulledRow, error) {
-	return f.record("PutLedgerBudget", user_id, "", command_input)
+func (f *fakeLedgerCommandRepo) PutLedgerBudget(_ context.Context, caller repository.Caller, command_input repository.BudgetInput) (*repository.PulledRow, error) {
+	return f.record("PutLedgerBudget", caller, "", command_input)
 }
-func (f *fakeLedgerCommandRepo) CreateLedgerSurplusAllocation(_ context.Context, user_id int64, command_input repository.SurplusAllocationInput) (*repository.PulledRow, error) {
-	return f.record("CreateLedgerSurplusAllocation", user_id, "", command_input)
+func (f *fakeLedgerCommandRepo) CreateLedgerSurplusAllocation(_ context.Context, caller repository.Caller, command_input repository.SurplusAllocationInput) (*repository.PulledRow, error) {
+	return f.record("CreateLedgerSurplusAllocation", caller, "", command_input)
 }
 
 // newLedgerCommandMux mounts the command handlers under the routes main uses.
@@ -133,7 +133,7 @@ func serveCommand(t *testing.T, command_repo *fakeLedgerCommandRepo, method stri
 }
 
 func TestLedgerCommandHandlers_Validation(t *testing.T) {
-	valid_recurring := `"wallet":"ledger","name":"Rent","emoji":"🏠","billing_day":27,"type":"fixed","category_id":"` + testRowID + `"`
+	valid_recurring := `"name":"Rent","emoji":"🏠","billing_day":27,"type":"fixed","category_id":"` + testRowID + `"`
 	test_cases := []struct {
 		name         string
 		method       string
@@ -160,7 +160,10 @@ func TestLedgerCommandHandlers_Validation(t *testing.T) {
 		{"base income negative", "PUT", "/ledger/base-income", `{"amount":-1}`, http.StatusBadRequest, ""},
 		{"base income forged member", "PUT", "/ledger/base-income", `{"amount":1,"member_id":2}`, http.StatusBadRequest, ""},
 		{"recurring ok", "POST", "/ledger/recurring-expenses", `{` + valid_recurring + `}`, http.StatusCreated, "CreateLedgerRecurringExpense"},
-		{"recurring bad wallet", "POST", "/ledger/recurring-expenses", `{` + strings.Replace(valid_recurring, `"ledger"`, `"shared"`, 1) + `}`, http.StatusBadRequest, ""},
+		{"recurring with a wallet", "POST", "/ledger/recurring-expenses", `{` + valid_recurring + `,"wallet":"ledger"}`, http.StatusBadRequest, ""},
+		{"household target", "POST", "/ledger/recurring-expenses?ledger=household", `{` + valid_recurring + `}`, http.StatusCreated, "CreateLedgerRecurringExpense"},
+		{"unknown target", "POST", "/ledger/recurring-expenses?ledger=archive", `{` + valid_recurring + `}`, http.StatusBadRequest, ""},
+		{"ledger ID as target", "DELETE", "/ledger/income-records/" + testRowID + "?ledger=" + testRowID, "", http.StatusBadRequest, ""},
 		{"recurring zero amount", "POST", "/ledger/recurring-expenses", `{` + valid_recurring + `,"amount":0}`, http.StatusBadRequest, ""},
 		{"recurring day 32", "PUT", "/ledger/recurring-expenses/" + testRowID, `{` + strings.Replace(valid_recurring, "27", "32", 1) + `}`, http.StatusBadRequest, ""},
 		{"confirm ok", "POST", "/ledger/recurring-expenses/" + testRowID + "/confirm", `{"amount":100,"year_month":"2026-10"}`, http.StatusCreated, "ConfirmLedgerRecurringExpense"},
@@ -185,8 +188,15 @@ func TestLedgerCommandHandlers_Validation(t *testing.T) {
 			if command_repo.called_command != test_case.want_command {
 				t.Fatalf("called %q, want %q", command_repo.called_command, test_case.want_command)
 			}
-			if test_case.want_command != "" && command_repo.called_user_id != 7 {
-				t.Fatalf("user = %d, want the token's user", command_repo.called_user_id)
+			if test_case.want_command != "" && command_repo.called_caller.UserID != 7 {
+				t.Fatalf("user = %d, want the token's user", command_repo.called_caller.UserID)
+			}
+			want_target := repository.TargetPersonal
+			if strings.Contains(test_case.path, "ledger=household") {
+				want_target = repository.TargetHousehold
+			}
+			if test_case.want_command != "" && command_repo.called_caller.Target != want_target {
+				t.Fatalf("target = %q, want %q", command_repo.called_caller.Target, want_target)
 			}
 		})
 	}

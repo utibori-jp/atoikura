@@ -1,7 +1,7 @@
 import { buildDailyEntries, STATEMENT_TYPES, type BreakdownRow, type DailyEntry } from "../logic";
 import type { LedgerData } from "./ledgerData";
 
-// Spending aggregations of the shared ledger wallet, computed in the DB worker
+// Spending aggregations of the ledger, computed in the DB worker
 // with the Step 3 logic (the local equivalents of /expenses/*).
 
 export interface DailyCumulative {
@@ -25,12 +25,7 @@ export async function loadDailyCumulative(
       year_month,
       today_jst
     ),
-    ledger_data.local_db.query(
-      "listDailyVariableSums",
-      ledger_data.ledger_id,
-      { wallet: "ledger" },
-      year_month
-    ),
+    ledger_data.local_db.query("listDailyVariableSums", ledger_data.ledger_id, year_month),
   ]);
   return {
     year_month,
@@ -44,12 +39,7 @@ export function loadMonthlyBreakdown(
   ledger_data: LedgerData,
   year_month: string
 ): Promise<BreakdownRow[]> {
-  return ledger_data.local_db.query(
-    "listMonthlyBreakdown",
-    ledger_data.ledger_id,
-    { wallet: "ledger" },
-    year_month
-  );
+  return ledger_data.local_db.query("listMonthlyBreakdown", ledger_data.ledger_id, year_month);
 }
 
 export interface MonthlyBreakdownItem {
@@ -67,7 +57,7 @@ const STATEMENT_TYPE_ORDER_BY_CODE = new Map(
   STATEMENT_TYPES.map((statement_type) => [statement_type.type_code, statement_type.display_order])
 );
 
-// The review screens' per-category totals of the shared ledger wallet.
+// The review screens' per-category totals of the ledger.
 export async function loadMonthlyBreakdownItems(
   ledger_data: LedgerData,
   year_month: string

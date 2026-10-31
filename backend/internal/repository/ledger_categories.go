@@ -31,8 +31,8 @@ func (category_group_input CategoryGroupInput) columns() []columnValue {
 }
 
 // CreateLedgerCategoryGroup adds a category group to the caller's ledger.
-func (r *Repository) CreateLedgerCategoryGroup(ctx context.Context, user_id int64, category_group_input CategoryGroupInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) CreateLedgerCategoryGroup(ctx context.Context, caller Caller, category_group_input CategoryGroupInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		group_id, err := ledger_tx.insertRow(ctx, "category_groups", category_group_input.columns())
 		if err != nil {
 			return nil, conflictOnUniqueViolation(err, categoryGroupDuplicateMessage)
@@ -42,8 +42,8 @@ func (r *Repository) CreateLedgerCategoryGroup(ctx context.Context, user_id int6
 }
 
 // UpdateLedgerCategoryGroup overwrites a category group of the caller's ledger.
-func (r *Repository) UpdateLedgerCategoryGroup(ctx context.Context, user_id int64, group_id string, category_group_input CategoryGroupInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) UpdateLedgerCategoryGroup(ctx context.Context, caller Caller, group_id string, category_group_input CategoryGroupInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		group_row, err := ledger_tx.lockLiveRow(ctx, "category_groups", group_id, "UPDATE")
 		if err != nil {
 			return nil, err
@@ -60,8 +60,8 @@ func (r *Repository) UpdateLedgerCategoryGroup(ctx context.Context, user_id int6
 
 // DeleteLedgerCategoryGroup deletes a category group that has no live
 // categories left, as the legacy API does.
-func (r *Repository) DeleteLedgerCategoryGroup(ctx context.Context, user_id int64, group_id string) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) DeleteLedgerCategoryGroup(ctx context.Context, caller Caller, group_id string) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		// FOR UPDATE here and FOR SHARE in category writes serialize the two, so a
 		// category can't be added to a group that is being deleted.
 		group_row, err := ledger_tx.lockLiveRow(ctx, "category_groups", group_id, "UPDATE")
@@ -115,8 +115,8 @@ func expenseCategoryColumns(group_id string, expense_category_input ExpenseCateg
 }
 
 // CreateLedgerExpenseCategory adds a category to a live group of the caller's ledger.
-func (r *Repository) CreateLedgerExpenseCategory(ctx context.Context, user_id int64, expense_category_input ExpenseCategoryInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) CreateLedgerExpenseCategory(ctx context.Context, caller Caller, expense_category_input ExpenseCategoryInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		group_id, err := ledger_tx.requireLiveGroup(ctx, expense_category_input.GroupID)
 		if err != nil {
 			return nil, err
@@ -131,8 +131,8 @@ func (r *Repository) CreateLedgerExpenseCategory(ctx context.Context, user_id in
 
 // UpdateLedgerExpenseCategory overwrites a category, possibly moving it to
 // another live group of the same ledger.
-func (r *Repository) UpdateLedgerExpenseCategory(ctx context.Context, user_id int64, category_id string, expense_category_input ExpenseCategoryInput) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) UpdateLedgerExpenseCategory(ctx context.Context, caller Caller, category_id string, expense_category_input ExpenseCategoryInput) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		category_row, err := ledger_tx.lockLiveRow(ctx, "expense_categories", category_id, "UPDATE")
 		if err != nil {
 			return nil, err
@@ -153,8 +153,8 @@ func (r *Repository) UpdateLedgerExpenseCategory(ctx context.Context, user_id in
 
 // DeleteLedgerExpenseCategory deletes a category. Entries that reference it stay
 // valid; devices flag them (design.md §5.1).
-func (r *Repository) DeleteLedgerExpenseCategory(ctx context.Context, user_id int64, category_id string) (*PulledRow, error) {
-	return r.runLedgerCommand(ctx, user_id, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
+func (r *Repository) DeleteLedgerExpenseCategory(ctx context.Context, caller Caller, category_id string) (*PulledRow, error) {
+	return r.runLedgerCommand(ctx, caller, func(ctx context.Context, ledger_tx *ledgerTx) (*writtenRow, error) {
 		category_row, err := ledger_tx.lockLiveRow(ctx, "expense_categories", category_id, "UPDATE")
 		if err != nil {
 			return nil, err

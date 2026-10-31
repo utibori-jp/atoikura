@@ -15,8 +15,6 @@ export interface ValidationWarning {
   message: string;
 }
 
-export type Wallet = "ledger" | "allowance";
-
 export interface JournalEntryInput {
   transaction_date?: string;
   item?: string | null;
@@ -24,13 +22,10 @@ export interface JournalEntryInput {
   category_id?: string | null;
   is_excluded?: boolean;
   note?: string | null;
-  wallet?: Wallet;
 }
 
 export interface JournalEntryContext {
-  // Allowance entries exist only in household mode.
-  is_household: boolean;
-  // Looks the category up in the local cache of the current ledger.
+  // Looks the category up in the local cache of the entry's ledger.
   // "deleted" is accepted with a warning: the entry may have been written offline
   // before the deletion synced (design.md §5.1).
   categoryStatus: (category_id: string) => "active" | "deleted" | "unknown";
@@ -72,14 +67,6 @@ export function validateJournalEntry(
   }
   if (entry_input.note != null && codePointLength(entry_input.note) > MAX_NOTE_LENGTH) {
     return invalid("noteは500文字以内で入力してください");
-  }
-
-  const wallet = entry_input.wallet ?? "ledger";
-  if (wallet !== "ledger" && wallet !== "allowance") {
-    return invalid("walletはledgerかallowanceで指定してください");
-  }
-  if (wallet === "allowance" && !entry_context.is_household) {
-    return invalid("お小遣いの仕訳は家庭に参加しているときだけ登録できます");
   }
 
   const category_status = entry_context.categoryStatus(entry_input.category_id);

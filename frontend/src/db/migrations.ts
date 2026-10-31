@@ -201,6 +201,34 @@ const SCHEMA_V2_STATEMENTS = [
   )`,
 ];
 
+// Household as an attachable ledger (Step 8, design.md D5, D15). A device now
+// holds several ledgers: the personal one, an attached household and archives.
+const SCHEMA_V3_STATEMENTS = [
+  // A row's ledger replaces the wallet.
+  `ALTER TABLE journal_entries DROP COLUMN wallet`,
+  `ALTER TABLE recurring_expenses DROP COLUMN wallet`,
+  // The ledger cache gains the archive kind; SQLite can't change a CHECK, so the
+  // table is recreated and refilled by the full pull below.
+  `DROP TABLE ledgers`,
+  `CREATE TABLE ledgers (
+    id TEXT PRIMARY KEY NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('personal', 'household', 'archive')),
+    name TEXT,
+    seq INTEGER,
+    deleted INTEGER NOT NULL DEFAULT 0 CHECK (deleted IN (0, 1)),
+    deleted_at TEXT,
+    created_at TEXT,
+    updated_at TEXT
+  )`,
+  `ALTER TABLE ledger_members ADD COLUMN ledger_kind TEXT`,
+  `ALTER TABLE allowance_totals ADD COLUMN saved INTEGER NOT NULL DEFAULT 0`,
+  // _sync_state.ledger_id is now the personal ledger. ledger_ids (a JSON array)
+  // is the set of ledgers the last pull covered; when it changes, pull restarts.
+  `ALTER TABLE _sync_state ADD COLUMN household_ledger_id TEXT`,
+  `ALTER TABLE _sync_state ADD COLUMN ledger_ids TEXT`,
+  `UPDATE _sync_state SET since = 0`,
+];
+
 export const MIGRATIONS: Migration[] = [
   {
     version: 1,
@@ -211,5 +239,10 @@ export const MIGRATIONS: Migration[] = [
     version: 2,
     description: "sync engine bookkeeping (#204)",
     statements: SCHEMA_V2_STATEMENTS,
+  },
+  {
+    version: 3,
+    description: "attachable household ledgers (#207)",
+    statements: SCHEMA_V3_STATEMENTS,
   },
 ];

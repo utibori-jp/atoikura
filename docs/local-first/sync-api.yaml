@@ -7,8 +7,9 @@ info:
     Sync API for the hybrid local-first architecture (issue #198).
     Semantics: docs/local-first/sync-protocol.md. Data model: docs/local-first/design.md.
 
-    The caller's user and ledger are always derived from the bearer token.
-    `owner_id` and `ledger_id` are never accepted in a request body.
+    The caller's user and ledgers are always derived from the bearer token. A write
+    names a target, `personal` or `household` (design.md D15); `owner_id` and
+    `ledger_id` are never accepted in a request.
     Online-only collections are written through the REST commands under `/ledger`,
     and every device reads them through pull.
 
@@ -61,9 +62,10 @@ paths:
     get:
       summary: Pull every visible change after a cursor
       description: |
-        Returns the rows of the caller's current ledger that are visible to the caller,
-        with `since < seq ≤ watermark`, ordered by seq. If `ledger_id` differs from the one
-        the device has stored, the device resets its cursor to 0 and pulls again.
+        Returns the rows visible to the caller in their personal ledger, attached household
+        and archives, with `since < seq ≤ watermark`, ordered by seq. If `ledger_ids`
+        differs from the set the device has stored, the device resets its cursor to 0,
+        drops the rows of ledgers no longer listed, and pulls again.
       operationId: pullChanges
       parameters:
         - $ref: "#/components/parameters/SyncProtocol"
@@ -179,14 +181,15 @@ paths:
   # Every command needs the X-Atoikura-Sync-Protocol header, rejects unknown body
   # fields (so a body can't name an owner or a ledger), and returns the written row
   # in the shape pull returns it. The same row reaches other devices through pull.
-  # Rows of another ledger, and other members' allowance recurring expenses, are
-  # reported as 404.
+  # The ?ledger= query parameter picks the caller's personal (default) or household
+  # ledger. Rows of any other ledger (including other members' personal ledgers)
+  # are reported as 404; `ledger=household` without a household is 403.
 
   /ledger/category-groups:
     post:
       summary: Create a category group
       operationId: createCategoryGroup
-      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CategoryGroupInput" } } } }
       responses:
         "201": { $ref: "#/components/responses/WrittenRow" }
@@ -196,7 +199,7 @@ paths:
         "426": { $ref: "#/components/responses/UpdateRequired" }
 
   /ledger/category-groups/{id}:
-    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
     put:
       summary: Update a category group
       operationId: updateCategoryGroup
@@ -223,7 +226,7 @@ paths:
     post:
       summary: Create a category in a live group of the caller's ledger
       operationId: createExpenseCategory
-      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategoryInput" } } } }
       responses:
         "201": { $ref: "#/components/responses/WrittenRow" }
@@ -233,7 +236,7 @@ paths:
         "426": { $ref: "#/components/responses/UpdateRequired" }
 
   /ledger/expense-categories/{id}:
-    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
     put:
       summary: Update a category, possibly moving it to another group
       operationId: updateExpenseCategory
@@ -260,7 +263,7 @@ paths:
     post:
       summary: Record income earned by the caller
       operationId: createIncomeRecord
-      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/IncomeRecordInput" } } } }
       responses:
         "201": { $ref: "#/components/responses/WrittenRow" }
@@ -269,7 +272,7 @@ paths:
         "426": { $ref: "#/components/responses/UpdateRequired" }
 
   /ledger/income-records/{id}:
-    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
     put:
       summary: Update one of the caller's income records
       description: Another member's income is visible but returns 403.
@@ -298,7 +301,7 @@ paths:
       summary: Set the caller's base income
       description: The ledger's base income is the sum over its members.
       operationId: putBaseIncome
-      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BaseIncomeInput" } } } }
       responses:
         "200": { $ref: "#/components/responses/WrittenRow" }
@@ -309,9 +312,9 @@ paths:
   /ledger/recurring-expenses:
     post:
       summary: Create a recurring expense
-      description: The `allowance` wallet is accepted only in a household. The category must be live in the caller's ledger.
+      description: The category must be live in the target ledger.
       operationId: createRecurringExpense
-      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RecurringExpenseInput" } } } }
       responses:
         "201": { $ref: "#/components/responses/WrittenRow" }
@@ -320,10 +323,9 @@ paths:
         "426": { $ref: "#/components/responses/UpdateRequired" }
 
   /ledger/recurring-expenses/{id}:
-    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
     put:
       summary: Update a recurring expense
-      description: The wallet can't change (400).
       operationId: updateRecurringExpense
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RecurringExpenseInput" } } } }
       responses:
@@ -344,7 +346,7 @@ paths:
         "426": { $ref: "#/components/responses/UpdateRequired" }
 
   /ledger/recurring-expenses/{id}/confirm:
-    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
     post:
       summary: Post a recurring expense's amount for a month
       description: |
@@ -365,7 +367,7 @@ paths:
     post:
       summary: Create a savings goal
       operationId: createSavingsGoal
-      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SavingsGoalInput" } } } }
       responses:
         "201": { $ref: "#/components/responses/WrittenRow" }
@@ -374,7 +376,7 @@ paths:
         "426": { $ref: "#/components/responses/UpdateRequired" }
 
   /ledger/savings-goals/{id}:
-    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
     put:
       summary: Update a savings goal
       operationId: updateSavingsGoal
@@ -397,7 +399,7 @@ paths:
         "426": { $ref: "#/components/responses/UpdateRequired" }
 
   /ledger/savings-goals/{id}/postings:
-    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }]
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
     post:
       summary: Record a manual savings posting for a month
       description: A month with a manual posting gets no automatic posting.
@@ -414,7 +416,7 @@ paths:
     put:
       summary: Set the ledger's budget
       operationId: putBudget
-      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BudgetInput" } } } }
       responses:
         "200": { $ref: "#/components/responses/WrittenRow" }
@@ -430,7 +432,7 @@ paths:
         max(0, income − Σ base incomes) − already allocated (400). Allocations are
         append-only.
       operationId: createSurplusAllocation
-      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SurplusAllocationInput" } } } }
       responses:
         "201": { $ref: "#/components/responses/WrittenRow" }
@@ -448,12 +450,20 @@ components:
       schema:
         type: string
         format: uuid
+    LedgerTarget:
+      name: ledger
+      in: query
+      description: The caller's ledger a command writes to. The ledger is resolved from the token.
+      schema:
+        type: string
+        enum: [personal, household]
+        default: personal
     SyncProtocol:
       name: X-Atoikura-Sync-Protocol
       in: header
       required: true
       description: |
-        Sync protocol version of the client (currently 1). The server answers 426 when it
+        Sync protocol version of the client (currently 2). The server answers 426 when it
         is missing or older than the oldest supported version, and returns its own
         version in the same response header.
       schema:
@@ -553,9 +563,8 @@ components:
     RecurringExpenseInput:
       type: object
       additionalProperties: false
-      required: [wallet, name, emoji, billing_day, type, category_id]
+      required: [name, emoji, billing_day, type, category_id]
       properties:
-        wallet: { type: string, enum: [ledger, allowance] }
         name: { type: string, minLength: 1, maxLength: 50 }
         emoji: { type: string }
         billing_day: { type: integer, minimum: 1, maximum: 31 }
@@ -681,7 +690,10 @@ components:
       description: Allowed fields for `journal_entries` (field names → FieldValue).
       additionalProperties: false
       properties:
-        wallet:
+        ledger:
+          description: |
+            Target of a new entry, `personal` or `household` (required on create). The
+            server resolves it to a ledger; an existing entry can't move (`IMMUTABLE`).
           $ref: "#/components/schemas/FieldValue"
         transaction_date:
           $ref: "#/components/schemas/FieldValue"
@@ -796,6 +808,10 @@ components:
         id:
           type: string
           description: UUID; for `allowance_totals`, the composite key "<member_id>:<year_month>"
+        ledger_id:
+          type: string
+          format: uuid
+          description: The ledger the row lives in
         owner_id:
           type: integer
           format: int64
@@ -816,10 +832,17 @@ components:
 
     PullResponse:
       type: object
-      required: [ledger_id, rows, next_since, has_more]
+      required: [ledger_ids, personal_ledger_id, household_ledger_id, rows, next_since, has_more]
       properties:
-        ledger_id:
+        ledger_ids:
+          type: array
+          description: Every ledger the page covers (personal, household, archives)
+          items: { type: string, format: uuid }
+        personal_ledger_id:
           type: string
+          format: uuid
+        household_ledger_id:
+          type: [string, "null"]
           format: uuid
         rows:
           type: array

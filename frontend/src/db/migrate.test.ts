@@ -58,7 +58,7 @@ describe("runMigrations", () => {
   it("creates the full schema on an empty database", () => {
     const applied_versions = runMigrations(test_db, MIGRATIONS);
 
-    expect(applied_versions).toEqual([1, 2]);
+    expect(applied_versions).toEqual([1, 2, 3]);
     expect(getSchemaVersion(test_db)).toBe(MIGRATIONS.length);
     expect(listTableNames(test_db)).toEqual(EXPECTED_TABLES);
   });
@@ -87,8 +87,8 @@ describe("runMigrations", () => {
     ];
     runMigrations(test_db, MIGRATIONS);
     test_db.exec(
-      `INSERT INTO journal_entries (id, ledger_id, owner_id, wallet, transaction_date, amount, category_id)
-       VALUES ('j1', 'l1', 1, 'ledger', '2026-10-01', 1200, 'c1')`
+      `INSERT INTO journal_entries (id, ledger_id, owner_id, transaction_date, amount, category_id)
+       VALUES ('j1', 'l1', 1, '2026-10-01', 1200, 'c1')`
     );
 
     const applied_versions = runMigrations(test_db, upgrade_migrations);
@@ -128,15 +128,39 @@ describe("runMigrations", () => {
     expect(() => runMigrations(test_db, gapped_migrations)).toThrow(SchemaVersionError);
   });
 
-  it("enforces the wallet constraint on journal entries", () => {
+  it("drops the wallet and restarts the pull when upgrading to attachable ledgers", () => {
+    runMigrations(
+      test_db,
+      MIGRATIONS.filter((migration) => migration.version <= 2)
+    );
+    test_db.exec(
+      `INSERT INTO journal_entries (id, ledger_id, owner_id, wallet, transaction_date, amount, category_id)
+       VALUES ('j1', 'l1', 1, 'ledger', '2026-10-01', 1200, 'c1')`
+    );
+    test_db.exec("INSERT INTO ledgers (id, kind) VALUES ('l1', 'personal')");
+    test_db.exec(
+      "INSERT INTO _sync_state (singleton_id, device_id, ledger_id, since) VALUES (1, 'd1', 'l1', 42)"
+    );
+
+    expect(runMigrations(test_db, MIGRATIONS)).toEqual([3]);
+    expect(test_db.selectRows("SELECT id, ledger_id, amount FROM journal_entries")).toEqual([
+      { id: "j1", ledger_id: "l1", amount: 1200 },
+    ]);
+    expect(test_db.selectRows("SELECT COUNT(*) AS ledger_count FROM ledgers")).toEqual([
+      { ledger_count: 0 },
+    ]);
+    expect(
+      test_db.selectRows(
+        "SELECT ledger_id, household_ledger_id, ledger_ids, since FROM _sync_state"
+      )
+    ).toEqual([{ ledger_id: "l1", household_ledger_id: null, ledger_ids: null, since: 0 }]);
+  });
+
+  it("accepts only the known ledger kinds", () => {
     runMigrations(test_db, MIGRATIONS);
 
-    expect(() =>
-      test_db.exec(
-        `INSERT INTO journal_entries (id, ledger_id, owner_id, wallet, transaction_date, amount, category_id)
-         VALUES ('j1', 'l1', 1, 'pocket', '2026-10-01', 1200, 'c1')`
-      )
-    ).toThrow();
+    test_db.exec("INSERT INTO ledgers (id, kind) VALUES ('a1', 'archive')");
+    expect(() => test_db.exec("INSERT INTO ledgers (id, kind) VALUES ('w1', 'wallet')")).toThrow();
   });
 });
 
