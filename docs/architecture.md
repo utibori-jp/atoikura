@@ -48,7 +48,9 @@ atoikura/
 │   ├── public/
 │   │   └── icons/              # PWA manifest icons (192px, 512px)
 │   ├── Dockerfile
-│   ├── nginx.conf
+│   ├── nginx.conf.template     # nginx config with the security headers (filled in at start)
+│   ├── docker-entrypoint.d/    # derives the CSP's API origin from VITE_API_URL
+│   ├── securityHeaders.ts      # CSP and security headers (vite preview + nginx)
 │   ├── .env.example
 │   ├── package.json
 │   └── vite.config.ts          # VitePWA plugin configuration: precache and update behaviour

@@ -11,7 +11,7 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: /(demo|pwa)\.spec\.ts/,
+      testIgnore: /(demo|pwa|csp)\.spec\.ts/,
     },
     {
       // The static demo build, served by its own dev server with no backend.
@@ -20,10 +20,11 @@ export default defineConfig({
       testMatch: /demo\.spec\.ts/,
     },
     {
-      // The production build with its service worker, served by vite preview.
+      // The production build with its service worker and security headers,
+      // served by vite preview.
       name: "pwa",
       use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:4173" },
-      testMatch: /pwa\.spec\.ts/,
+      testMatch: /(pwa|csp)\.spec\.ts/,
     },
   ],
   webServer: [
@@ -37,6 +38,8 @@ export default defineConfig({
       // contained; mirrors docker-compose.yml's backend service.
       env: {
         JWT_SECRET: process.env.JWT_SECRET ?? "dev-jwt-secret-change-in-production",
+        // The dev server, and the production build under vite preview (csp.spec.ts).
+        CORS_ALLOWED_ORIGIN: "http://localhost:3000,http://localhost:4173",
       },
     },
     {

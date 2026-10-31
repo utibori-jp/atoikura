@@ -1,0 +1,8 @@
+#!/bin/sh
+# Sourced by the nginx image before it fills in the config templates: the API
+# origin for the CSP's connect-src, taken from the build's VITE_API_URL unless
+# API_ORIGIN is set explicitly.
+if [ -z "${API_ORIGIN:-}" ]; then
+  API_ORIGIN=$(printf '%s' "${VITE_API_URL:-}" | sed -E 's#^(https?://[^/]+).*#\1#')
+fi
+export API_ORIGIN

@@ -1,6 +1,8 @@
+import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+import { apiOriginOf, securityHeaders } from "./securityHeaders";
 
 // The "demo" mode produces the static, MSW-backed GitHub Pages build (#142):
 // it is served from a project-site subpath and must NOT register the PWA service
@@ -79,6 +81,11 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       port: 3000,
+    },
+    // The production build under the production security headers (#208), as
+    // nginx.conf.template sends them; the E2E suite checks for CSP violations here.
+    preview: {
+      headers: securityHeaders(apiOriginOf(loadEnv(mode, process.cwd(), "VITE_").VITE_API_URL)),
     },
     // SQLite WASM (local-first DB, #199) locates sqlite3.wasm relative to its own
     // module, which breaks if Vite pre-bundles it. The DB runs in a module worker.
