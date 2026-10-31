@@ -3,6 +3,7 @@ import { deleteJournalEntry, listJournalDays, type JournalEntryView } from "../.
 import { useLedgerData, useLocalData } from "../../data/ledgerData";
 import { listDailyNotes, saveDailyNote } from "../../data/notes";
 import { T } from "../../theme";
+import { JournalCsvButton } from "../JournalCsvButton";
 import { MonthSwitcher } from "../MonthSwitcher";
 import { noteRows } from "../noteRows";
 import { useConfirm } from "../dialogContext";
@@ -165,6 +166,7 @@ export function WebJournal({ year_month, onYearMonthChange, onEditEntry }: Props
             日ごとの記録をふりかえり、コメントを残せます
           </div>
         </div>
+        <JournalCsvButton year_month={year_month} journal_days={entries} />
       </div>
 
       <div

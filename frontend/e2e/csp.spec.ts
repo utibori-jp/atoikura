@@ -57,6 +57,15 @@ test("the app runs under its CSP without violations", async ({ page }) => {
   // Every main screen, including an online edit.
   await page.getByRole("button", { name: /仕訳/ }).first().click();
   await expect(page.getByText("E2E CSPランチ", { exact: true })).toBeVisible();
+  // The month's CSV is saved from the local copy through a blob URL.
+  const [csv_download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "⬇ CSV" }).click(),
+  ]);
+  expect(csv_download.suggestedFilename()).toMatch(/^atoikura-journal-\d{4}-\d{2}\.csv$/);
+  const csv_chunks: Buffer[] = [];
+  for await (const csv_chunk of await csv_download.createReadStream()) csv_chunks.push(csv_chunk);
+  expect(Buffer.concat(csv_chunks).toString("utf8")).toContain(",E2E CSPランチ,640,");
   await page.getByRole("button", { name: /予算/ }).first().click();
   await expect(page.getByText("今月の予算プラン")).toBeVisible();
   await page.getByText("毎月の見込み収入").click();
