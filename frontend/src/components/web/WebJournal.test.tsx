@@ -21,7 +21,7 @@ function serveJournal() {
 describe("WebJournal on the local database", () => {
   it("lists the month's entries and offers edit/delete only for the user's own", async () => {
     await renderWithLedger(
-      <WebJournal year_month="2026-10" onEditEntry={() => {}} />,
+      <WebJournal year_month="2026-10" onYearMonthChange={() => {}} onEditEntry={() => {}} />,
       serveJournal()
     );
 
@@ -35,7 +35,7 @@ describe("WebJournal on the local database", () => {
 
   it("deletes an entry after confirmation, on the device", async () => {
     const { local_db } = await renderWithLedger(
-      <WebJournal year_month="2026-10" onEditEntry={() => {}} />,
+      <WebJournal year_month="2026-10" onYearMonthChange={() => {}} onEditEntry={() => {}} />,
       serveJournal()
     );
     await screen.findByText("パン", undefined, INITIAL_LOAD);
@@ -53,7 +53,7 @@ describe("WebJournal on the local database", () => {
 
   it("saves a day's note as the user types", async () => {
     const { local_db } = await renderWithLedger(
-      <WebJournal year_month="2026-10" onEditEntry={() => {}} />,
+      <WebJournal year_month="2026-10" onYearMonthChange={() => {}} onEditEntry={() => {}} />,
       serveJournal()
     );
     await screen.findByText("パン", undefined, INITIAL_LOAD);

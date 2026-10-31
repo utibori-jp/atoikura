@@ -3,6 +3,7 @@ import { deleteJournalEntry, listJournalDays, type JournalEntryView } from "../.
 import { useLedgerData, useLocalData } from "../../data/ledgerData";
 import { listDailyNotes, saveDailyNote } from "../../data/notes";
 import { T } from "../../theme";
+import { MonthSwitcher } from "../MonthSwitcher";
 import { useConfirm } from "../dialogContext";
 import { emojiForGroup } from "../mobile/groupEmoji";
 
@@ -17,6 +18,7 @@ function formatDateParts(date_str: string): { day: number; month: number; weekda
 
 interface Props {
   year_month: string;
+  onYearMonthChange: (year_month: string) => void;
   onEditEntry: (entry: JournalEntryView) => void;
 }
 
@@ -91,7 +93,7 @@ function DailyNoteField({ date, initial_note }: { date: string; initial_note: st
   );
 }
 
-export function WebJournal({ year_month, onEditEntry }: Props) {
+export function WebJournal({ year_month, onYearMonthChange, onEditEntry }: Props) {
   const confirm = useConfirm();
   const ledger_data = useLedgerData();
   const { data: journal_data, error_message: load_error_message } = useLocalData(
@@ -194,6 +196,8 @@ export function WebJournal({ year_month, onEditEntry }: Props) {
           />
         </div>
       </div>
+
+      <MonthSwitcher year_month={year_month} onYearMonthChange={onYearMonthChange} />
 
       {error_msg && <div style={{ color: T.coralDeep, fontSize: 13 }}>{error_msg}</div>}
 

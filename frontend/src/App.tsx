@@ -19,6 +19,7 @@ import { WebIncome } from "./components/web/WebIncome";
 import { WebReview } from "./components/web/WebReview";
 import { WebJournal } from "./components/web/WebJournal";
 import { WebMaster } from "./components/web/WebMaster";
+import { MonthSwitcher } from "./components/MonthSwitcher";
 import { SyncStatusIndicator } from "./components/SyncStatusIndicator";
 import type { JournalEntryView } from "./data/journal";
 import { LedgerDataProvider } from "./data/LedgerDataProvider";
@@ -38,19 +39,15 @@ type BudgetSubScreen = "hub" | "income" | "recurring" | "savings";
 // the native Back button walks screens instead of leaving the SPA (#165).
 type NavLocation = { tab: Tab; sub: BudgetSubScreen };
 
-function useMediaQuery(media_query: string): boolean {
-  const [is_matching, setIsMatching] = useState(() => window.matchMedia(media_query).matches);
+function useMobile(): boolean {
+  const [is_mobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 1023px)").matches);
   useEffect(() => {
-    const mq = window.matchMedia(media_query);
-    const handler = (e: MediaQueryListEvent) => setIsMatching(e.matches);
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, [media_query]);
-  return is_matching;
-}
-
-function useMobile(): boolean {
-  return useMediaQuery("(max-width: 1023px)");
+  }, []);
+  return is_mobile;
 }
 
 function LogoIcon() {
@@ -102,17 +99,6 @@ const MOBILE_TAB_ITEMS: { id: Tab | "add"; label: string; emoji: string }[] = [
 
 function currentMonthJST(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(0, 7);
-}
-
-function addMonths(ym: string, delta: number): string {
-  const [year, month] = ym.split("-").map(Number);
-  const date = new Date(year, month - 1 + delta, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function formatMonthJP(ym: string): string {
-  const [year, month] = ym.split("-").map(Number);
-  return `${year}年${month}月`;
 }
 
 interface UserPillProps {
@@ -176,24 +162,17 @@ function UserPill({ user, active, onClick }: UserPillProps) {
 interface NavBarProps {
   active: Tab;
   onChange: (tab: Tab) => void;
-  listYearMonth: string;
-  onListMonthChange: (ym: string) => void;
   user: UserProfile;
 }
 
-function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: NavBarProps) {
-  const isCurrent = listYearMonth >= currentMonthJST();
-  // Narrow desktop widths: drop the wordmark and nav emojis and tighten spacing so the nav,
-  // the journal month switcher and the sync pill stay on one line.
-  const is_compact = useMediaQuery("(max-width: 1279px)");
-
+function NavBar({ active, onChange, user }: NavBarProps) {
   return (
     <header
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: is_compact ? "14px 24px" : "14px 36px",
+        padding: "14px 36px",
         background: T.card,
         borderBottom: `1px solid ${T.hair}`,
         boxShadow: "0 2px 12px -8px rgba(80,40,10,0.12)",
@@ -206,19 +185,17 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
       {/* Logo */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
         <LogoIcon />
-        {!is_compact && (
-          <span
-            style={{
-              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
-              fontWeight: 900,
-              fontSize: 22,
-              letterSpacing: "-0.01em",
-              color: T.ink,
-            }}
-          >
-            Atoikura
-          </span>
-        )}
+        <span
+          style={{
+            fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+            fontWeight: 900,
+            fontSize: 22,
+            letterSpacing: "-0.01em",
+            color: T.ink,
+          }}
+        >
+          Atoikura
+        </span>
       </div>
 
       {/* Nav pills */}
@@ -237,7 +214,7 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
             key={item.id}
             onClick={() => onChange(item.id)}
             style={{
-              padding: is_compact ? "10px 14px" : "10px 18px",
+              padding: "10px 18px",
               borderRadius: 999,
               border: "none",
               background: active === item.id ? T.ink : "transparent",
@@ -253,69 +230,14 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
               whiteSpace: "nowrap",
             }}
           >
-            {!is_compact && <span style={{ fontSize: 14 }}>{item.emoji}</span>}
+            <span style={{ fontSize: 14 }}>{item.emoji}</span>
             {item.label}
           </button>
         ))}
       </nav>
 
-      {/* Right: month nav (list) + user pill */}
+      {/* Right: sync status + user pill */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-        {active === "list" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button
-              onClick={() => onListMonthChange(addMonths(listYearMonth, -1))}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                color: T.inkSoft,
-                fontSize: 13,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              ‹
-            </button>
-            <span
-              style={{
-                padding: "6px 16px",
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                fontSize: 13,
-                fontWeight: 600,
-                color: T.ink,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {formatMonthJP(listYearMonth)}
-            </span>
-            <button
-              onClick={() => onListMonthChange(addMonths(listYearMonth, 1))}
-              disabled={isCurrent}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                fontSize: 13,
-                cursor: isCurrent ? "default" : "pointer",
-                color: isCurrent ? T.hair : T.inkSoft,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              ›
-            </button>
-          </div>
-        )}
         <SyncStatusIndicator />
         <UserPill user={user} active={active === "account"} onClick={() => onChange("account")} />
       </div>
@@ -634,8 +556,6 @@ function AppContent({
 
   const { session } = session_state;
 
-  const isCurrent = list_year_month >= currentMonthJST();
-
   return (
     <SessionProvider session={session}>
       <div
@@ -656,8 +576,6 @@ function AppContent({
             // reset the budget sub-screen to the hub (#134) — otherwise the
             // header "予算" button leaves you stranded on income/recurring.
             onChange={(tab) => navigate({ tab, sub: "hub" })}
-            listYearMonth={list_year_month}
-            onListMonthChange={setListYearMonth}
             user={session.user}
           />
         )}
@@ -681,65 +599,12 @@ function AppContent({
             <LedgerDataProvider>
               {/* Month navigation for list tab on mobile */}
               {is_mobile && active_tab === "list" && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 16,
-                    justifyContent: "center",
-                  }}
-                >
-                  <button
-                    onClick={() => setListYearMonth(addMonths(list_year_month, -1))}
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 999,
-                      border: `1.5px solid ${T.hair}`,
-                      background: T.card,
-                      color: T.inkSoft,
-                      fontSize: 16,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    ‹
-                  </button>
-                  <span
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: 999,
-                      border: `1.5px solid ${T.hair}`,
-                      background: T.card,
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: T.ink,
-                    }}
-                  >
-                    {formatMonthJP(list_year_month)}
-                  </span>
-                  <button
-                    onClick={() => setListYearMonth(addMonths(list_year_month, 1))}
-                    disabled={isCurrent}
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 999,
-                      border: `1.5px solid ${T.hair}`,
-                      background: T.card,
-                      fontSize: 16,
-                      cursor: isCurrent ? "default" : "pointer",
-                      color: isCurrent ? T.hair : T.inkSoft,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    ›
-                  </button>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+                  <MonthSwitcher
+                    year_month={list_year_month}
+                    onYearMonthChange={setListYearMonth}
+                    is_mobile
+                  />
                 </div>
               )}
 
@@ -762,6 +627,7 @@ function AppContent({
                 ) : (
                   <WebJournal
                     year_month={list_year_month}
+                    onYearMonthChange={setListYearMonth}
                     onEditEntry={(entry) => {
                       setEditEntry(entry);
                       setShowEntrySheet(true);

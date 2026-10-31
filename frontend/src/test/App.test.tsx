@@ -81,8 +81,8 @@ describe("App — mobile layout (≤ 1023 px)", () => {
     fireEvent.click(screen.getByRole("button", { name: /仕訳/ }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "‹" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "›" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "前の月" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "次の月" })).toBeInTheDocument();
     });
   });
 
