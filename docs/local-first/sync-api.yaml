@@ -1,0 +1,1062 @@
+openapi: 3.1.0
+
+info:
+  title: atoikura sync API
+  version: 0.1.0-draft
+  description: |
+    Sync API for the hybrid local-first architecture (issue #198).
+    Semantics: docs/local-first/sync-protocol.md. Data model: docs/local-first/design.md.
+
+    The caller's user and ledgers are always derived from the bearer token. A write
+    names a target, `personal` or `household` (design.md D15); `owner_id` and
+    `ledger_id` are never accepted in a request.
+    Online-only collections are written through the REST commands under `/ledger`,
+    and every device reads them through pull. Households are created, joined, left
+    and dissolved through `/household` (design.md §6).
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+paths:
+  /sync/push:
+    post:
+      summary: Push a batch of offline-writable changes
+      description: |
+        Only `journal_entries`, `daily_notes` and `monthly_review_notes` are accepted.
+        Changes are validated and applied independently, and the result is reported per
+        change. Superseded fields (older HLC, or a tombstoned record) are not an error.
+        Request-level errors apply nothing.
+      operationId: pushChanges
+      parameters:
+        - $ref: "#/components/parameters/SyncProtocol"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushRequest"
+      responses:
+        "200":
+          description: Results, one per change and in request order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: Body larger than 1 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          $ref: "#/components/responses/UpdateRequired"
+
+  /sync/pull:
+    get:
+      summary: Pull every visible change after a cursor
+      description: |
+        Returns the rows visible to the caller in their personal ledger, attached household
+        and archives, with `since < seq ≤ watermark`, ordered by seq. If `ledger_ids`
+        differs from the set the device has stored, the device resets its cursor to 0,
+        drops the rows of ledgers no longer listed, and pulls again.
+      operationId: pullChanges
+      parameters:
+        - $ref: "#/components/parameters/SyncProtocol"
+        - name: since
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 500
+      responses:
+        "200":
+          description: Changed rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "426":
+          $ref: "#/components/responses/UpdateRequired"
+
+  /auth/token:
+    post:
+      summary: Log in and get an access token and a refresh token
+      description: |
+        The access token lives 1 hour. The refresh token lives 90 days, is bound to one
+        device (a token family), and is stored only as a SHA-256 hash on the server.
+      operationId: issueTokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                device_name:
+                  type: string
+                  maxLength: 100
+      responses:
+        "200":
+          description: Token pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/refresh:
+    post:
+      summary: Exchange a refresh token for a new token pair
+      description: |
+        The presented refresh token is rotated: it can't be used again. Presenting a
+        token that was already rotated revokes its whole family (theft detection), and
+        the device must log in again.
+      operationId: refreshTokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/logout:
+    post:
+      summary: Revoke the refresh token family of this device
+      description: Answers 204 for any well-formed request, so it reveals nothing about the token.
+      operationId: logout
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "204":
+          description: Revoked (or unknown)
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  # --- REST commands for online-only collections (#213) ---
+  # Every command needs the X-Atoikura-Sync-Protocol header, rejects unknown body
+  # fields (so a body can't name an owner or a ledger), and returns the written row
+  # in the shape pull returns it. The same row reaches other devices through pull.
+  # The ?ledger= query parameter picks the caller's personal (default) or household
+  # ledger. Rows of any other ledger (including other members' personal ledgers)
+  # are reported as 404; `ledger=household` without a household is 403.
+
+  /ledger/category-groups:
+    post:
+      summary: Create a category group
+      operationId: createCategoryGroup
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CategoryGroupInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/category-groups/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+    put:
+      summary: Update a category group
+      operationId: updateCategoryGroup
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CategoryGroupInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    delete:
+      summary: Delete a category group
+      description: Rejected with 400 while the group still has live categories.
+      operationId: deleteCategoryGroup
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/expense-categories:
+    post:
+      summary: Create a category in a live group of the caller's ledger
+      operationId: createExpenseCategory
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategoryInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/expense-categories/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+    put:
+      summary: Update a category, possibly moving it to another group
+      operationId: updateExpenseCategory
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategoryInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    delete:
+      summary: Delete a category
+      description: Entries that reference it stay valid; devices flag them.
+      operationId: deleteExpenseCategory
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/income-records:
+    post:
+      summary: Record income earned by the caller
+      operationId: createIncomeRecord
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/IncomeRecordInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/income-records/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+    put:
+      summary: Update one of the caller's income records
+      description: Another member's income is visible but returns 403.
+      operationId: updateIncomeRecord
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/IncomeRecordInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    delete:
+      summary: Delete one of the caller's income records
+      operationId: deleteIncomeRecord
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/base-income:
+    put:
+      summary: Set the caller's base income
+      description: The ledger's base income is the sum over its members.
+      operationId: putBaseIncome
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BaseIncomeInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/recurring-expenses:
+    post:
+      summary: Create a recurring expense
+      description: The category must be live in the target ledger.
+      operationId: createRecurringExpense
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RecurringExpenseInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/recurring-expenses/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+    put:
+      summary: Update a recurring expense
+      operationId: updateRecurringExpense
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RecurringExpenseInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    delete:
+      summary: Delete a recurring expense
+      description: Entries it already posted stay.
+      operationId: deleteRecurringExpense
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/recurring-expenses/{id}/confirm:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+    post:
+      summary: Post a recurring expense's amount for a month
+      description: |
+        Creates the month's journal entry on the billing day (clamped to the month's last
+        day) and returns it. Each recurring expense is posted at most once per month,
+        also if that posting was deleted later (409).
+      operationId: confirmRecurringExpense
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MonthlyAmountInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/savings-goals:
+    post:
+      summary: Create a savings goal
+      operationId: createSavingsGoal
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SavingsGoalInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/savings-goals/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+    put:
+      summary: Update a savings goal
+      operationId: updateSavingsGoal
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SavingsGoalInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    delete:
+      summary: Delete a savings goal
+      description: Its postings stay as history.
+      operationId: deleteSavingsGoal
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/savings-goals/{id}/postings:
+    parameters: [{ $ref: "#/components/parameters/RowId" }, { $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+    post:
+      summary: Record a manual savings posting for a month
+      description: A month with a manual posting gets no automatic posting.
+      operationId: createSavingsPosting
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MonthlyAmountInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/budget:
+    put:
+      summary: Set the ledger's budget
+      operationId: putBudget
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BudgetInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /ledger/surplus-allocations:
+    post:
+      summary: Allocate part of a month's surplus
+      description: |
+        The amount may not exceed the month's unallocated surplus,
+        max(0, income − Σ base incomes) − already allocated (400). Allocations are
+        append-only. A personal ledger takes no allocations while a household is
+        attached (400): what is left of the allowance carries over to the next month
+        (design.md §3).
+      operationId: createSurplusAllocation
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }, { $ref: "#/components/parameters/LedgerTarget" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SurplusAllocationInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+  /household:
+    post:
+      summary: Create a household with the caller as its owner
+      description: |
+        The household starts with a copy of the caller's live categories, recurring
+        expenses and base income, with new IDs; no history is copied (design.md §6, Q7).
+        409 when the caller already has a household attached.
+      operationId: createHousehold
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/HouseholdInput" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/HouseholdLedger" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/invitations:
+    post:
+      summary: Invite someone to the caller's household
+      description: |
+        Returns a link token and a short code naming the same invitation, valid for 24
+        hours and usable once (Q8). The token is shown only in this response: the server
+        stores its SHA-256 hash. A household can have at most 10 open invitations (409).
+      operationId: createHouseholdInvitation
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "201":
+          description: The new invitation
+          content: { application/json: { schema: { $ref: "#/components/schemas/Invitation" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+    get:
+      summary: List the open invitations of the caller's household
+      operationId: listHouseholdInvitations
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "200":
+          description: Invitations that can still be redeemed, without their tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [invitations]
+                properties:
+                  invitations: { type: array, items: { $ref: "#/components/schemas/Invitation" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/invitations/{id}:
+    parameters: [{ $ref: "#/components/parameters/RowId" }]
+    delete:
+      summary: Revoke an open invitation of the caller's household
+      operationId: revokeHouseholdInvitation
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "204": { description: Revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/join:
+    post:
+      summary: Redeem an invitation
+      description: |
+        Names the invitation by the link's `token` or by the short `code` (case and
+        hyphens are ignored); exactly one of them. The caller's base income is copied into
+        the household (Q10) and their allowance balance starts this month. 404 when the
+        invitation is unknown, used, revoked or expired; after 10 such failures within an
+        hour the caller gets 429 until older failures age out. 409 when the caller already
+        has a household attached.
+      operationId: joinHousehold
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JoinInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/HouseholdLedger" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /household/leave:
+    post:
+      summary: Leave the caller's household
+      description: |
+        Ends the membership, copies the household's journal entries and income records up
+        to today (with the categories they use) into a new read-only archive ledger of the
+        caller, and copies their household base income back to their personal ledger (Q9).
+        The owner can't leave (409): they remove the other members and dissolve instead.
+      operationId: leaveHousehold
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "204": { description: Left }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/members/{user_id}:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    delete:
+      summary: Remove a member (owner only)
+      description: The member is detached as by leave and gets their own archive.
+      operationId: removeHouseholdMember
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "204": { description: Removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/dissolve:
+    post:
+      summary: Dissolve the household (owner only, once alone)
+      description: |
+        The household ledger becomes the owner's archive, its open invitations are
+        revoked and its allowance totals are deleted. The owner's base income is copied
+        back to their personal ledger.
+      operationId: dissolveHousehold
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      responses:
+        "204": { description: Dissolved }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+  /household/allowances:
+    put:
+      summary: Set a member's allowance from a month on
+      description: |
+        Any member can set the allowance of any active member (design.md Q4). Setting the
+        same month again replaces the amount.
+      operationId: putHouseholdAllowance
+      parameters: [{ $ref: "#/components/parameters/SyncProtocol" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AllowanceInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/WrittenRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+
+components:
+  parameters:
+    RowId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LedgerTarget:
+      name: ledger
+      in: query
+      description: The caller's ledger a command writes to. The ledger is resolved from the token.
+      schema:
+        type: string
+        enum: [personal, household]
+        default: personal
+    SyncProtocol:
+      name: X-Atoikura-Sync-Protocol
+      in: header
+      required: true
+      description: |
+        Sync protocol version of the client (currently 2). The server answers 426 when it
+        is missing or older than the oldest supported version, and returns its own
+        version in the same response header.
+      schema:
+        type: integer
+        minimum: 1
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Sent in the `Authorization` header (not a cookie). Access tokens live 1 hour; use /auth/refresh to get a new one.
+
+  responses:
+    HouseholdLedger:
+      description: The caller's household; the next pull covers it
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [household_ledger_id]
+            properties:
+              household_ledger_id: { type: string, format: uuid }
+    TooManyRequests:
+      description: Too many failed attempts; try again later (code TOO_MANY_REQUESTS)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    WrittenRow:
+      description: The written row, in the shape pull returns it (a tombstone for deletes)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/PulledRow"
+    Forbidden:
+      description: The row is visible to the caller but only its author may change it
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: No live row with this ID in the caller's ledger
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: A uniqueness invariant would break
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UpdateRequired:
+      description: The client speaks a sync protocol the server no longer supports (code UPDATE_REQUIRED).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    BadRequest:
+      description: Malformed request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing, invalid or expired token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    CategoryGroupInput:
+      type: object
+      additionalProperties: false
+      required: [name, statement_type_code]
+      properties:
+        name: { type: string, minLength: 1, description: Unique among the ledger's live groups }
+        statement_type_code: { type: string, enum: [food, other, fixed, excluded] }
+        description: { type: [string, "null"] }
+
+    ExpenseCategoryInput:
+      type: object
+      additionalProperties: false
+      required: [group_id, name]
+      properties:
+        group_id: { type: string, format: uuid, description: A live group of the caller's ledger }
+        name: { type: string, minLength: 1, description: Unique among the group's live categories }
+        description: { type: [string, "null"] }
+
+    IncomeRecordInput:
+      type: object
+      additionalProperties: false
+      required: [transaction_date, amount, name, income_type, emoji]
+      description: The earner is always the caller.
+      properties:
+        transaction_date: { type: string, format: date }
+        amount: { type: integer, minimum: 1, maximum: 2147483647 }
+        name: { type: string, minLength: 1, maxLength: 50 }
+        income_type: { type: string, enum: [salary, side, bonus, oneoff] }
+        emoji: { type: string }
+        note: { type: string }
+
+    BaseIncomeInput:
+      type: object
+      additionalProperties: false
+      required: [amount]
+      properties:
+        amount: { type: integer, minimum: 0, maximum: 2147483647 }
+
+    RecurringExpenseInput:
+      type: object
+      additionalProperties: false
+      required: [name, emoji, billing_day, type, category_id]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50 }
+        emoji: { type: string }
+        billing_day: { type: integer, minimum: 1, maximum: 31 }
+        amount: { type: [integer, "null"], minimum: 1, maximum: 2147483647, description: Fixed expenses with an amount are posted every month }
+        type: { type: string, enum: [fixed, variable] }
+        category_id: { type: string, format: uuid }
+
+    MonthlyAmountInput:
+      type: object
+      additionalProperties: false
+      required: [amount, year_month]
+      properties:
+        amount: { type: integer, minimum: 1, maximum: 2147483647 }
+        year_month: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+
+    SavingsGoalInput:
+      type: object
+      additionalProperties: false
+      required: [name, emoji, monthly_amount, target_amount]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50 }
+        emoji: { type: string }
+        monthly_amount: { type: integer, minimum: 0, maximum: 2147483647 }
+        target_amount: { type: integer, minimum: 0, maximum: 2147483647 }
+        deadline: { type: [string, "null"], description: "YYYY-MM; an empty string clears it" }
+        memo: { type: string }
+
+    BudgetInput:
+      type: object
+      additionalProperties: false
+      required: [monthly_budget, goal_amount]
+      properties:
+        monthly_budget: { type: integer, minimum: 0, maximum: 2147483647 }
+        goal_text: { type: [string, "null"] }
+        goal_amount: { type: integer, minimum: 0, maximum: 2147483647 }
+
+    SurplusAllocationInput:
+      type: object
+      additionalProperties: false
+      required: [year_month, amount, destination]
+      description: "`savings_goal_id` is required for `savings` and forbidden for `budget`."
+      properties:
+        year_month: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        amount: { type: integer, minimum: 1, maximum: 2147483647 }
+        destination: { type: string, enum: [budget, savings] }
+        savings_goal_id: { type: [string, "null"], format: uuid }
+
+    HouseholdInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50 }
+
+    Invitation:
+      type: object
+      required: [id, short_code, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        token: { type: string, description: Only in the response that creates the invitation }
+        short_code: { type: string, pattern: "^[A-HJ-NP-Z2-9]{8}$" }
+        created_by: { type: integer, description: Only in the list }
+        expires_at: { type: string, format: date-time }
+
+    JoinInput:
+      type: object
+      additionalProperties: false
+      description: Exactly one of `token` and `code`.
+      properties:
+        token: { type: string, minLength: 1, maxLength: 128 }
+        code: { type: string, description: "The short code; case, spaces and hyphens are ignored" }
+
+    AllowanceInput:
+      type: object
+      additionalProperties: false
+      required: [member_id, effective_from, amount]
+      properties:
+        member_id: { type: integer, minimum: 1 }
+        effective_from: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        amount: { type: integer, minimum: 0, maximum: 2147483647 }
+
+    TokenPair:
+      type: object
+      required: [access_token, access_token_expires_at, refresh_token, refresh_token_expires_at, user_id]
+      properties:
+        access_token:
+          type: string
+        access_token_expires_at:
+          type: string
+          format: date-time
+        refresh_token:
+          type: string
+        refresh_token_expires_at:
+          type: string
+          format: date-time
+        user_id:
+          type: integer
+          format: int64
+
+    RefreshTokenRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    Hlc:
+      type: string
+      description: "Hybrid logical clock: <unix_ms 13 digits>-<counter 4 hex>-<device_id>. Ordered lexicographically."
+      pattern: "^[0-9]{13}-[0-9a-f]{4}-[0-9A-Za-z_-]{1,32}$"
+      maxLength: 51
+
+    PushableCollection:
+      type: string
+      enum: [journal_entries, daily_notes, monthly_review_notes]
+
+    PulledCollection:
+      type: string
+      enum:
+        - ledgers
+        - ledger_members
+        - category_groups
+        - expense_categories
+        - income_records
+        - base_incomes
+        - recurring_expenses
+        - savings_goals
+        - savings_postings
+        - budgets
+        - allowances
+        - surplus_allocations
+        - allowance_totals
+        - journal_entries
+        - daily_notes
+        - monthly_review_notes
+
+    FieldValue:
+      type: object
+      required: [value, hlc]
+      properties:
+        value:
+          description: Plain JSON value. It is validated by the server against the field's rules.
+        hlc:
+          $ref: "#/components/schemas/Hlc"
+
+    JournalEntryFields:
+      type: object
+      description: Allowed fields for `journal_entries` (field names → FieldValue).
+      additionalProperties: false
+      properties:
+        ledger:
+          description: |
+            Target of a new entry, `personal` or `household` (required on create). The
+            server resolves it to a ledger; an existing entry can't move (`IMMUTABLE`).
+          $ref: "#/components/schemas/FieldValue"
+        transaction_date:
+          $ref: "#/components/schemas/FieldValue"
+        item:
+          $ref: "#/components/schemas/FieldValue"
+        amount:
+          $ref: "#/components/schemas/FieldValue"
+        is_excluded:
+          $ref: "#/components/schemas/FieldValue"
+        category_id:
+          $ref: "#/components/schemas/FieldValue"
+        note:
+          $ref: "#/components/schemas/FieldValue"
+
+    DailyNoteFields:
+      type: object
+      additionalProperties: false
+      properties:
+        date:
+          $ref: "#/components/schemas/FieldValue"
+        note:
+          $ref: "#/components/schemas/FieldValue"
+
+    MonthlyReviewNoteFields:
+      type: object
+      additionalProperties: false
+      properties:
+        year_month:
+          $ref: "#/components/schemas/FieldValue"
+        category_id:
+          $ref: "#/components/schemas/FieldValue"
+        note:
+          $ref: "#/components/schemas/FieldValue"
+
+    Change:
+      type: object
+      required: [collection, id, fields]
+      additionalProperties: false
+      properties:
+        collection:
+          $ref: "#/components/schemas/PushableCollection"
+        id:
+          type: string
+          format: uuid
+        fields:
+          description: The field set must match `collection`. Unknown fields reject the change (UNKNOWN_FIELD).
+          oneOf:
+            - $ref: "#/components/schemas/JournalEntryFields"
+            - $ref: "#/components/schemas/DailyNoteFields"
+            - $ref: "#/components/schemas/MonthlyReviewNoteFields"
+        deleted_hlc:
+          description: Present to tombstone the record. Delete wins permanently.
+          $ref: "#/components/schemas/Hlc"
+
+    PushRequest:
+      type: object
+      required: [changes]
+      properties:
+        changes:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/Change"
+
+    PushResult:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [applied, rejected]
+        seq:
+          type: integer
+          format: int64
+          description: Present when anything was stored.
+        superseded:
+          type: array
+          description: Fields not stored because a newer value exists or the record is deleted.
+          items:
+            type: string
+        merged_into:
+          type: string
+          format: uuid
+          description: Present when a new note was merged into an existing note with the same natural key. The client re-keys its local row.
+        reason:
+          type: string
+          description: Present when rejected.
+          enum: [UNKNOWN_COLLECTION, UNKNOWN_FIELD, TOO_LARGE, CLOCK_SKEW, FORBIDDEN, INVALID, IMMUTABLE]
+        message:
+          type: string
+          description: A Japanese message that can be shown to the user, when rejected.
+
+    PushResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/PushResult"
+
+    PulledRow:
+      type: object
+      required: [collection, id, seq, deleted, data]
+      properties:
+        collection:
+          $ref: "#/components/schemas/PulledCollection"
+        id:
+          type: string
+          description: UUID; for `allowance_totals`, the composite key "<member_id>:<year_month>"
+        ledger_id:
+          type: string
+          format: uuid
+          description: The ledger the row lives in
+        owner_id:
+          type: integer
+          format: int64
+        seq:
+          type: integer
+          format: int64
+        deleted:
+          type: boolean
+        data:
+          type: object
+          description: The full row (every column of the collection except the envelope). Omitted values are null.
+          additionalProperties: true
+        field_hlc:
+          type: object
+          description: Offline-writable collections only.
+          additionalProperties:
+            $ref: "#/components/schemas/Hlc"
+
+    PullResponse:
+      type: object
+      required: [ledger_ids, personal_ledger_id, household_ledger_id, rows, next_since, has_more]
+      properties:
+        ledger_ids:
+          type: array
+          description: Every ledger the page covers (personal, household, archives)
+          items: { type: string, format: uuid }
+        personal_ledger_id:
+          type: string
+          format: uuid
+        household_ledger_id:
+          type: [string, "null"]
+          format: uuid
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/PulledRow"
+        next_since:
+          type: integer
+          format: int64
+        has_more:
+          type: boolean

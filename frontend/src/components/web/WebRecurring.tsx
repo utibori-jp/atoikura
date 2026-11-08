@@ -1,13 +1,32 @@
 import { useEffect, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import {
+  commandErrorMessage,
+  useCanEditOnline,
+  useLedgerApi,
+  type PendingRecurringView,
+  type RecurringExpenseFields,
+  type RecurringExpenseView,
+} from "../../data/ledgerApi";
+import type { CategoryGroupView, ExpenseCategoryView } from "../../data/journal";
+import { useDataVersion } from "../../session/sessionHooks";
+import { OnlineEditNotice } from "../OnlineEditNotice";
 import { T } from "../../theme";
 import { EmojiPicker } from "../EmojiPicker";
+import { Modal } from "../Modal";
+import { useConfirm } from "../dialogContext";
+import {
+  useEntityForm,
+  FormField,
+  AmountField,
+  SelectField,
+  FormError,
+  FormActions,
+} from "../forms";
 
-type RecurringExpense = components["schemas"]["RecurringExpense"];
-type PendingRecurring = components["schemas"]["PendingRecurring"];
-type ExpenseCategory = components["schemas"]["ExpenseCategory"];
-type CategoryGroup = components["schemas"]["CategoryGroup"];
+type RecurringExpense = RecurringExpenseView;
+type PendingRecurring = PendingRecurringView;
+type ExpenseCategory = ExpenseCategoryView;
+type CategoryGroup = CategoryGroupView;
 
 const FIXED_STATEMENT_TYPE_ID = 3;
 
@@ -29,7 +48,7 @@ type FilterType = "fixed" | "variable" | "all";
 
 // Form state for create / edit. id=null means "create mode".
 interface RecurringFormState {
-  id: number | null;
+  id: string | null;
   name: string;
   emoji: string;
   billing_day: string;
@@ -63,19 +82,19 @@ function recurring_to_form(r: RecurringExpense): RecurringFormState {
 }
 
 export function WebRecurring({ onBack }: Props) {
+  const api = useLedgerApi();
+  const data_version = useDataVersion();
+  const can_edit = useCanEditOnline();
+  const [command_error, setCommandError] = useState("");
+  const confirm = useConfirm();
   const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
   const [pending, setPending] = useState<PendingRecurring[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
-  const [confirm_amounts, setConfirmAmounts] = useState<Record<number, string>>({});
-  const [confirming_id, setConfirmingId] = useState<number | null>(null);
+  const [confirm_amounts, setConfirmAmounts] = useState<Record<string, string>>({});
+  const [confirming_id, setConfirmingId] = useState<string | null>(null);
   const [expense_categories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [category_groups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const ym = currentMonthJST();
-
-  // recurring_form=null means the form is hidden
-  const [recurring_form, setRecurringForm] = useState<RecurringFormState | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [form_error_msg, setFormErrorMsg] = useState("");
 
   const refresh_lists = async () => {
     const [rec_res, pend_res] = await Promise.all([
@@ -105,7 +124,7 @@ export function WebRecurring({ onBack }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [ym]);
+  }, [ym, api, data_version]);
 
   const fixed_group_id_set = new Set(
     category_groups.filter((g) => g.statement_type.id === FIXED_STATEMENT_TYPE_ID).map((g) => g.id)
@@ -121,11 +140,12 @@ export function WebRecurring({ onBack }: Props) {
     return true;
   });
 
-  const handle_confirm = async (id: number) => {
+  const handle_confirm = async (id: string) => {
     const amount_str = confirm_amounts[id];
     const amount = parseInt(amount_str ?? "", 10);
     if (isNaN(amount) || amount < 1) return;
     setConfirmingId(id);
+    setCommandError("");
     try {
       await api.confirmRecurringExpense(id, amount, ym);
       const [rec_res, pend_res] = await Promise.all([
@@ -139,102 +159,67 @@ export function WebRecurring({ onBack }: Props) {
         delete n[id];
         return n;
       });
-    } catch {
-      // ignore
+    } catch (confirm_error) {
+      setCommandError(commandErrorMessage(confirm_error, "確定できませんでした"));
     } finally {
       setConfirmingId(null);
     }
   };
 
-  const handle_delete = async (id: number) => {
-    if (!window.confirm("この定期支出を削除しますか？")) return;
-    await api.deleteRecurringExpense(id).catch(() => {});
-    setRecurring((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  const open_create_form = () => {
-    setRecurringForm(blank_recurring_form());
-    setFormErrorMsg("");
-  };
-
-  const open_edit_form = (r: RecurringExpense) => {
-    setRecurringForm(recurring_to_form(r));
-    setFormErrorMsg("");
-  };
-
-  const handle_recurring_submit = async () => {
-    if (!recurring_form) return;
-    setFormErrorMsg("");
-
-    if (!recurring_form.name.trim()) {
-      setFormErrorMsg("名前を入力してください");
-      return;
-    }
-    const parsed_billing_day = parseInt(recurring_form.billing_day, 10);
-    if (isNaN(parsed_billing_day) || parsed_billing_day < 1 || parsed_billing_day > 31) {
-      setFormErrorMsg("引落日を1〜31で入力してください");
-      return;
-    }
-
-    const parsed_category_id = parseInt(recurring_form.category_id, 10);
-    if (isNaN(parsed_category_id)) {
-      setFormErrorMsg("カテゴリを選択してください");
-      return;
-    }
-
-    let parsed_amount: number | null = null;
-    if (recurring_form.amount.trim() !== "") {
-      parsed_amount = parseInt(recurring_form.amount, 10);
-      if (isNaN(parsed_amount) || parsed_amount < 0) {
-        setFormErrorMsg("金額を正しく入力してください");
-        return;
-      }
-    }
-
-    setSubmitting(true);
+  const handle_delete = async (id: string) => {
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この定期支出を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
+    setCommandError("");
     try {
-      const request_body: components["schemas"]["RecurringExpenseRequest"] = {
-        name: recurring_form.name.trim(),
-        emoji: recurring_form.emoji.trim() || DEFAULT_RECURRING_EMOJI,
-        billing_day: parsed_billing_day,
-        amount: parsed_amount,
-        type: recurring_form.type,
-        category_id: parsed_category_id,
-      };
+      await api.deleteRecurringExpense(id);
+    } catch (delete_error) {
+      setCommandError(commandErrorMessage(delete_error, "削除できませんでした"));
+    }
+  };
 
-      if (recurring_form.id !== null) {
-        await api.updateRecurringExpense(recurring_form.id, request_body);
+  const recurring_form = useEntityForm<RecurringFormState, RecurringExpense>({
+    blank: blank_recurring_form,
+    fromEntity: recurring_to_form,
+    validate: (f) => {
+      if (!f.name.trim()) return "名前を入力してください";
+      const parsed_billing_day = parseInt(f.billing_day, 10);
+      if (isNaN(parsed_billing_day) || parsed_billing_day < 1 || parsed_billing_day > 31)
+        return "引落日を1〜31で入力してください";
+      if (!f.category_id) return "カテゴリを選択してください";
+      if (f.amount.trim() !== "") {
+        const parsed_amount = parseInt(f.amount, 10);
+        if (isNaN(parsed_amount) || parsed_amount < 0) return "金額を正しく入力してください";
+      }
+      return null;
+    },
+    onSubmit: async (f) => {
+      const request_body: RecurringExpenseFields = {
+        name: f.name.trim(),
+        emoji: f.emoji.trim() || DEFAULT_RECURRING_EMOJI,
+        billing_day: parseInt(f.billing_day, 10),
+        amount: f.amount.trim() !== "" ? parseInt(f.amount, 10) : null,
+        type: f.type,
+        category_id: f.category_id,
+      };
+      if (f.id !== null) {
+        await api.updateRecurringExpense(f.id, request_body);
       } else {
         await api.createRecurringExpense(request_body);
       }
-
       await refresh_lists();
-      setRecurringForm(null);
-    } catch (err) {
-      setFormErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+  });
 
   const filterPills: { id: FilterType; label: string }[] = [
     { id: "fixed", label: "固定" },
     { id: "variable", label: "要確認" },
     { id: "all", label: "すべて" },
   ];
-
-  const input_style: React.CSSProperties = {
-    width: "100%",
-    padding: "10px 12px",
-    border: `1.5px solid ${T.hair}`,
-    borderRadius: 12,
-    fontFamily: "inherit",
-    fontSize: 14,
-    color: T.ink,
-    background: T.bgSoft,
-    outline: "none",
-    boxSizing: "border-box",
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -272,7 +257,8 @@ export function WebRecurring({ onBack }: Props) {
           </div>
         </div>
         <button
-          onClick={open_create_form}
+          onClick={recurring_form.openCreate}
+          disabled={!can_edit}
           style={{
             border: "none",
             background: T.coral,
@@ -290,40 +276,32 @@ export function WebRecurring({ onBack }: Props) {
         </button>
       </div>
 
-      {/* Inline create / edit form */}
-      {recurring_form && (
-        <div
-          style={{
-            padding: "18px 20px",
-            borderRadius: 20,
-            background: T.bgSoft,
-            border: `1.5px solid ${T.hair}`,
-          }}
-        >
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
-            {recurring_form.id !== null ? "定期支出を編集" : "定期支出を追加"}
-          </div>
+      <OnlineEditNotice can_edit={can_edit} command_error={command_error} />
 
+      {/* Create / edit form as a centered modal popup (#131) */}
+      {recurring_form.form && (
+        <Modal
+          title={recurring_form.isEdit ? "定期支出を編集" : "定期支出を追加"}
+          onClose={recurring_form.close}
+          maxWidth={520}
+        >
           {/* Row 1: emoji + name */}
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: "0 0 80px" }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>絵文字</div>
-              <input
-                type="text"
-                value={recurring_form.emoji}
-                onChange={(e) => setRecurringForm((f) => f && { ...f, emoji: e.target.value })}
+              <FormField
+                label="絵文字"
+                value={recurring_form.form.emoji}
+                onChange={(v) => recurring_form.setField("emoji", v)}
                 placeholder="🏠"
-                style={{ ...input_style, textAlign: "center", fontSize: 20 }}
+                style={{ textAlign: "center", fontSize: 20 }}
               />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>名前</div>
-              <input
-                type="text"
-                value={recurring_form.name}
-                onChange={(e) => setRecurringForm((f) => f && { ...f, name: e.target.value })}
+              <FormField
+                label="名前"
+                value={recurring_form.form.name}
+                onChange={(v) => recurring_form.setField("name", v)}
                 placeholder="家賃"
-                style={input_style}
               />
             </div>
           </div>
@@ -331,8 +309,8 @@ export function WebRecurring({ onBack }: Props) {
           {/* Quick emoji picker */}
           <div style={{ marginBottom: 12 }}>
             <EmojiPicker
-              value={recurring_form.emoji}
-              onSelect={(emoji) => setRecurringForm((f) => f && { ...f, emoji })}
+              value={recurring_form.form.emoji}
+              onSelect={(emoji) => recurring_form.setField("emoji", emoji)}
               options={RECURRING_EMOJI_OPTIONS}
               accent={T.coral}
               accentSoft={T.coralSoft}
@@ -342,32 +320,22 @@ export function WebRecurring({ onBack }: Props) {
           {/* Row 2: billing day + amount */}
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
-                引落日（1〜31日）
-              </div>
-              <input
+              <FormField
+                label="引落日（1〜31日）"
                 type="number"
                 min={1}
                 max={31}
-                value={recurring_form.billing_day}
-                onChange={(e) =>
-                  setRecurringForm((f) => f && { ...f, billing_day: e.target.value })
-                }
+                value={recurring_form.form.billing_day}
+                onChange={(v) => recurring_form.setField("billing_day", v)}
                 placeholder="25"
-                style={input_style}
               />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>
-                金額（円）（任意）
-              </div>
-              <input
-                type="number"
-                min={0}
-                value={recurring_form.amount}
-                onChange={(e) => setRecurringForm((f) => f && { ...f, amount: e.target.value })}
+              <AmountField
+                label="金額（円）（任意）"
+                value={recurring_form.form.amount}
+                onChange={(v) => recurring_form.setField("amount", v)}
                 placeholder="80000"
-                style={input_style}
               />
             </div>
           </div>
@@ -375,79 +343,38 @@ export function WebRecurring({ onBack }: Props) {
           {/* Row 3: type + category */}
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>種別</div>
-              <select
-                value={recurring_form.type}
-                onChange={(e) =>
-                  setRecurringForm(
-                    (f) => f && { ...f, type: e.target.value as "fixed" | "variable" }
-                  )
-                }
-                style={{ ...input_style, appearance: "auto" }}
-              >
-                <option value="fixed">固定（毎月同じ金額）</option>
-                <option value="variable">要確認（毎月変動）</option>
-              </select>
+              <SelectField
+                label="種別"
+                value={recurring_form.form.type}
+                onChange={(v) => recurring_form.setField("type", v as "fixed" | "variable")}
+                options={[
+                  { value: "fixed", label: "固定（毎月同じ金額）" },
+                  { value: "variable", label: "要確認（毎月変動）" },
+                ]}
+              />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>カテゴリ</div>
-              <select
-                value={recurring_form.category_id}
-                onChange={(e) =>
-                  setRecurringForm((f) => f && { ...f, category_id: e.target.value })
-                }
-                style={{ ...input_style, appearance: "auto" }}
-              >
-                <option value="">選択してください</option>
-                {fixed_expense_categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.category_name}
-                  </option>
-                ))}
-              </select>
+              <SelectField
+                label="カテゴリ"
+                value={recurring_form.form.category_id}
+                onChange={(v) => recurring_form.setField("category_id", v)}
+                placeholder="選択してください"
+                options={fixed_expense_categories.map((cat) => ({
+                  value: String(cat.id),
+                  label: cat.category_name,
+                }))}
+              />
             </div>
           </div>
 
-          {form_error_msg && (
-            <div style={{ color: T.coralDeep, fontSize: 13, marginBottom: 10 }}>
-              {form_error_msg}
-            </div>
-          )}
+          <FormError message={recurring_form.error} />
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handle_recurring_submit}
-              disabled={submitting}
-              style={{
-                border: "none",
-                background: T.coral,
-                color: "#fff",
-                padding: "9px 20px",
-                borderRadius: 999,
-                fontFamily: "inherit",
-                fontWeight: 700,
-                cursor: "pointer",
-                boxShadow: `0 3px 0 ${T.coralDeep}`,
-              }}
-            >
-              {submitting ? "保存中…" : "保存"}
-            </button>
-            <button
-              onClick={() => setRecurringForm(null)}
-              style={{
-                border: `1px solid ${T.hair}`,
-                background: "#fff",
-                color: T.inkSoft,
-                padding: "9px 20px",
-                borderRadius: 999,
-                fontFamily: "inherit",
-                cursor: "pointer",
-              }}
-            >
-              キャンセル
-            </button>
-          </div>
-        </div>
+          <FormActions
+            onSubmit={recurring_form.submit}
+            onCancel={recurring_form.close}
+            submitting={recurring_form.submitting}
+          />
+        </Modal>
       )}
 
       {pending.length > 0 && (
@@ -480,12 +407,14 @@ export function WebRecurring({ onBack }: Props) {
               {parseInt(ym.split("-")[1])}月分
             </span>
           </div>
-          <div style={{ display: "flex", gap: 16 }}>
+          <div
+            data-testid="pending-cards"
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
+          >
             {pending.map((p) => (
               <div
                 key={p.id}
                 style={{
-                  flex: 1,
                   background: T.card,
                   borderRadius: 24,
                   padding: "20px 22px",
@@ -555,7 +484,7 @@ export function WebRecurring({ onBack }: Props) {
                   />
                   <button
                     onClick={() => handle_confirm(p.id)}
-                    disabled={confirming_id === p.id}
+                    disabled={!can_edit || confirming_id === p.id}
                     style={{
                       flex: 1,
                       border: "none",
@@ -704,53 +633,56 @@ export function WebRecurring({ onBack }: Props) {
                   >
                     {r.amount ? yen(r.amount) : "—"}
                   </div>
-                  <div
-                    style={{ display: "flex", gap: 4, marginTop: 6, justifyContent: "flex-end" }}
-                  >
-                    <span
-                      onClick={() => open_edit_form(r)}
-                      style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 8,
-                        background: "#fff",
-                        border: `1px solid ${T.hair}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 12,
-                        color: T.inkSoft,
-                        cursor: "pointer",
-                      }}
+                  {can_edit && (
+                    <div
+                      style={{ display: "flex", gap: 4, marginTop: 6, justifyContent: "flex-end" }}
                     >
-                      ✎
-                    </span>
-                    <span
-                      onClick={() => handle_delete(r.id)}
-                      style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 8,
-                        background: "#fff",
-                        border: `1px solid ${T.hair}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 12,
-                        color: T.inkSoft,
-                        cursor: "pointer",
-                      }}
-                    >
-                      🗑
-                    </span>
-                  </div>
+                      <span
+                        onClick={() => recurring_form.openEdit(r)}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          background: "#fff",
+                          border: `1px solid ${T.hair}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 12,
+                          color: T.inkSoft,
+                          cursor: "pointer",
+                        }}
+                      >
+                        ✎
+                      </span>
+                      <span
+                        onClick={() => handle_delete(r.id)}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          background: "#fff",
+                          border: `1px solid ${T.hair}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 12,
+                          color: T.inkSoft,
+                          cursor: "pointer",
+                        }}
+                      >
+                        🗑
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
         <button
-          onClick={open_create_form}
+          onClick={recurring_form.openCreate}
+          disabled={!can_edit}
           style={{
             width: "100%",
             marginTop: 16,

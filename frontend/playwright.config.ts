@@ -11,6 +11,20 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      testIgnore: /(demo|pwa|csp)\.spec\.ts/,
+    },
+    {
+      // The static demo build, served by its own dev server with no backend.
+      name: "demo",
+      use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:3001/atoikura/" },
+      testMatch: /demo\.spec\.ts/,
+    },
+    {
+      // The production build with its service worker and security headers,
+      // served by vite preview.
+      name: "pwa",
+      use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:4173" },
+      testMatch: /(pwa|csp)\.spec\.ts/,
     },
   ],
   webServer: [
@@ -23,14 +37,27 @@ export default defineConfig({
       // fixed dev secret so the single `npm run test:e2e` command is self-
       // contained; mirrors docker-compose.yml's backend service.
       env: {
-        JWT_SECRET:
-          process.env.JWT_SECRET ?? "dev-jwt-secret-change-in-production",
+        JWT_SECRET: process.env.JWT_SECRET ?? "dev-jwt-secret-change-in-production",
+        // The dev server, and the production build under vite preview (csp.spec.ts).
+        CORS_ALLOWED_ORIGIN: "http://localhost:3000,http://localhost:4173",
       },
     },
     {
       command: "npm run dev",
       url: "http://localhost:3000",
       timeout: 120_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: "npx vite --mode demo --port 3001 --strictPort",
+      url: "http://localhost:3001/atoikura/",
+      timeout: 120_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: "npm run build && npx vite preview --port 4173 --strictPort",
+      url: "http://localhost:4173",
+      timeout: 300_000,
       reuseExistingServer: !process.env.CI,
     },
   ],

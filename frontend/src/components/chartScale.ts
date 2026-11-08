@@ -20,3 +20,38 @@ export function chartMaxY(monthly_budget: number, totals: number[]): number {
   const data_max = totals.reduce((max, v) => (Number.isFinite(v) && v > max ? v : max), 0);
   return Math.max(budget * 1.05, data_max * 1.1, 1);
 }
+
+// Smallest tick step we ever use, in yen. Cumulative totals are whole yen and the
+// axis labels render as "{step/1000}k", so anything below ¥1k would produce
+// fractional, unreadable labels.
+const MIN_TICK_STEP = 1000;
+
+/**
+ * Generate evenly-spaced "nice" y-axis tick values for the home cumulative chart.
+ *
+ * The tick labels used to be a hard-coded list topping out at ¥80k (#129), so
+ * once `maxY` grew past ¥80k the axis had no reference values above ¥80k. This
+ * derives the ticks from the actual scale instead: it picks a rounded step from
+ * the 1-2-5 ladder (…1k, 2k, 5k, 10k, 20k, 50k…) aiming for ~`target_ticks`
+ * intervals, then walks from 0 up to `maxY`. The result always starts at 0, is
+ * evenly spaced, and spans the plotted range to within one step.
+ *
+ * @param maxY the y-axis maximum (see {@link chartMaxY}); 0/NaN yields just `[0]`
+ * @param target_ticks the desired number of intervals (defaults to 5)
+ */
+export function niceTicks(maxY: number, target_ticks = 5): number[] {
+  if (!Number.isFinite(maxY) || maxY <= 0) return [0];
+
+  const rough_step = maxY / target_ticks;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rough_step)));
+  const normalized_step = rough_step / magnitude; // in [1, 10)
+  const nice_multiplier =
+    normalized_step < 1.5 ? 1 : normalized_step < 3 ? 2 : normalized_step < 7 ? 5 : 10;
+  const step = Math.max(nice_multiplier * magnitude, MIN_TICK_STEP);
+
+  const ticks: number[] = [];
+  for (let tick = 0; tick <= maxY + 1e-9; tick += step) {
+    ticks.push(tick);
+  }
+  return ticks;
+}

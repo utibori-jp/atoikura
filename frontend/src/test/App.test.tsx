@@ -1,5 +1,6 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import App from "../App";
+import { createTestAppServices } from "./appServices";
 
 // recharts ResponsiveContainer uses ResizeObserver, which jsdom doesn't provide
 class ResizeObserverMock {
@@ -27,20 +28,13 @@ function mockMatchMedia(matches: boolean) {
   });
 }
 
-const TOKEN_KEY = "atoikura.jwt_token";
-
 describe("App — mobile layout (≤ 1023 px)", () => {
   beforeEach(() => {
     mockMatchMedia(true);
-    sessionStorage.setItem(TOKEN_KEY, "test-token");
-  });
-
-  afterEach(() => {
-    sessionStorage.removeItem(TOKEN_KEY);
   });
 
   it("renders bottom tab bar instead of top nav", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
@@ -55,47 +49,45 @@ describe("App — mobile layout (≤ 1023 px)", () => {
   });
 
   it("opens EntrySheet when FAB is clicked", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "＋" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "✕" })).toBeInTheDocument();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
   });
 
-  it("closes EntrySheet when ✕ is clicked", async () => {
-    render(<App />);
+  it("closes EntrySheet when the close button is clicked", async () => {
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "＋" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "✕" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: "✕" }));
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "✕" })).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
   it("shows month navigation when journal tab is active", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: /仕訳/ }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "‹" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "›" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "前の月" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "次の月" })).toBeInTheDocument();
     });
   });
 
   it("navigates to account view when avatar is clicked", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
@@ -112,15 +104,10 @@ describe("App — mobile layout (≤ 1023 px)", () => {
 describe("App — desktop layout (≥ 1024 px)", () => {
   beforeEach(() => {
     mockMatchMedia(false);
-    sessionStorage.setItem(TOKEN_KEY, "test-token");
-  });
-
-  afterEach(() => {
-    sessionStorage.removeItem(TOKEN_KEY);
   });
 
   it("renders top navigation bar with a <nav> element", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
@@ -128,10 +115,85 @@ describe("App — desktop layout (≥ 1024 px)", () => {
   });
 
   it("includes マスタ tab that is absent from the mobile tab bar", async () => {
-    render(<App />);
+    render(<App services={createTestAppServices()} />);
 
     await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
 
     expect(screen.getByRole("button", { name: /マスタ/ })).toBeInTheDocument();
+  });
+
+  it("returns to the budget hub when the header 予算 button is clicked from a sub-screen (#134)", async () => {
+    render(<App services={createTestAppServices()} />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+
+    const nav = document.querySelector("nav") as HTMLElement;
+
+    // Open the budget tab → land on the hub.
+    fireEvent.click(within(nav).getByRole("button", { name: /予算/ }));
+    await waitFor(() => expect(screen.getByText("今月の予算プラン")).toBeInTheDocument());
+
+    // Drill into the 収入 (income) sub-screen via the hub tile.
+    fireEvent.click(screen.getByText("毎月の見込み収入"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /収入を記録/ })).toBeInTheDocument()
+    );
+    expect(screen.queryByText("今月の予算プラン")).not.toBeInTheDocument();
+
+    // Clicking the header 予算 button must bring the hub back, not leave us
+    // stranded on the income sub-screen.
+    fireEvent.click(within(nav).getByRole("button", { name: /予算/ }));
+    await waitFor(() => expect(screen.getByText("今月の予算プラン")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /収入を記録/ })).not.toBeInTheDocument();
+  });
+
+  it("pushes a history entry for each in-app screen transition (#165)", async () => {
+    const push_spy = vi.spyOn(window.history, "pushState");
+    render(<App services={createTestAppServices()} />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+    const nav = document.querySelector("nav") as HTMLElement;
+
+    // Tab change pushes a history entry carrying the new location.
+    fireEvent.click(within(nav).getByRole("button", { name: /予算/ }));
+    await waitFor(() => expect(screen.getByText("今月の予算プラン")).toBeInTheDocument());
+    expect(push_spy).toHaveBeenCalledWith({ nav: { tab: "budget", sub: "hub" } }, "");
+
+    // Drilling into a sub-screen pushes another entry.
+    fireEvent.click(screen.getByText("毎月の見込み収入"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /収入を記録/ })).toBeInTheDocument()
+    );
+    expect(push_spy).toHaveBeenCalledWith({ nav: { tab: "budget", sub: "income" } }, "");
+
+    push_spy.mockRestore();
+  });
+
+  it("browser Back (popstate) returns to the previous in-app screen (#165)", async () => {
+    render(<App services={createTestAppServices()} />);
+
+    await waitFor(() => expect(screen.getByText("Atoikura")).toBeInTheDocument());
+    const nav = document.querySelector("nav") as HTMLElement;
+
+    // Navigate home → budget hub → income sub-screen.
+    fireEvent.click(within(nav).getByRole("button", { name: /予算/ }));
+    await waitFor(() => expect(screen.getByText("今月の予算プラン")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("毎月の見込み収入"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /収入を記録/ })).toBeInTheDocument()
+    );
+
+    // Back restores the budget hub (the previous location), not an app exit.
+    window.dispatchEvent(
+      new PopStateEvent("popstate", { state: { nav: { tab: "budget", sub: "hub" } } })
+    );
+    await waitFor(() => expect(screen.getByText("今月の予算プラン")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /収入を記録/ })).not.toBeInTheDocument();
+
+    // Back again restores home.
+    window.dispatchEvent(
+      new PopStateEvent("popstate", { state: { nav: { tab: "home", sub: "hub" } } })
+    );
+    await waitFor(() => expect(screen.queryByText("今月の予算プラン")).not.toBeInTheDocument());
   });
 });

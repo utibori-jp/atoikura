@@ -6,18 +6,12 @@ Guidelines for Claude Code when working in this repository.
 
 ## Must Read Before Starting
 
-Common to all tasks:
+The tool-agnostic onboarding list (which docs to read, in what order, for which
+work area) lives in **[`AGENTS.md`](AGENTS.md)** — the single source of truth so
+the guidance doesn't drift between files. Read it first.
 
-- `docs/spec.md` — Specifications / V1 constraints (Source of Truth)
-- `docs/atoikura.dbml` — DB schema definitions
-- `docs/atoikura-api.yaml` — OpenAPI contracts
-- `docs/architecture.md` — Tech stack and directory structure
-- `docs/prompts/<current-step>.md` — Task definitions for the current step
-
-Read additional documents based on the work area:
-
-- For Backend work → `docs/conventions-backend.md`
-- For Frontend work → `docs/conventions-frontend.md`
+The sections below add **Claude Code-specific** environment guidance (devcontainer
+firewall, Docker-in-Docker, container logs, E2E) on top of `AGENTS.md`.
 
 ---
 
@@ -98,6 +92,10 @@ cd frontend && npm run test:e2e
 ```
 
 The `webServer` config in `playwright.config.ts` automatically boots the Go backend (`make -C ../backend run` on `:8080`) and the Vite dev server (`npm run dev` on `:3000`) before running tests, and shuts them down after. No manual startup is needed.
+The `demo` project (`e2e/demo.spec.ts`) runs against the demo build on `:3001`
+(`vite --mode demo`), which needs no backend.
+The `pwa` project (`e2e/pwa.spec.ts`) builds the app and serves it with
+`vite preview` on `:4173` to test the service worker.
 
 **Prerequisites before first run:**
 - The backend DB must be migrated so the signup endpoint works:

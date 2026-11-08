@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import type { CategoryGroupView, ExpenseCategoryView, StatementTypeView } from "../../data/journal";
+import { commandErrorMessage, useCanEditOnline, useLedgerApi } from "../../data/ledgerApi";
+import { useDataVersion } from "../../session/sessionHooks";
+import { OnlineEditNotice } from "../OnlineEditNotice";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
+import { Modal } from "../Modal";
+import { useAlert, useConfirm } from "../dialogContext";
 
-type CategoryGroup = components["schemas"]["CategoryGroup"];
-type ExpenseCategory = components["schemas"]["ExpenseCategory"];
-type StatementType = components["schemas"]["StatementTypeSummary"];
+type CategoryGroup = CategoryGroupView;
+type ExpenseCategory = ExpenseCategoryView;
+type StatementType = StatementTypeView;
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 void yen;
@@ -14,20 +18,24 @@ void yen;
 type ActiveTab = "groups" | "categories";
 
 interface GroupFormState {
-  id: number | null;
+  id: string | null;
   name: string;
   emoji: string;
   statement_type_id: string;
 }
 
 interface CategoryFormState {
-  id: number | null;
+  id: string | null;
   name: string;
-  category_code: string;
   group_id: string;
 }
 
 export function WebMaster() {
+  const api = useLedgerApi();
+  const data_version = useDataVersion();
+  const can_edit = useCanEditOnline();
+  const confirm = useConfirm();
+  const alert = useAlert();
   const [active_tab, setActiveTab] = useState<ActiveTab>("groups");
   const [groups, setGroups] = useState<CategoryGroup[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
@@ -62,7 +70,7 @@ export function WebMaster() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [api, data_version]);
 
   const refresh = async () => {
     const [g_res, c_res] = await Promise.all([
@@ -99,19 +107,25 @@ export function WebMaster() {
       await refresh();
       setGroupForm(null);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
+      setErrorMsg(commandErrorMessage(err, "保存できませんでした"));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handle_group_delete = async (id: number) => {
-    if (!window.confirm("この大分類を削除しますか？")) return;
+  const handle_group_delete = async (id: string) => {
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この大分類を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await api.deleteCategoryGroup(id);
       await refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "削除に失敗しました");
+      await alert(commandErrorMessage(err, "削除に失敗しました"));
     }
   };
 
@@ -126,16 +140,11 @@ export function WebMaster() {
       setErrorMsg("大分類を選択してください");
       return;
     }
-    if (!cat_form.category_code.trim()) {
-      setErrorMsg("コードを入力してください");
-      return;
-    }
     setSubmitting(true);
     try {
       const body = {
         category_name: cat_form.name.trim(),
-        category_code: cat_form.category_code.trim(),
-        group_id: parseInt(cat_form.group_id, 10),
+        group_id: cat_form.group_id,
       };
       if (cat_form.id) {
         await api.updateExpenseCategory(cat_form.id, body);
@@ -145,19 +154,25 @@ export function WebMaster() {
       await refresh();
       setCatForm(null);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
+      setErrorMsg(commandErrorMessage(err, "保存できませんでした"));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handle_cat_delete = async (id: number) => {
-    if (!window.confirm("この生活区分を削除しますか？")) return;
+  const handle_cat_delete = async (id: string) => {
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この生活区分を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await api.deleteExpenseCategory(id);
       await refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "削除に失敗しました");
+      await alert(commandErrorMessage(err, "削除に失敗しました"));
     }
   };
 
@@ -196,6 +211,8 @@ export function WebMaster() {
           自分らしいカテゴリで管理しよう
         </div>
       </div>
+
+      <OnlineEditNotice can_edit={can_edit} />
 
       <div style={{ display: "flex", gap: 8 }}>
         {(
@@ -258,6 +275,7 @@ export function WebMaster() {
               大分類（{groups.length}件）
             </div>
             <button
+              disabled={!can_edit}
               onClick={() => {
                 setGroupForm({ id: null, name: "", emoji: "", statement_type_id: "" });
                 setErrorMsg("");
@@ -280,18 +298,11 @@ export function WebMaster() {
           </div>
 
           {group_form && (
-            <div
-              style={{
-                marginBottom: 18,
-                padding: "18px 20px",
-                borderRadius: 20,
-                background: T.bgSoft,
-                border: `1.5px solid ${T.hair}`,
-              }}
+            <Modal
+              title={group_form.id ? "大分類を編集" : "大分類を追加"}
+              onClose={() => setGroupForm(null)}
+              maxWidth={520}
             >
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
-                {group_form.id ? "大分類を編集" : "大分類を追加"}
-              </div>
               <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                 <div style={{ flex: "0 0 80px" }}>
                   <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>絵文字</div>
@@ -369,7 +380,7 @@ export function WebMaster() {
                   キャンセル
                 </button>
               </div>
-            </div>
+            </Modal>
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -430,6 +441,7 @@ export function WebMaster() {
                   </div>
                   <div style={{ display: "flex", gap: 4, color: T.inkSoft }}>
                     <button
+                      disabled={!can_edit}
                       onClick={() => {
                         setGroupForm({
                           id: g.id,
@@ -451,6 +463,7 @@ export function WebMaster() {
                       ✎
                     </button>
                     <button
+                      disabled={!can_edit}
                       onClick={() => handle_group_delete(g.id)}
                       style={{
                         padding: "4px 6px",
@@ -495,41 +508,16 @@ export function WebMaster() {
             >
               生活区分（大分類ごと）
             </div>
-            <button
-              onClick={() => {
-                setCatForm({ id: null, name: "", category_code: "", group_id: "" });
-                setErrorMsg("");
-              }}
-              style={{
-                border: "none",
-                background: T.coral,
-                color: "#fff",
-                padding: "10px 18px",
-                borderRadius: 999,
-                fontFamily: "inherit",
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: "pointer",
-                boxShadow: `0 4px 0 ${T.coralDeep}`,
-              }}
-            >
-              ＋ 生活区分を追加
-            </button>
+            {/* The redundant top-right "＋ 生活区分を追加" button was removed (#130);
+                the per-group "＋ 追加" buttons are the single, in-context add entry. */}
           </div>
 
           {cat_form && (
-            <div
-              style={{
-                marginBottom: 18,
-                padding: "18px 20px",
-                borderRadius: 20,
-                background: T.bgSoft,
-                border: `1.5px solid ${T.hair}`,
-              }}
+            <Modal
+              title={cat_form.id ? "生活区分を編集" : "生活区分を追加"}
+              onClose={() => setCatForm(null)}
+              maxWidth={520}
             >
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
-                {cat_form.id ? "生活区分を編集" : "生活区分を追加"}
-              </div>
               <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>名前</div>
@@ -538,18 +526,6 @@ export function WebMaster() {
                     value={cat_form.name}
                     onChange={(e) => setCatForm((f) => f && { ...f, name: e.target.value })}
                     placeholder="外食"
-                    style={input_style}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: T.inkSoft, marginBottom: 4 }}>コード</div>
-                  <input
-                    type="text"
-                    value={cat_form.category_code}
-                    onChange={(e) =>
-                      setCatForm((f) => f && { ...f, category_code: e.target.value })
-                    }
-                    placeholder="eating_out"
                     style={input_style}
                   />
                 </div>
@@ -607,7 +583,7 @@ export function WebMaster() {
                   キャンセル
                 </button>
               </div>
-            </div>
+            </Modal>
           )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -635,12 +611,12 @@ export function WebMaster() {
                     >
                       {c.category_name}
                       <button
+                        disabled={!can_edit}
                         onClick={() => {
                           setCatForm({
                             id: c.id,
                             name: c.category_name,
-                            category_code: c.category_code ?? "",
-                            group_id: String(c.group_id),
+                            group_id: c.group_id,
                           });
                           setErrorMsg("");
                         }}
@@ -656,6 +632,7 @@ export function WebMaster() {
                         ✎
                       </button>
                       <button
+                        disabled={!can_edit}
                         onClick={() => handle_cat_delete(c.id)}
                         style={{
                           color: T.inkSoft,
@@ -671,8 +648,9 @@ export function WebMaster() {
                     </div>
                   ))}
                   <button
+                    disabled={!can_edit}
                     onClick={() => {
-                      setCatForm({ id: null, name: "", category_code: "", group_id: String(g.id) });
+                      setCatForm({ id: null, name: "", group_id: g.id });
                       setErrorMsg("");
                     }}
                     style={{
