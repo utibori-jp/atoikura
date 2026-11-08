@@ -1,0 +1,1365 @@
+{
+  "cases": [
+    {
+      "name": "current month, spending on some days, fractional pace floors",
+      "year_month": "2026-10",
+      "today_jst": "2026-10-15",
+      "actual_sums": {
+        "2026-10-01": {
+          "food": 1200,
+          "other": 500
+        },
+        "2026-10-07": {
+          "food": 3301
+        },
+        "2026-10-15": {
+          "other": 7777
+        }
+      },
+      "expected": [
+        {
+          "date": "2026-10-01",
+          "food": 1200,
+          "other": 500,
+          "total": 1700,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-02",
+          "food": 1200,
+          "other": 500,
+          "total": 1700,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-03",
+          "food": 1200,
+          "other": 500,
+          "total": 1700,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-04",
+          "food": 1200,
+          "other": 500,
+          "total": 1700,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-05",
+          "food": 1200,
+          "other": 500,
+          "total": 1700,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-06",
+          "food": 1200,
+          "other": 500,
+          "total": 1700,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-07",
+          "food": 4501,
+          "other": 500,
+          "total": 5001,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-08",
+          "food": 4501,
+          "other": 500,
+          "total": 5001,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-09",
+          "food": 4501,
+          "other": 500,
+          "total": 5001,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-10",
+          "food": 4501,
+          "other": 500,
+          "total": 5001,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-11",
+          "food": 4501,
+          "other": 500,
+          "total": 5001,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-12",
+          "food": 4501,
+          "other": 500,
+          "total": 5001,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-13",
+          "food": 4501,
+          "other": 500,
+          "total": 5001,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-14",
+          "food": 4501,
+          "other": 500,
+          "total": 5001,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-15",
+          "food": 4501,
+          "other": 8277,
+          "total": 12778,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-16",
+          "food": 4801,
+          "other": 8828,
+          "total": 13629,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-17",
+          "food": 5101,
+          "other": 9380,
+          "total": 14481,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-18",
+          "food": 5401,
+          "other": 9932,
+          "total": 15333,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-19",
+          "food": 5701,
+          "other": 10484,
+          "total": 16185,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-20",
+          "food": 6001,
+          "other": 11036,
+          "total": 17037,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-21",
+          "food": 6301,
+          "other": 11587,
+          "total": 17888,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-22",
+          "food": 6601,
+          "other": 12139,
+          "total": 18740,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-23",
+          "food": 6901,
+          "other": 12691,
+          "total": 19592,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-24",
+          "food": 7201,
+          "other": 13243,
+          "total": 20444,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-25",
+          "food": 7501,
+          "other": 13795,
+          "total": 21296,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-26",
+          "food": 7801,
+          "other": 14346,
+          "total": 22147,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-27",
+          "food": 8101,
+          "other": 14898,
+          "total": 22999,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-28",
+          "food": 8401,
+          "other": 15450,
+          "total": 23851,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-29",
+          "food": 8701,
+          "other": 16002,
+          "total": 24703,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-30",
+          "food": 9002,
+          "other": 16554,
+          "total": 25556,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-31",
+          "food": 9302,
+          "other": 17105,
+          "total": 26407,
+          "is_actual": false
+        }
+      ]
+    },
+    {
+      "name": "current month, no spending yet",
+      "year_month": "2026-10",
+      "today_jst": "2026-10-03",
+      "actual_sums": {},
+      "expected": [
+        {
+          "date": "2026-10-01",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-02",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-03",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-04",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-05",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-06",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-07",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-08",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-09",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-10",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-11",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-12",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-13",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-14",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-15",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-16",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-17",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-18",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-19",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-20",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-21",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-22",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-23",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-24",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-25",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-26",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-27",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-28",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-29",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-30",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-31",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        }
+      ]
+    },
+    {
+      "name": "current month, today is the first day",
+      "year_month": "2026-10",
+      "today_jst": "2026-10-01",
+      "actual_sums": {
+        "2026-10-01": {
+          "food": 1000,
+          "other": 333
+        }
+      },
+      "expected": [
+        {
+          "date": "2026-10-01",
+          "food": 1000,
+          "other": 333,
+          "total": 1333,
+          "is_actual": true
+        },
+        {
+          "date": "2026-10-02",
+          "food": 2000,
+          "other": 666,
+          "total": 2666,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-03",
+          "food": 3000,
+          "other": 999,
+          "total": 3999,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-04",
+          "food": 4000,
+          "other": 1332,
+          "total": 5332,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-05",
+          "food": 5000,
+          "other": 1665,
+          "total": 6665,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-06",
+          "food": 6000,
+          "other": 1998,
+          "total": 7998,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-07",
+          "food": 7000,
+          "other": 2331,
+          "total": 9331,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-08",
+          "food": 8000,
+          "other": 2664,
+          "total": 10664,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-09",
+          "food": 9000,
+          "other": 2997,
+          "total": 11997,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-10",
+          "food": 10000,
+          "other": 3330,
+          "total": 13330,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-11",
+          "food": 11000,
+          "other": 3663,
+          "total": 14663,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-12",
+          "food": 12000,
+          "other": 3996,
+          "total": 15996,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-13",
+          "food": 13000,
+          "other": 4329,
+          "total": 17329,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-14",
+          "food": 14000,
+          "other": 4662,
+          "total": 18662,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-15",
+          "food": 15000,
+          "other": 4995,
+          "total": 19995,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-16",
+          "food": 16000,
+          "other": 5328,
+          "total": 21328,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-17",
+          "food": 17000,
+          "other": 5661,
+          "total": 22661,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-18",
+          "food": 18000,
+          "other": 5994,
+          "total": 23994,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-19",
+          "food": 19000,
+          "other": 6327,
+          "total": 25327,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-20",
+          "food": 20000,
+          "other": 6660,
+          "total": 26660,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-21",
+          "food": 21000,
+          "other": 6993,
+          "total": 27993,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-22",
+          "food": 22000,
+          "other": 7326,
+          "total": 29326,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-23",
+          "food": 23000,
+          "other": 7659,
+          "total": 30659,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-24",
+          "food": 24000,
+          "other": 7992,
+          "total": 31992,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-25",
+          "food": 25000,
+          "other": 8325,
+          "total": 33325,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-26",
+          "food": 26000,
+          "other": 8658,
+          "total": 34658,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-27",
+          "food": 27000,
+          "other": 8991,
+          "total": 35991,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-28",
+          "food": 28000,
+          "other": 9324,
+          "total": 37324,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-29",
+          "food": 29000,
+          "other": 9657,
+          "total": 38657,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-30",
+          "food": 30000,
+          "other": 9990,
+          "total": 39990,
+          "is_actual": false
+        },
+        {
+          "date": "2026-10-31",
+          "food": 31000,
+          "other": 10323,
+          "total": 41323,
+          "is_actual": false
+        }
+      ]
+    },
+    {
+      "name": "past month, every day actual",
+      "year_month": "2026-09",
+      "today_jst": "2026-10-27",
+      "actual_sums": {
+        "2026-09-02": {
+          "food": 800
+        },
+        "2026-09-30": {
+          "other": 1500
+        }
+      },
+      "expected": [
+        {
+          "date": "2026-09-01",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-02",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-03",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-04",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-05",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-06",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-07",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-08",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-09",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-10",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-11",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-12",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-13",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-14",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-15",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-16",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-17",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-18",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-19",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-20",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-21",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-22",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-23",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-24",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-25",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-26",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-27",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-28",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-29",
+          "food": 800,
+          "other": 0,
+          "total": 800,
+          "is_actual": true
+        },
+        {
+          "date": "2026-09-30",
+          "food": 800,
+          "other": 1500,
+          "total": 2300,
+          "is_actual": true
+        }
+      ]
+    },
+    {
+      "name": "future month, no actuals",
+      "year_month": "2026-12",
+      "today_jst": "2026-10-27",
+      "actual_sums": {},
+      "expected": [
+        {
+          "date": "2026-12-01",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-02",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-03",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-04",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-05",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-06",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-07",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-08",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-09",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-10",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-11",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-12",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-13",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-14",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-15",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-16",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-17",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-18",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-19",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-20",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-21",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-22",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-23",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-24",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-25",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-26",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-27",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-28",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-29",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-30",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        },
+        {
+          "date": "2026-12-31",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": false
+        }
+      ]
+    },
+    {
+      "name": "leap February, today is the last day",
+      "year_month": "2028-02",
+      "today_jst": "2028-02-29",
+      "actual_sums": {
+        "2028-02-10": {
+          "food": 2500,
+          "other": 100
+        },
+        "2028-02-29": {
+          "food": 1
+        }
+      },
+      "expected": [
+        {
+          "date": "2028-02-01",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-02",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-03",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-04",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-05",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-06",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-07",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-08",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-09",
+          "food": 0,
+          "other": 0,
+          "total": 0,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-10",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-11",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-12",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-13",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-14",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-15",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-16",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-17",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-18",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-19",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-20",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-21",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-22",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-23",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-24",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-25",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-26",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-27",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-28",
+          "food": 2500,
+          "other": 100,
+          "total": 2600,
+          "is_actual": true
+        },
+        {
+          "date": "2028-02-29",
+          "food": 2501,
+          "other": 100,
+          "total": 2601,
+          "is_actual": true
+        }
+      ]
+    }
+  ],
+  "description": "Daily cumulative + month-end forecast. Generated from backend/internal/service.BuildDailyEntries (the reference implementation); consumed by Go and Vitest tests."
+}

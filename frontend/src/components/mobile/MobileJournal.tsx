@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import { useState } from "react";
+import { deleteJournalEntry, listJournalDays, type JournalEntryView } from "../../data/journal";
+import { useLedgerData, useLocalData } from "../../data/ledgerData";
+import { listDailyNotes, saveDailyNote } from "../../data/notes";
 import { T } from "../../theme";
+import { useAlert, useConfirm } from "../dialogContext";
+import { JournalCsvButton } from "../JournalCsvButton";
 import { emojiForGroup } from "./groupEmoji";
-
-type DailyJournalEntries = components["schemas"]["DailyJournalEntries"];
-type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
 
 const COLORS = {
   coralSoft: "#FFE8DD",
@@ -18,8 +18,7 @@ const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 
 interface Props {
   year_month: string;
-  refresh_token: number;
-  onEditEntry: (entry: JournalEntryResponse) => void;
+  onEditEntry: (entry: JournalEntryView) => void;
 }
 
 function formatDateParts(date_str: string): { day: number; month: number; weekday: string } {
@@ -31,48 +30,38 @@ function formatDateParts(date_str: string): { day: number; month: number; weekda
   };
 }
 
-export function MobileJournal({ year_month, refresh_token, onEditEntry }: Props) {
-  const [entries, setEntries] = useState<DailyJournalEntries[] | null>(null);
-  const [error_message, setErrorMessage] = useState("");
-  const [daily_notes_map, setDailyNotesMap] = useState<Record<string, string>>({});
+export function MobileJournal({ year_month, onEditEntry }: Props) {
+  const confirm = useConfirm();
+  const alert = useAlert();
+  const ledger_data = useLedgerData();
+  const { data: journal_data, error_message: load_error_message } = useLocalData(
+    async (loaded_ledger_data) => ({
+      journal_days: await listJournalDays(loaded_ledger_data, year_month),
+      daily_notes: await listDailyNotes(loaded_ledger_data, year_month),
+    }),
+    [year_month]
+  );
+  const entries = journal_data?.journal_days ?? null;
+  const daily_notes_map = journal_data?.daily_notes ?? {};
+  const error_message = load_error_message ?? "";
   const [editing_note_date, setEditingNoteDate] = useState<string | null>(null);
   const [note_draft, setNoteDraft] = useState("");
   const [saving_note_date, setSavingNoteDate] = useState<string | null>(null);
-  const [deleting_id, setDeletingId] = useState<number | null>(null);
-  const [local_refresh, setLocalRefresh] = useState(0);
+  const [deleting_id, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([api.listJournalEntries(year_month), api.getDailyNotes(year_month)])
-      .then(([entries_res, notes_res]) => {
-        if (cancelled) return;
-        setErrorMessage("");
-        setEditingNoteDate(null);
-        setEntries(entries_res.entries);
-        const notes_map: Record<string, string> = {};
-        for (const n of notes_res.notes) {
-          if (n.note != null) notes_map[n.date] = n.note;
-        }
-        setDailyNotesMap(notes_map);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setErrorMessage(err instanceof Error ? err.message : "取得に失敗しました");
-        setEntries([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [year_month, refresh_token, local_refresh]);
-
-  const handle_delete = async (id: number) => {
-    if (!window.confirm("この仕訳を削除しますか？")) return;
+  const handle_delete = async (id: string) => {
+    const confirmed = await confirm({
+      title: "削除の確認",
+      message: "この仕訳を削除しますか？",
+      confirmLabel: "削除",
+      danger: true,
+    });
+    if (!confirmed) return;
     setDeletingId(id);
     try {
-      await api.deleteJournalEntry(id);
-      setLocalRefresh((n) => n + 1);
+      await deleteJournalEntry(ledger_data, id);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "削除に失敗しました");
+      await alert(err instanceof Error ? err.message : "削除に失敗しました");
     } finally {
       setDeletingId(null);
     }
@@ -81,16 +70,10 @@ export function MobileJournal({ year_month, refresh_token, onEditEntry }: Props)
   const handle_save_note = async (date: string) => {
     setSavingNoteDate(date);
     try {
-      const saved = await api.updateDailyNote(date, note_draft.trim());
-      setDailyNotesMap((prev) => {
-        const next = { ...prev };
-        if (saved.note == null || saved.note === "") delete next[date];
-        else next[date] = saved.note;
-        return next;
-      });
+      await saveDailyNote(ledger_data, date, note_draft.trim());
       setEditingNoteDate(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "コメントの保存に失敗しました");
+      await alert(err instanceof Error ? err.message : "コメントの保存に失敗しました");
     } finally {
       setSavingNoteDate(null);
     }
@@ -100,6 +83,9 @@ export function MobileJournal({ year_month, refresh_token, onEditEntry }: Props)
 
   return (
     <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <JournalCsvButton year_month={year_month} journal_days={entries} />
+      </div>
       {is_loading && (
         <p style={{ color: T.inkSoft, fontSize: 14, textAlign: "center" }}>読み込み中…</p>
       )}
@@ -196,6 +182,7 @@ export function MobileJournal({ year_month, refresh_token, onEditEntry }: Props)
                       border: `1px dashed ${T.mustard}`,
                       fontSize: 12,
                       color: T.ink,
+                      whiteSpace: "pre-wrap",
                     }}
                   >
                     💬 {note}
@@ -258,6 +245,7 @@ export function MobileJournal({ year_month, refresh_token, onEditEntry }: Props)
                     <button
                       key={e.id}
                       type="button"
+                      disabled={!e.can_edit}
                       onClick={() => onEditEntry(e)}
                       style={{
                         width: "100%",
@@ -376,30 +364,32 @@ export function MobileJournal({ year_month, refresh_token, onEditEntry }: Props)
                         >
                           {yen(e.amount)}
                         </div>
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            handle_delete(e.id);
-                          }}
-                          onKeyDown={(ev) => {
-                            if (ev.key === "Enter" || ev.key === " ") {
-                              ev.preventDefault();
+                        {e.can_edit && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(ev) => {
                               ev.stopPropagation();
                               handle_delete(e.id);
-                            }
-                          }}
-                          aria-label="削除"
-                          style={{
-                            color: deleting_id === e.id ? T.hair : T.inkSoft,
-                            cursor: deleting_id === e.id ? "default" : "pointer",
-                            padding: 4,
-                            fontSize: 14,
-                          }}
-                        >
-                          ✕
-                        </span>
+                            }}
+                            onKeyDown={(ev) => {
+                              if (ev.key === "Enter" || ev.key === " ") {
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                handle_delete(e.id);
+                              }
+                            }}
+                            aria-label="削除"
+                            style={{
+                              color: deleting_id === e.id ? T.hair : T.inkSoft,
+                              cursor: deleting_id === e.id ? "default" : "pointer",
+                              padding: 4,
+                              fontSize: 14,
+                            }}
+                          >
+                            ✕
+                          </span>
+                        )}
                       </div>
                     </button>
                   );

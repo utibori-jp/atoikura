@@ -1,15 +1,12 @@
 import { useEffect, useCallback, useState } from "react";
-import { api } from "../../api/client";
-import type { components } from "../../api/types";
+import { createJournalEntry, listCategoryGroups, listExpenseCategories } from "../../data/journal";
+import { useLedgerData, useLocalData } from "../../data/ledgerData";
+import { loadDailyCumulative, type DailyCumulative } from "../../data/spending";
 import { T } from "../../theme";
 import { emojiForGroup } from "../mobile/groupEmoji";
 import { DateField } from "../DateField";
-import { chartMaxY } from "../chartScale";
+import { chartMaxY, niceTicks } from "../chartScale";
 import { smoothPath } from "../chartPath";
-
-type DailyCumulativeResponse = components["schemas"]["DailyCumulativeResponse"];
-type CategoryGroup = components["schemas"]["CategoryGroup"];
-type ExpenseCategory = components["schemas"]["ExpenseCategory"];
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString("ja-JP")}`;
 const yenSlim = (n: number) => Math.round(n).toLocaleString("ja-JP");
@@ -44,14 +41,29 @@ interface DonutProps {
   remaining: number;
   remaining_pct: number;
   days_left: number;
+  over_budget: boolean;
+  overspend: number;
+  used_pct: number;
 }
 
-function DonutChart({ size, spent_pct, remaining, remaining_pct, days_left }: DonutProps) {
+function DonutChart({
+  size,
+  spent_pct,
+  remaining,
+  remaining_pct,
+  days_left,
+  over_budget,
+  overspend,
+  used_pct,
+}: DonutProps) {
   const r = 96;
   const cx = size / 2;
   const cy = size / 2;
   const circ = 2 * Math.PI * r;
-  const spent_arc = (circ * spent_pct) / 100;
+  // When over budget the ring is full and solid-red; otherwise it fills to the
+  // spent fraction with the usual mustard→coral gradient (#125).
+  const arc_pct = over_budget ? 100 : spent_pct;
+  const spent_arc = (circ * arc_pct) / 100;
 
   return (
     <div style={{ position: "relative", width: size, height: size }}>
@@ -63,13 +75,13 @@ function DonutChart({ size, spent_pct, remaining, remaining_pct, days_left }: Do
           </linearGradient>
         </defs>
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="#FFE8DD" strokeWidth="26" />
-        {spent_pct > 0 && (
+        {arc_pct > 0 && (
           <circle
             cx={cx}
             cy={cy}
             r={r}
             fill="none"
-            stroke="url(#webDonutGrad)"
+            stroke={over_budget ? T.danger : "url(#webDonutGrad)"}
             strokeWidth="26"
             strokeDasharray={`${spent_arc} ${circ}`}
             strokeLinecap="round"
@@ -87,33 +99,79 @@ function DonutChart({ size, spent_pct, remaining, remaining_pct, days_left }: Do
           justifyContent: "center",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-          <span
-            style={{
-              fontFamily: "'DM Sans', sans-serif",
-              fontWeight: 700,
-              fontSize: 38,
-              letterSpacing: "-0.03em",
-              color: T.ink,
-              lineHeight: 1,
-            }}
-          >
-            {yenSlim(remaining)}
-          </span>
-          <span
-            style={{
-              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
-              fontWeight: 700,
-              fontSize: 17,
-              color: T.ink,
-            }}
-          >
-            円
-          </span>
-        </div>
-        <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 6 }}>
-          残り <strong style={{ color: T.coralDeep }}>{remaining_pct}%</strong> · あと{days_left}日
-        </div>
+        {over_budget ? (
+          <>
+            <div
+              style={{
+                fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                fontSize: 13,
+                fontWeight: 700,
+                color: T.danger,
+                marginBottom: 4,
+              }}
+            >
+              予算オーバー
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+              <span
+                style={{
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 36,
+                  letterSpacing: "-0.03em",
+                  color: T.danger,
+                  lineHeight: 1,
+                }}
+              >
+                −{yenSlim(overspend)}
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 17,
+                  color: T.danger,
+                }}
+              >
+                円
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 6 }}>
+              <strong style={{ color: T.danger }}>{used_pct}%</strong> 使用 · あと{days_left}日
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+              <span
+                style={{
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 38,
+                  letterSpacing: "-0.03em",
+                  color: T.ink,
+                  lineHeight: 1,
+                }}
+              >
+                {yenSlim(remaining)}
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 17,
+                  color: T.ink,
+                }}
+              >
+                円
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 6 }}>
+              残り <strong style={{ color: T.coralDeep }}>{remaining_pct}%</strong> · あと
+              {days_left}日
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -122,7 +180,7 @@ function DonutChart({ size, spent_pct, remaining, remaining_pct, days_left }: Do
 interface AreaChartProps {
   width: number;
   height: number;
-  days: DailyCumulativeResponse["days"];
+  days: DailyCumulative["days"];
   monthly_budget: number;
   today_day: number;
   days_in_month: number;
@@ -172,7 +230,7 @@ function AreaChart({
   const other_path = smoothPath(other_pts);
   const fc_path = smoothPath(fc_pts);
 
-  const y_ticks = [0, 20000, 40000, 60000, 80000].filter((t) => t <= maxY * 1.05);
+  const y_ticks = niceTicks(maxY);
   const x_ticks = [1, 5, 10, 15, 20, 25, days_in_month];
 
   const today_x = xAt(today_day);
@@ -383,14 +441,20 @@ function StatPill({ tone, label, value, sub }: StatPillProps) {
   );
 }
 
-interface EntryFormProps {
-  onSuccess: () => void;
-}
-
-function EntryForm({ onSuccess }: EntryFormProps) {
-  const [groups, setGroups] = useState<CategoryGroup[]>([]);
-  const [all_categories, setAllCategories] = useState<ExpenseCategory[]>([]);
-  const [selected_group_id, setSelectedGroupId] = useState("");
+function EntryForm() {
+  const ledger_data = useLedgerData();
+  const { data: category_lists } = useLocalData(
+    async (loaded_ledger_data) => ({
+      category_groups: await listCategoryGroups(loaded_ledger_data),
+      expense_categories: await listExpenseCategories(loaded_ledger_data),
+    }),
+    []
+  );
+  const groups = category_lists?.category_groups ?? [];
+  const all_categories = category_lists?.expense_categories ?? [];
+  const [chosen_group_id, setChosenGroupId] = useState("");
+  // Starts on the first group once the categories have loaded.
+  const selected_group_id = chosen_group_id || (groups[0]?.id ?? "");
   const [selected_category_id, setSelectedCategoryId] = useState("");
   const [transaction_date, setTransactionDate] = useState(todayJST());
   const [amount_str, setAmountStr] = useState("");
@@ -398,16 +462,6 @@ function EntryForm({ onSuccess }: EntryFormProps) {
   const [is_excluded, setIsExcluded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error_msg, setErrorMsg] = useState("");
-
-  useEffect(() => {
-    api.listCategoryGroups().then((res) => {
-      setGroups(res.category_groups);
-      if (res.category_groups.length > 0) {
-        setSelectedGroupId((cur) => cur || String(res.category_groups[0].id));
-      }
-    });
-    api.listExpenseCategories().then((res) => setAllCategories(res.expense_categories));
-  }, []);
 
   const filtered_categories = all_categories.filter(
     (c) => String(c.group_id) === selected_group_id
@@ -420,7 +474,7 @@ function EntryForm({ onSuccess }: EntryFormProps) {
         return still_valid ? cur : "";
       })
     );
-  }, [selected_group_id, all_categories]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected_group_id, category_lists]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handle_submit = useCallback(
     async (e?: React.FormEvent) => {
@@ -437,10 +491,10 @@ function EntryForm({ onSuccess }: EntryFormProps) {
       }
       setSubmitting(true);
       try {
-        await api.createJournalEntry({
+        await createJournalEntry(ledger_data, {
           transaction_date,
           amount: parsed_amount,
-          category_id: parseInt(selected_category_id, 10),
+          category_id: selected_category_id,
           is_excluded,
           item: item || null,
           note: null,
@@ -450,14 +504,13 @@ function EntryForm({ onSuccess }: EntryFormProps) {
         setIsExcluded(false);
         // Keep the entered transaction_date (#118) so consecutive entries on the
         // same past date don't require re-selecting it each time.
-        onSuccess();
       } catch (err) {
         setErrorMsg(err instanceof Error ? err.message : "エラーが発生しました");
       } finally {
         setSubmitting(false);
       }
     },
-    [amount_str, selected_category_id, transaction_date, is_excluded, item, onSuccess]
+    [ledger_data, amount_str, selected_category_id, transaction_date, is_excluded, item]
   );
 
   useEffect(() => {
@@ -596,7 +649,7 @@ function EntryForm({ onSuccess }: EntryFormProps) {
               <button
                 key={g.id}
                 type="button"
-                onClick={() => setSelectedGroupId(String(g.id))}
+                onClick={() => setChosenGroupId(String(g.id))}
                 style={{
                   border: `1.5px solid ${active ? T.coral : T.hair}`,
                   background: active ? T.coral : "#fff",
@@ -713,7 +766,7 @@ function EntryForm({ onSuccess }: EntryFormProps) {
               setItem("");
               setIsExcluded(false);
               setTransactionDate(todayJST());
-              setSelectedGroupId(groups.length > 0 ? String(groups[0].id) : "");
+              setChosenGroupId(groups.length > 0 ? String(groups[0].id) : "");
               setSelectedCategoryId("");
             }}
             style={{
@@ -752,30 +805,15 @@ function EntryForm({ onSuccess }: EntryFormProps) {
   );
 }
 
-interface Props {
-  refresh_token: number;
-  onSuccess: () => void;
-}
-
-export function WebHome({ refresh_token, onSuccess }: Props) {
-  const [cumulative, setCumulative] = useState<DailyCumulativeResponse | null>(null);
+export function WebHome() {
   const ym = currentMonthJST();
   const today = todayJST();
+  const { data: cumulative } = useLocalData(
+    (ledger_data) => loadDailyCumulative(ledger_data, ym, today),
+    [ym, today]
+  );
   const today_day = todayDayJST();
   const days_total = daysInMonth(ym);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getDailyCumulative(ym)
-      .then((res) => {
-        if (!cancelled) setCumulative(res);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [ym, refresh_token]);
 
   const monthly_budget = cumulative?.variable_budget ?? 0;
   const last_actual = cumulative?.days
@@ -785,6 +823,11 @@ export function WebHome({ refresh_token, onSuccess }: Props) {
   const remaining = Math.max(0, monthly_budget - spent_so_far);
   const remaining_pct = monthly_budget > 0 ? Math.round((remaining / monthly_budget) * 100) : 0;
   const spent_pct = 100 - remaining_pct;
+  // Over-budget is distinct from "no budget set" and from "exactly on budget":
+  // surface the overspend explicitly instead of clamping to a bare ¥0 (#125).
+  const over_budget = monthly_budget > 0 && spent_so_far > monthly_budget;
+  const overspend = Math.max(0, spent_so_far - monthly_budget);
+  const used_pct = monthly_budget > 0 ? Math.round((spent_so_far / monthly_budget) * 100) : 0;
   const days_left = Math.max(0, days_total - today_day);
   const daily_pace = today_day > 0 ? spent_so_far / today_day : 0;
   const projected_end = Math.round(daily_pace * days_total);
@@ -848,6 +891,9 @@ export function WebHome({ refresh_token, onSuccess }: Props) {
             remaining={remaining}
             remaining_pct={remaining_pct}
             days_left={days_left}
+            over_budget={over_budget}
+            overspend={overspend}
+            used_pct={used_pct}
           />
         </div>
 
@@ -929,7 +975,7 @@ export function WebHome({ refresh_token, onSuccess }: Props) {
         />
       </div>
 
-      <EntryForm onSuccess={onSuccess} />
+      <EntryForm />
     </div>
   );
 }

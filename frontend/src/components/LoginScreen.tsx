@@ -1,16 +1,17 @@
 import { useState, type FormEvent } from "react";
-import { api, AuthError, token_store } from "../api/client";
+import { AuthError } from "../api/client";
 import { T, btnPrimary } from "../theme";
-import type { components } from "../api/types";
-
-type UserProfile = components["schemas"]["UserResponse"];
 type Mode = "login" | "signup";
 
 interface LoginScreenProps {
-  onSuccess: (user: UserProfile) => void;
+  // Both throw AuthError for wrong credentials.
+  onLogin: (email: string, password: string) => Promise<void>;
+  onSignup: (email: string, password: string, display_name: string | null) => Promise<void>;
+  // Why the user was signed out, e.g. an expired session.
+  notice?: string | null;
 }
 
-export function LoginScreen({ onSuccess }: LoginScreenProps) {
+export function LoginScreen({ onLogin, onSignup, notice = null }: LoginScreenProps) {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,16 +38,11 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
     setSubmitting(true);
     setErrorMessage(null);
     try {
-      const result =
-        mode === "login"
-          ? await api.login(email, password)
-          : await api.signup({
-              email,
-              password,
-              display_name: display_name.trim() || null,
-            });
-      token_store.save(result.token);
-      onSuccess(result);
+      if (mode === "login") {
+        await onLogin(email, password);
+      } else {
+        await onSignup(email, password, display_name.trim() || null);
+      }
     } catch (err) {
       if (mode === "login" && err instanceof AuthError) {
         setErrorMessage("メールアドレスまたはパスワードが正しくありません");
@@ -242,7 +238,7 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
             />
           </div>
 
-          {error_message && (
+          {(error_message ?? notice) && (
             <div
               role="alert"
               style={{
@@ -254,7 +250,7 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
                 marginBottom: 16,
               }}
             >
-              {error_message}
+              {error_message ?? notice}
             </div>
           )}
 

@@ -5,7 +5,11 @@
 atoikura tracks the gap between your monthly variable-expense budget and
 cumulative spending — no income tracking, no complexity, just your number.
 
+**🚀 [Try the live demo](https://utibori-jp.github.io/atoikura/)** — runs entirely in your browser on mocked data (read-only, no backend, no sign-up).
+
 The UI is in Japanese (the target users are native Japanese speakers); the codebase, docs, and tooling are in English.
+
+> **For AI agents:** start with [`AGENTS.md`](AGENTS.md) — the canonical "read these first" entry point.
 
 ---
 
@@ -14,7 +18,7 @@ The UI is in Japanese (the target users are native Japanese speakers); the codeb
 - Docker / Docker Compose
 - Either:
   - VS Code with the **Dev Containers** extension (recommended; everything is bundled in `.devcontainer/`)
-  - Or, for local development: Go 1.25+ and Node 24+
+  - Or, for local development: Go 1.27+ and Node 24+
 
 ---
 
@@ -62,4 +66,6 @@ docker compose down
 - `docs/architecture.md` — tech stack and repository layout
 - `docs/atoikura.dbml` — database schema
 - `docs/atoikura-api.yaml` — OpenAPI spec
-- `docs/prompts/README.md` — implementation roadmap for Claude Code
+- `docs/conventions/` — backend & frontend coding conventions
+- `docs/design/` — high-fidelity UI design references (mobile & web)
+- `docs/deploy-migrations.md` — production migration runbook

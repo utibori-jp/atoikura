@@ -1,10 +1,14 @@
-linters:
-  enable:
-    - errcheck
-    - staticcheck
-    - govet
-    - unused
+version: "2"
 
-issues:
-  exclude-dirs:
-    - internal/db
+linters:
+  # The standard set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - internal/db

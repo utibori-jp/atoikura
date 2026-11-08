@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { ReviewScreen } from "./components/ReviewScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { UserInfo } from "./components/UserInfo";
+import { Modal } from "./components/Modal";
+import { DialogProvider } from "./components/dialogs";
 import { MobileHome } from "./components/mobile/MobileHome";
 import { MobileJournal } from "./components/mobile/MobileJournal";
 import { MobileEntryForm } from "./components/mobile/MobileEntryForm";
@@ -17,14 +19,32 @@ import { WebIncome } from "./components/web/WebIncome";
 import { WebReview } from "./components/web/WebReview";
 import { WebJournal } from "./components/web/WebJournal";
 import { WebMaster } from "./components/web/WebMaster";
-import { api, AuthError, clearRuntimeCaches, token_store } from "./api/client";
-import type { components } from "./api/types";
+import { MonthSwitcher } from "./components/MonthSwitcher";
+import { SyncStatusIndicator } from "./components/SyncStatusIndicator";
+import type { JournalEntryView } from "./data/journal";
+import { LedgerDataProvider } from "./data/LedgerDataProvider";
+import { joinTokenFromHash } from "./data/household";
+import { LedgerViewContext, useLedgerViewState } from "./data/ledgerData";
+import { ArchiveViewer } from "./components/ArchiveViewer";
+import { HouseholdSettings } from "./components/HouseholdSettings";
+import { LedgerViewSwitcher } from "./components/LedgerViewSwitcher";
+import { UpdateNotice } from "./pwa/UpdateNotice";
+import { SessionProvider } from "./session/SessionContext";
+import {
+  createBrowserAppServices,
+  SessionController,
+  type AppServices,
+  type UserProfile,
+} from "./session/sessionController";
 import { T } from "./theme";
 
 type Tab = "home" | "list" | "budget" | "master" | "review" | "account";
 type BudgetSubScreen = "hub" | "income" | "recurring" | "savings";
-type UserProfile = components["schemas"]["UserResponse"];
-type JournalEntryResponse = components["schemas"]["JournalEntryResponse"];
+
+// A point in the in-app navigation, mirrored onto the browser history stack so
+// the native Back button walks screens instead of leaving the SPA (#165).
+// archive is the past household open on the account screen, if any.
+type NavLocation = { tab: Tab; sub: BudgetSubScreen; archive?: string | null };
 
 function useMobile(): boolean {
   const [is_mobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 1023px)").matches);
@@ -88,17 +108,6 @@ function currentMonthJST(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).slice(0, 7);
 }
 
-function addMonths(ym: string, delta: number): string {
-  const [year, month] = ym.split("-").map(Number);
-  const date = new Date(year, month - 1 + delta, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function formatMonthJP(ym: string): string {
-  const [year, month] = ym.split("-").map(Number);
-  return `${year}年${month}月`;
-}
-
 interface UserPillProps {
   user: UserProfile;
   active: boolean;
@@ -160,14 +169,10 @@ function UserPill({ user, active, onClick }: UserPillProps) {
 interface NavBarProps {
   active: Tab;
   onChange: (tab: Tab) => void;
-  listYearMonth: string;
-  onListMonthChange: (ym: string) => void;
   user: UserProfile;
 }
 
-function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: NavBarProps) {
-  const isCurrent = listYearMonth >= currentMonthJST();
-
+function NavBar({ active, onChange, user }: NavBarProps) {
   return (
     <header
       style={{
@@ -185,7 +190,7 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
       }}
     >
       {/* Logo */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
         <LogoIcon />
         <span
           style={{
@@ -229,6 +234,7 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
               gap: 6,
               fontFamily: "inherit",
               transition: "background 0.15s",
+              whiteSpace: "nowrap",
             }}
           >
             <span style={{ fontSize: 14 }}>{item.emoji}</span>
@@ -237,62 +243,9 @@ function NavBar({ active, onChange, listYearMonth, onListMonthChange, user }: Na
         ))}
       </nav>
 
-      {/* Right: month nav (list) + user pill */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {active === "list" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button
-              onClick={() => onListMonthChange(addMonths(listYearMonth, -1))}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                color: T.inkSoft,
-                fontSize: 13,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              ‹
-            </button>
-            <span
-              style={{
-                padding: "6px 16px",
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                fontSize: 13,
-                fontWeight: 600,
-                color: T.ink,
-              }}
-            >
-              {formatMonthJP(listYearMonth)}
-            </span>
-            <button
-              onClick={() => onListMonthChange(addMonths(listYearMonth, 1))}
-              disabled={isCurrent}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                fontSize: 13,
-                cursor: isCurrent ? "default" : "pointer",
-                color: isCurrent ? T.hair : T.inkSoft,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              ›
-            </button>
-          </div>
-        )}
+      {/* Right: sync status + user pill */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <SyncStatusIndicator />
         <UserPill user={user} active={active === "account"} onClick={() => onChange("account")} />
       </div>
     </header>
@@ -359,29 +312,32 @@ function MobileHeader({ user, onAvatarClick }: MobileHeaderProps) {
           Atoikura
         </span>
       </div>
-      <button
-        type="button"
-        onClick={onAvatarClick}
-        title="アカウント"
-        style={{
-          width: 34,
-          height: 34,
-          minWidth: 44,
-          minHeight: 44,
-          borderRadius: "50%",
-          background: T.sage,
-          color: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontWeight: 700,
-          fontSize: 14,
-          border: "none",
-          cursor: "pointer",
-        }}
-      >
-        {display.slice(0, 1).toUpperCase()}
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <SyncStatusIndicator is_mobile />
+        <button
+          type="button"
+          onClick={onAvatarClick}
+          title="アカウント"
+          style={{
+            width: 34,
+            height: 34,
+            minWidth: 44,
+            minHeight: 44,
+            borderRadius: "50%",
+            background: T.sage,
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: 700,
+            fontSize: 14,
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          {display.slice(0, 1).toUpperCase()}
+        </button>
+      </div>
     </div>
   );
 }
@@ -485,146 +441,137 @@ function MobileTabBar({ active, onChange, onPlusClick, addTone = "coral" }: Mobi
 
 interface EntrySheetProps {
   onClose: () => void;
-  onSuccess: () => void;
-  edit_entry?: JournalEntryResponse | null;
+  edit_entry?: JournalEntryView | null;
+  is_mobile?: boolean;
 }
 
-function EntrySheet({ onClose, onSuccess, edit_entry }: EntrySheetProps) {
+function EntrySheet({ onClose, edit_entry, is_mobile = false }: EntrySheetProps) {
   const is_edit = !!edit_entry;
+  // Screens re-read local data on their own; an edit closes the sheet, while a
+  // new entry keeps it open for the next one.
   const handle_success = () => {
-    onSuccess();
     if (is_edit) onClose();
   };
 
+  // On web this is a compact, width-constrained centered card; on mobile the
+  // shared Modal renders its bottom-sheet variant, preserving the original
+  // sheet UX while no longer filling the whole screen on desktop (#133).
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 200,
-        background: "rgba(42,37,32,0.45)",
-      }}
-      onClick={onClose}
+    <Modal
+      title={is_edit ? "支出を編集" : "支出を記録"}
+      onClose={onClose}
+      is_mobile={is_mobile}
+      maxWidth={460}
     >
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: T.card,
-          borderTopLeftRadius: 32,
-          borderTopRightRadius: 32,
-          padding: "12px 20px",
-          paddingBottom: "max(env(safe-area-inset-bottom, 0px), 28px)",
-          boxShadow: "0 -20px 50px -20px rgba(0,0,0,0.3)",
-          maxHeight: "90dvh",
-          overflowY: "auto",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          style={{
-            width: 42,
-            height: 5,
-            borderRadius: 999,
-            background: T.hair,
-            margin: "0 auto 14px",
-          }}
-        />
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 16,
-          }}
-        >
-          <span
-            style={{
-              fontFamily: "'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif",
-              fontSize: 19,
-              fontWeight: 900,
-              color: T.ink,
-            }}
-          >
-            {is_edit ? "支出を編集" : "支出を記録"}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              width: 30,
-              height: 30,
-              minWidth: 44,
-              minHeight: 44,
-              borderRadius: 999,
-              background: T.bgSoft,
-              border: "none",
-              cursor: "pointer",
-              color: T.inkSoft,
-              fontSize: 15,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            ✕
-          </button>
-        </div>
+      <LedgerDataProvider>
         <MobileEntryForm onSuccess={handle_success} edit_entry={edit_entry} />
-      </div>
-    </div>
+      </LedgerDataProvider>
+    </Modal>
   );
 }
 
-type AuthState =
-  | { status: "checking" }
-  | { status: "anonymous" }
-  | { status: "authenticated"; user: UserProfile };
-
-export default function App() {
-  const [auth_state, setAuthState] = useState<AuthState>(() =>
-    token_store.load() ? { status: "checking" } : { status: "anonymous" }
+function AppContent({
+  is_mobile,
+  session_controller,
+}: {
+  is_mobile: boolean;
+  session_controller: SessionController;
+}) {
+  const session_state = useSyncExternalStore(
+    session_controller.subscribe,
+    session_controller.getState
   );
-  const [active_tab, setActiveTab] = useState<Tab>("home");
+  // An invitation link lands on the account screen's household settings.
+  const [active_tab, setActiveTab] = useState<Tab>(() =>
+    joinTokenFromHash(window.location.hash) ? "account" : "home"
+  );
   const [budget_sub, setBudgetSub] = useState<BudgetSubScreen>("hub");
-  const [refresh_token, setRefreshToken] = useState(0);
+  const [archive_ledger_id, setArchiveLedgerId] = useState<string | null>(null);
   const [list_year_month, setListYearMonth] = useState(currentMonthJST());
   const [show_entry_sheet, setShowEntrySheet] = useState(false);
-  const [edit_entry, setEditEntry] = useState<JournalEntryResponse | null>(null);
-  const is_mobile = useMobile();
+  const [edit_entry, setEditEntry] = useState<JournalEntryView | null>(null);
+  const ledger_view_state = useLedgerViewState();
+  // An invitation link opens the app with #join=<token>. The token is taken out
+  // of the URL right away so it doesn't linger in history, and the household
+  // settings ask before joining.
+  const [pending_join_token, setPendingJoinToken] = useState<string | null>(() =>
+    joinTokenFromHash(window.location.hash)
+  );
+  useEffect(() => {
+    const clearJoinHash = () =>
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${window.location.search}`
+      );
+    if (joinTokenFromHash(window.location.hash)) clearJoinHash();
+    // A link opened in a tab that already shows the app only changes the hash.
+    const handle_hashchange = () => {
+      const join_token = joinTokenFromHash(window.location.hash);
+      if (!join_token) return;
+      clearJoinHash();
+      setPendingJoinToken(join_token);
+      setActiveTab("account");
+      setArchiveLedgerId(null);
+    };
+    window.addEventListener("hashchange", handle_hashchange);
+    return () => window.removeEventListener("hashchange", handle_hashchange);
+  }, []);
+
+  // ── In-app history (#165) ──────────────────────────────────────────────────
+  // Screen navigation is React state, not URL routes, so without History API
+  // integration the browser Back button leaves the SPA entirely. Every screen
+  // transition goes through `navigate`, which mirrors the new location onto the
+  // history stack; `popstate` restores it. Back then walks budget sub-screen →
+  // budget hub → home before the browser finally exits the app.
+  const navigate = (patch: Partial<NavLocation>) => {
+    // Any other navigation closes an open archive.
+    const next_archive = patch.archive ?? null;
+    const next: NavLocation = {
+      tab: patch.tab ?? active_tab,
+      sub: patch.sub ?? budget_sub,
+      ...(next_archive ? { archive: next_archive } : {}),
+    };
+    if (next.tab === active_tab && next.sub === budget_sub && next_archive === archive_ledger_id)
+      return;
+    setActiveTab(next.tab);
+    setBudgetSub(next.sub);
+    setArchiveLedgerId(next_archive);
+    window.history.pushState({ nav: next }, "");
+  };
+
+  // Seed the first history entry once the user is authenticated so the initial
+  // popstate has a location to restore and Back from home exits cleanly.
+  useEffect(() => {
+    if (session_state.status !== "ready") return;
+    window.history.replaceState({ nav: { tab: "home", sub: "hub" } satisfies NavLocation }, "");
+  }, [session_state.status]);
 
   useEffect(() => {
-    if (auth_state.status !== "checking") return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const user = await api.getCurrentUser();
-        if (!cancelled) setAuthState({ status: "authenticated", user });
-      } catch (err) {
-        if (cancelled) return;
-        if (err instanceof AuthError) {
-          token_store.clear();
-        }
-        setAuthState({ status: "anonymous" });
-      }
-    })();
-    return () => {
-      cancelled = true;
+    const handle_popstate = (event: PopStateEvent) => {
+      const nav = (event.state as { nav?: NavLocation } | null)?.nav;
+      setActiveTab(nav?.tab ?? "home");
+      setBudgetSub(nav?.sub ?? "hub");
+      setArchiveLedgerId(nav?.archive ?? null);
     };
-  }, [auth_state.status]);
+    window.addEventListener("popstate", handle_popstate);
+    return () => window.removeEventListener("popstate", handle_popstate);
+  }, []);
 
-  function handleLogout() {
-    token_store.clear();
-    // Purge cached per-user master data so the next account does not inherit
-    // this user's categories from the service worker cache (#114).
-    void clearRuntimeCaches();
-    setActiveTab("home");
-    setAuthState({ status: "anonymous" });
+  useEffect(() => {
+    void session_controller.initialize();
+  }, [session_controller]);
+
+  async function handleLogout(options?: { discard_pending_changes?: boolean }) {
+    const logout_result = await session_controller.logout(options);
+    if (logout_result.outcome === "signed_out") {
+      setActiveTab("home");
+      setArchiveLedgerId(null);
+    }
+    return logout_result;
   }
 
-  if (auth_state.status === "checking") {
+  if (session_state.status === "checking" || session_state.status === "unavailable") {
     return (
       <div
         style={{
@@ -637,196 +584,196 @@ export default function App() {
           fontSize: 14,
         }}
       >
-        読み込み中…
+        {session_state.status === "unavailable" ? session_state.message : "読み込み中…"}
       </div>
     );
   }
 
-  if (auth_state.status === "anonymous") {
-    return <LoginScreen onSuccess={(user) => setAuthState({ status: "authenticated", user })} />;
+  if (session_state.status === "anonymous") {
+    return (
+      <LoginScreen
+        notice={session_state.notice}
+        onLogin={(email, password) => session_controller.login(email, password)}
+        onSignup={(email, password, display_name) =>
+          session_controller.signup(email, password, display_name)
+        }
+      />
+    );
   }
 
-  const isCurrent = list_year_month >= currentMonthJST();
+  const { session } = session_state;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        minHeight: "100vh",
-        background: T.bg,
-        overflowX: "hidden",
-      }}
-    >
-      {is_mobile ? (
-        <MobileHeader user={auth_state.user} onAvatarClick={() => setActiveTab("account")} />
-      ) : (
-        <NavBar
-          active={active_tab}
-          onChange={setActiveTab}
-          listYearMonth={list_year_month}
-          onListMonthChange={setListYearMonth}
-          user={auth_state.user}
-        />
-      )}
+    <SessionProvider session={session}>
+      <LedgerViewContext.Provider value={ledger_view_state}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            minHeight: "100vh",
+            background: T.bg,
+            overflowX: "hidden",
+          }}
+        >
+          {is_mobile ? (
+            <MobileHeader user={session.user} onAvatarClick={() => navigate({ tab: "account" })} />
+          ) : (
+            <NavBar
+              active={active_tab}
+              // Tapping a nav button always lands on a tab's top-level view, so
+              // reset the budget sub-screen to the hub (#134) — otherwise the
+              // header "予算" button leaves you stranded on income/recurring.
+              onChange={(tab) => navigate({ tab, sub: "hub" })}
+              user={session.user}
+            />
+          )}
 
-      <main
-        style={{
-          flex: 1,
-          padding: is_mobile ? "16px 20px 96px" : "32px 36px",
-          maxWidth: is_mobile ? undefined : 1280,
-          width: "100%",
-          margin: "0 auto",
-          alignSelf: "stretch",
-          overflowX: "hidden",
-        }}
-      >
-        {/* Month navigation for list tab on mobile */}
-        {is_mobile && active_tab === "list" && (
-          <div
+          <main
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 16,
-              justifyContent: "center",
+              flex: 1,
+              padding: is_mobile ? "16px 20px 96px" : "32px 36px",
+              maxWidth: is_mobile ? undefined : 1280,
+              width: "100%",
+              margin: "0 auto",
+              alignSelf: "stretch",
+              overflowX: "hidden",
             }}
           >
-            <button
-              onClick={() => setListYearMonth(addMonths(list_year_month, -1))}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                color: T.inkSoft,
-                fontSize: 16,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              ‹
-            </button>
-            <span
-              style={{
-                padding: "10px 20px",
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                fontSize: 14,
-                fontWeight: 600,
-                color: T.ink,
-              }}
-            >
-              {formatMonthJP(list_year_month)}
-            </span>
-            <button
-              onClick={() => setListYearMonth(addMonths(list_year_month, 1))}
-              disabled={isCurrent}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 999,
-                border: `1.5px solid ${T.hair}`,
-                background: T.card,
-                fontSize: 16,
-                cursor: isCurrent ? "default" : "pointer",
-                color: isCurrent ? T.hair : T.inkSoft,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              ›
-            </button>
-          </div>
-        )}
+            {/* The account screen works before the first sync, so sign-out is always
+              reachable; every other screen waits for the ledger's data. */}
+            {active_tab === "account" && archive_ledger_id ? (
+              <LedgerDataProvider>
+                <ArchiveViewer
+                  archive_ledger_id={archive_ledger_id}
+                  // Opening pushed a history entry; going back pops it.
+                  onBack={() => window.history.back()}
+                  is_mobile={is_mobile}
+                />
+              </LedgerDataProvider>
+            ) : active_tab === "account" ? (
+              <>
+                <UserInfo user={session.user} onLogout={handleLogout} />
+                <LedgerDataProvider>
+                  <HouseholdSettings
+                    pending_join_token={pending_join_token}
+                    onJoinTokenHandled={() => setPendingJoinToken(null)}
+                    onOpenArchive={(opened_archive_id) =>
+                      navigate({ tab: "account", archive: opened_archive_id })
+                    }
+                  />
+                </LedgerDataProvider>
+              </>
+            ) : (
+              <LedgerDataProvider>
+                <LedgerViewSwitcher />
+                {/* Month navigation for list tab on mobile */}
+                {is_mobile && active_tab === "list" && (
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+                    <MonthSwitcher
+                      year_month={list_year_month}
+                      onYearMonthChange={setListYearMonth}
+                      is_mobile
+                    />
+                  </div>
+                )}
 
-        {active_tab === "home" &&
-          (is_mobile ? (
-            <MobileHome refresh_token={refresh_token} onShowList={() => setActiveTab("list")} />
-          ) : (
-            <WebHome
-              refresh_token={refresh_token}
-              onSuccess={() => setRefreshToken((t) => t + 1)}
-            />
-          ))}
+                {active_tab === "home" &&
+                  (is_mobile ? (
+                    <MobileHome onShowList={() => navigate({ tab: "list" })} />
+                  ) : (
+                    <WebHome />
+                  ))}
 
-        {active_tab === "list" &&
-          (is_mobile ? (
-            <MobileJournal
-              year_month={list_year_month}
-              refresh_token={refresh_token}
-              onEditEntry={(entry) => {
-                setEditEntry(entry);
+                {active_tab === "list" &&
+                  (is_mobile ? (
+                    <MobileJournal
+                      year_month={list_year_month}
+                      onEditEntry={(entry) => {
+                        setEditEntry(entry);
+                        setShowEntrySheet(true);
+                      }}
+                    />
+                  ) : (
+                    <WebJournal
+                      year_month={list_year_month}
+                      onYearMonthChange={setListYearMonth}
+                      onEditEntry={(entry) => {
+                        setEditEntry(entry);
+                        setShowEntrySheet(true);
+                      }}
+                    />
+                  ))}
+
+                {active_tab === "review" && (is_mobile ? <ReviewScreen /> : <WebReview />)}
+
+                {active_tab === "budget" &&
+                  (() => {
+                    if (is_mobile) {
+                      if (budget_sub === "income")
+                        return <MobileIncome onBack={() => navigate({ sub: "hub" })} />;
+                      if (budget_sub === "recurring")
+                        return <MobileRecurring onBack={() => navigate({ sub: "hub" })} />;
+                      if (budget_sub === "savings")
+                        return <MobileSavings onBack={() => navigate({ sub: "hub" })} />;
+                      return <MobileBudget onNavigate={(s) => navigate({ sub: s })} />;
+                    }
+                    if (budget_sub === "income")
+                      return <WebIncome onBack={() => navigate({ sub: "hub" })} />;
+                    if (budget_sub === "recurring")
+                      return <WebRecurring onBack={() => navigate({ sub: "hub" })} />;
+                    if (budget_sub === "savings")
+                      return <WebSavings onBack={() => navigate({ sub: "hub" })} />;
+                    return <WebBudget onNavigate={(s) => navigate({ sub: s })} />;
+                  })()}
+
+                {active_tab === "master" && <WebMaster />}
+              </LedgerDataProvider>
+            )}
+          </main>
+
+          {is_mobile && (
+            <MobileTabBar
+              active={active_tab}
+              // Always return to the budget hub on a tab tap, including when the
+              // tapped tab is "予算" itself (#134).
+              onChange={(tab) => navigate({ tab, sub: "hub" })}
+              onPlusClick={() => {
+                setEditEntry(null);
                 setShowEntrySheet(true);
               }}
+              addTone={active_tab === "budget" && budget_sub === "income" ? "sage" : "coral"}
             />
-          ) : (
-            <WebJournal
-              year_month={list_year_month}
-              refresh_token={refresh_token}
-              onEditEntry={(entry) => {
-                setEditEntry(entry);
-                setShowEntrySheet(true);
+          )}
+
+          {show_entry_sheet && (
+            <EntrySheet
+              onClose={() => {
+                setShowEntrySheet(false);
+                setEditEntry(null);
               }}
-              onRefresh={() => setRefreshToken((t) => t + 1)}
+              edit_entry={edit_entry}
+              is_mobile={is_mobile}
             />
-          ))}
+          )}
+        </div>
+      </LedgerViewContext.Provider>
+    </SessionProvider>
+  );
+}
 
-        {active_tab === "review" && (is_mobile ? <ReviewScreen /> : <WebReview />)}
-
-        {active_tab === "budget" &&
-          (() => {
-            if (is_mobile) {
-              if (budget_sub === "income")
-                return <MobileIncome onBack={() => setBudgetSub("hub")} />;
-              if (budget_sub === "recurring")
-                return <MobileRecurring onBack={() => setBudgetSub("hub")} />;
-              if (budget_sub === "savings")
-                return <MobileSavings onBack={() => setBudgetSub("hub")} />;
-              return <MobileBudget onNavigate={(s) => setBudgetSub(s)} />;
-            }
-            if (budget_sub === "income") return <WebIncome onBack={() => setBudgetSub("hub")} />;
-            if (budget_sub === "recurring")
-              return <WebRecurring onBack={() => setBudgetSub("hub")} />;
-            if (budget_sub === "savings") return <WebSavings onBack={() => setBudgetSub("hub")} />;
-            return <WebBudget onNavigate={(s) => setBudgetSub(s)} />;
-          })()}
-
-        {active_tab === "master" && <WebMaster />}
-
-        {active_tab === "account" && <UserInfo user={auth_state.user} onLogout={handleLogout} />}
-      </main>
-
-      {is_mobile && (
-        <MobileTabBar
-          active={active_tab}
-          onChange={(tab) => {
-            if (tab !== "budget") setBudgetSub("hub");
-            setActiveTab(tab);
-          }}
-          onPlusClick={() => {
-            setEditEntry(null);
-            setShowEntrySheet(true);
-          }}
-          addTone={active_tab === "budget" && budget_sub === "income" ? "sage" : "coral"}
-        />
-      )}
-
-      {show_entry_sheet && (
-        <EntrySheet
-          onClose={() => {
-            setShowEntrySheet(false);
-            setEditEntry(null);
-          }}
-          onSuccess={() => setRefreshToken((t) => t + 1)}
-          edit_entry={edit_entry}
-        />
-      )}
-    </div>
+export default function App({ services }: { services?: AppServices }) {
+  // One DialogProvider at the root renders the in-app confirm/alert Modal (#166);
+  // `is_mobile` is resolved once here and threaded through both the dialogs and
+  // the screen tree so the sheet/centered-card variant stays consistent.
+  const is_mobile = useMobile();
+  // Tests pass their own services (in-memory database, fake storage).
+  const [session_controller] = useState(
+    () => new SessionController(services ?? createBrowserAppServices())
+  );
+  return (
+    <DialogProvider is_mobile={is_mobile}>
+      <AppContent is_mobile={is_mobile} session_controller={session_controller} />
+      <UpdateNotice is_mobile={is_mobile} />
+    </DialogProvider>
   );
 }

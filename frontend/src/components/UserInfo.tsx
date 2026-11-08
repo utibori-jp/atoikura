@@ -1,12 +1,16 @@
-import { T, btnPrimary } from "../theme";
+import { useState } from "react";
+import { T, btnGhost, btnPrimary } from "../theme";
 import type { components } from "../api/types";
+import type { LogoutResult } from "../session/sessionController";
+import { Modal } from "./Modal";
 import { PasswordChangeForm } from "./PasswordChangeForm";
 
 type UserProfile = components["schemas"]["UserResponse"];
 
 interface UserInfoProps {
   user: UserProfile;
-  onLogout: () => void;
+  // Resolves "pending_changes" when unsent changes stopped the sign-out.
+  onLogout: (options?: { discard_pending_changes?: boolean }) => Promise<LogoutResult>;
 }
 
 function formatLastLogin(iso: string | null | undefined): string {
@@ -26,6 +30,21 @@ function formatLastLogin(iso: string | null | undefined): string {
 export function UserInfo({ user, onLogout }: UserInfoProps) {
   const display_name = user.display_name?.trim() || user.email;
   const initial = display_name.slice(0, 1).toUpperCase();
+  const [logging_out, setLoggingOut] = useState(false);
+  // Unsent changes that would be lost; the confirmation is open while set.
+  const [unsent_change_count, setUnsentChangeCount] = useState<number | null>(null);
+
+  async function requestLogout(discard_pending_changes: boolean) {
+    setLoggingOut(true);
+    try {
+      const logout_result = await onLogout({ discard_pending_changes });
+      if (logout_result.outcome === "pending_changes") {
+        setUnsentChangeCount(logout_result.pending_count);
+      }
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   const row_style: React.CSSProperties = {
     display: "flex",
@@ -118,19 +137,51 @@ export function UserInfo({ user, onLogout }: UserInfoProps) {
 
         <button
           type="button"
-          onClick={onLogout}
+          onClick={() => void requestLogout(false)}
+          disabled={logging_out}
           style={{
             ...btnPrimary,
             width: "100%",
             marginTop: 24,
             padding: "14px 24px",
+            opacity: logging_out ? 0.6 : 1,
           }}
         >
-          ログアウト
+          {logging_out ? "ログアウト中…" : "ログアウト"}
         </button>
       </div>
 
       <PasswordChangeForm />
+
+      {unsent_change_count !== null && (
+        <Modal title="未送信の変更があります" onClose={() => setUnsentChangeCount(null)}>
+          <p style={{ fontSize: 14, color: T.ink, lineHeight: 1.7, margin: 0 }}>
+            サーバーに送信できていない変更が{unsent_change_count}
+            件あります。ログアウトするとこの端末のデータは削除され、これらの変更は失われます。
+          </p>
+          <p style={{ fontSize: 13, color: T.inkSoft, lineHeight: 1.7, margin: "8px 0 0" }}>
+            オンラインに戻ってから再度ログアウトすると、送信してから削除します。
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+            <button
+              type="button"
+              onClick={() => setUnsentChangeCount(null)}
+              disabled={logging_out}
+              style={btnGhost}
+            >
+              キャンセル
+            </button>
+            <button
+              type="button"
+              onClick={() => void requestLogout(true)}
+              disabled={logging_out}
+              style={btnPrimary}
+            >
+              変更を破棄してログアウト
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

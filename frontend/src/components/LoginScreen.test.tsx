@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { AuthError } from "../api/client";
 import { LoginScreen } from "./LoginScreen";
 
 function getSubmitButton() {
@@ -6,21 +7,24 @@ function getSubmitButton() {
 }
 
 describe("LoginScreen", () => {
-  const onSuccess = vi.fn();
+  const onLogin = vi.fn<(email: string, password: string) => Promise<void>>();
+  const onSignup =
+    vi.fn<(email: string, password: string, display_name: string | null) => Promise<void>>();
 
   beforeEach(() => {
-    onSuccess.mockReset();
+    onLogin.mockReset().mockResolvedValue();
+    onSignup.mockReset().mockResolvedValue();
   });
 
   it("renders email and password inputs in login mode", () => {
-    render(<LoginScreen onSuccess={onSuccess} />);
+    render(<LoginScreen onLogin={onLogin} onSignup={onSignup} />);
     expect(screen.getByLabelText(/メールアドレス/)).toBeInTheDocument();
     expect(screen.getByLabelText(/パスワード/)).toBeInTheDocument();
     expect(getSubmitButton()).toBeInTheDocument();
   });
 
   it("shows error when submitting with empty fields", async () => {
-    render(<LoginScreen onSuccess={onSuccess} />);
+    render(<LoginScreen onLogin={onLogin} onSignup={onSignup} />);
     // Use fireEvent.submit to bypass HTML5 required validation in jsdom
     fireEvent.submit(getSubmitButton().closest("form")!);
     await waitFor(() => {
@@ -29,7 +33,7 @@ describe("LoginScreen", () => {
   });
 
   it("switches to signup mode and shows display name field", async () => {
-    render(<LoginScreen onSuccess={onSuccess} />);
+    render(<LoginScreen onLogin={onLogin} onSignup={onSignup} />);
     fireEvent.click(screen.getByRole("button", { name: /新規登録/ }));
     await waitFor(() => {
       expect(screen.getByLabelText(/表示名/)).toBeInTheDocument();
@@ -37,7 +41,7 @@ describe("LoginScreen", () => {
   });
 
   it("shows error when signup password is too short", async () => {
-    render(<LoginScreen onSuccess={onSuccess} />);
+    render(<LoginScreen onLogin={onLogin} onSignup={onSignup} />);
     fireEvent.click(screen.getByRole("button", { name: /新規登録/ }));
 
     fireEvent.change(screen.getByLabelText(/メールアドレス/), {
@@ -53,8 +57,8 @@ describe("LoginScreen", () => {
     });
   });
 
-  it("calls onSuccess after successful login", async () => {
-    render(<LoginScreen onSuccess={onSuccess} />);
+  it("passes the credentials to onLogin", async () => {
+    render(<LoginScreen onLogin={onLogin} onSignup={onSignup} />);
     fireEvent.change(screen.getByLabelText(/メールアドレス/), {
       target: { value: "dev@atoikura.local" },
     });
@@ -64,7 +68,26 @@ describe("LoginScreen", () => {
     fireEvent.click(getSubmitButton());
 
     await waitFor(() => {
-      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(onLogin).toHaveBeenCalledWith("dev@atoikura.local", "password123");
     });
+  });
+
+  it("says the credentials are wrong when login is refused", async () => {
+    onLogin.mockRejectedValue(new AuthError("認証情報が不正です"));
+    render(<LoginScreen onLogin={onLogin} onSignup={onSignup} />);
+    fireEvent.change(screen.getByLabelText(/メールアドレス/), {
+      target: { value: "dev@atoikura.local" },
+    });
+    fireEvent.change(screen.getByLabelText(/パスワード/), { target: { value: "wrong" } });
+    fireEvent.click(getSubmitButton());
+
+    expect(
+      await screen.findByText("メールアドレスまたはパスワードが正しくありません")
+    ).toBeInTheDocument();
+  });
+
+  it("shows why the user was signed out", () => {
+    render(<LoginScreen onLogin={onLogin} onSignup={onSignup} notice="再度ログインしてください" />);
+    expect(screen.getByRole("alert")).toHaveTextContent("再度ログインしてください");
   });
 });

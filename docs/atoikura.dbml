@@ -26,6 +26,7 @@ Table journal_entries {
   category_id integer [not null]
   user_id integer [not null]
   note text
+  recurring_expense_id integer [note: 'ON DELETE SET NULL']
   created_at timestamp
   updated_at timestamp
   version integer
@@ -86,6 +87,53 @@ Table budgets {
   goal_amount integer
   created_at timestamp
   updated_at timestamp
+}
+
+Table recurring_expenses {
+  id integer [primary key]
+  user_id integer [not null]
+  name varchar(50) [not null]
+  emoji varchar(10) [not null]
+  billing_day smallint [not null, note: 'CHECK (1..31)']
+  amount integer
+  type varchar(10) [not null, default: 'fixed', note: "CHECK (type IN ('fixed', 'variable'))"]
+  category_id integer [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table savings_goals {
+  id integer [primary key]
+  user_id integer [not null]
+  name varchar(50) [not null]
+  emoji varchar(10) [not null]
+  monthly_amount integer [not null, default: 0]
+  target_amount integer [not null, default: 0]
+  accumulated_amount integer [not null, default: 0]
+  deadline varchar(7)
+  last_posted_month varchar(7)
+  memo text [not null, default: '']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table income_records {
+  id integer [primary key]
+  user_id integer [not null]
+  transaction_date date [not null]
+  amount integer [not null]
+  name varchar(50) [not null]
+  income_type varchar(10) [not null, note: "CHECK (income_type IN ('salary', 'side', 'bonus', 'oneoff'))"]
+  emoji varchar(10) [not null]
+  note text [not null, default: '']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table base_income_settings {
+  user_id integer [primary key]
+  amount integer [not null, default: 0]
+  updated_at timestamptz [not null]
 }
 
 Table daily_notes {
@@ -172,3 +220,9 @@ Ref: category_groups.statement_type_id > statement_types.id
 Ref: accounts.id < account_transactions.account_id
 Ref: users.id < surplus_allocations.user_id
 Ref: savings_goals.id < surplus_allocations.savings_goal_id
+Ref: users.id < recurring_expenses.user_id
+Ref: users.id < savings_goals.user_id
+Ref: users.id < income_records.user_id
+Ref: users.id - base_income_settings.user_id
+Ref: recurring_expenses.category_id > expense_categories.id
+Ref: journal_entries.recurring_expense_id > recurring_expenses.id
