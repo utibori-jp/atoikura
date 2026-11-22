@@ -30,6 +30,17 @@ body {
   color: var(--ink);
 }
 
+/* Block pinch and double-tap zoom so the fixed mobile tab bar never slides out
+   of the visual viewport. iOS Safari ignores maximum-scale for user gestures,
+   so touch-action is what actually stops pinch zoom there. Applied to every
+   element because nested scroll containers (e.g. <main>) reset the inherited
+   touch-action chain. */
+*,
+*::before,
+*::after {
+  touch-action: pan-x pan-y;
+}
+
 #root {
   height: 100%;
   display: flex;

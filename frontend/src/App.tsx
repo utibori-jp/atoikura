@@ -351,7 +351,8 @@ interface MobileTabBarProps {
 
 function MobileTabBar({ active, onChange, onPlusClick, addTone = "coral" }: MobileTabBarProps) {
   return (
-    <div
+    <nav
+      aria-label="メインメニュー"
       style={{
         flexShrink: 0,
         background: T.card,
@@ -361,7 +362,12 @@ function MobileTabBar({ active, onChange, onPlusClick, addTone = "coral" }: Mobi
         justifyContent: "space-around",
         padding: "10px 10px 0",
         paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)",
-        position: "sticky",
+        // Fixed, not sticky: the app shell sets overflowX: hidden, which makes it a
+        // scroll container, so a sticky bar pins to the shell instead of the screen
+        // and drifts off-screen on long pages.
+        position: "fixed",
+        left: 0,
+        right: 0,
         bottom: 0,
         zIndex: 100,
         boxShadow: "0 -8px 24px -16px rgba(80,40,10,0.18)",
@@ -435,7 +441,7 @@ function MobileTabBar({ active, onChange, onPlusClick, addTone = "coral" }: Mobi
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }
 
@@ -610,7 +616,10 @@ function AppContent({
           style={{
             display: "flex",
             flexDirection: "column",
-            minHeight: "100vh",
+            // dvh, not vh: on mobile browsers 100vh is the height with the toolbars
+            // hidden, so while they show the shell overflows the screen and the
+            // bottom of the layout (and the tab bar) is cut off.
+            minHeight: "100dvh",
             background: T.bg,
             overflowX: "hidden",
           }}
@@ -631,7 +640,11 @@ function AppContent({
           <main
             style={{
               flex: 1,
-              padding: is_mobile ? "16px 20px 96px" : "32px 36px",
+              // Mobile bottom padding clears the fixed tab bar, including the
+              // home-indicator safe area it grows by.
+              padding: is_mobile
+                ? "16px 20px calc(96px + env(safe-area-inset-bottom, 0px))"
+                : "32px 36px",
               maxWidth: is_mobile ? undefined : 1280,
               width: "100%",
               margin: "0 auto",
