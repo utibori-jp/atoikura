@@ -44,8 +44,10 @@ describe("App — mobile layout (≤ 1023 px)", () => {
     expect(screen.getByRole("button", { name: /仕訳/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /予算/ })).toBeInTheDocument();
 
-    // Desktop <nav> element must not be present
-    expect(document.querySelector("nav")).not.toBeInTheDocument();
+    // The only <nav> is the mobile tab bar; the desktop header nav must not be present
+    const navigation_elements = screen.getAllByRole("navigation");
+    expect(navigation_elements).toHaveLength(1);
+    expect(navigation_elements[0]).toHaveAccessibleName("メインメニュー");
   });
 
   it("opens EntrySheet when FAB is clicked", async () => {
